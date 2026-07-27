@@ -118,6 +118,10 @@ export default function MoreScreen() {
     router.push({ params: { phone }, pathname: '/profile' });
   };
 
+  const handleOpenAddresses = () => {
+    router.push({ params: { phone }, pathname: '/saved-addresses' });
+  };
+
   const comingSoon = (title: string) => Alert.alert(title, t('comingSoon'));
 
   const handleLogout = () => {
@@ -180,6 +184,12 @@ export default function MoreScreen() {
               icon="person-circle-outline"
               label={t('manageProfile')}
               onPress={handleOpenProfile}
+            />
+            <Divider />
+            <Row
+              icon="location-outline"
+              label="Saved Addresses"
+              onPress={handleOpenAddresses}
             />
             <Divider />
             <Row
