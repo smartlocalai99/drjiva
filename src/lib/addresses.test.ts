@@ -77,8 +77,17 @@ describe('validateAddress', () => {
     ).toEqual({ customLabel: 'Enter an address label' });
   });
 
+  it('rejects an arbitrary 11-digit phone number', () => {
+    expect(validateAddress({ ...homeDraft, phone: '19876543210' })).toEqual({
+      phone: 'Enter a valid 10-digit phone number',
+    });
+  });
+
   it('accepts a complete delivery address', () => {
     expect(validateAddress(homeDraft)).toEqual({});
+    expect(validateAddress({ ...homeDraft, phone: '+91 98765 43210' })).toEqual(
+      {},
+    );
   });
 });
 

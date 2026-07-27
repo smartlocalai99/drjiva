@@ -77,11 +77,15 @@ function isSavedAddress(value: unknown): value is SavedAddress {
 
 export function validateAddress(draft: AddressDraft): AddressErrors {
   const errors: AddressErrors = {};
+  const phoneDigits = digits(draft.phone);
+  const hasValidPhone =
+    phoneDigits.length === 10 ||
+    (phoneDigits.length === 12 && phoneDigits.startsWith('91'));
 
   if (!draft.recipientName.trim()) {
     errors.recipientName = 'Enter recipient name';
   }
-  if (digits(draft.phone).slice(-10).length !== 10) {
+  if (!hasValidPhone) {
     errors.phone = 'Enter a valid 10-digit phone number';
   }
   if (!draft.building.trim()) {
