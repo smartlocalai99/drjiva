@@ -1,0 +1,536 @@
+import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { MedicineToggle } from '../src/components/dashboard/MedicineToggle';
+import { PressableScale } from '../src/components/PressableScale';
+import {
+  dashboardColors,
+  dashboardRadii,
+  dashboardSpacing,
+  dashboardTypography,
+} from '../src/dashboardTheme';
+import { getPatientByPhone, updatePatientProfile } from '../src/lib/patients';
+import {
+  getCachedPatientName,
+  saveCachedPatientName,
+} from '../src/lib/session';
+
+const GENDER_OPTIONS = ['Male', 'Female', 'Other'] as const;
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return '?';
+  }
+  const first = parts[0]?.[0] ?? '';
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+  return `${first}${last}`.toUpperCase();
+}
+
+export default function ProfileScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ phone?: string | string[] }>();
+  const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
+  const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [savedAt, setSavedAt] = useState<number | undefined>();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState<string | null>(null);
+  const [address, setAddress] = useState('');
+
+  useEffect(() => {
+    if (!phone) {
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPatient = async () => {
+      const cachedName = await getCachedPatientName(phone).catch(() => null);
+      if (!cancelled && cachedName) {
+        setName(cachedName);
+      }
+
+      try {
+        const patient = await getPatientByPhone(phone);
+        if (cancelled || !patient) {
+          return;
+        }
+        setName(patient.name);
+        setAge(patient.age != null ? String(patient.age) : '');
+        setGender(patient.gender);
+        setAddress(patient.address ?? '');
+        void saveCachedPatientName(phone, patient.name).catch(
+          () => undefined,
+        );
+      } catch {
+        // Keep any cached name visible if the profile refresh fails.
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadPatient();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phone]);
+
+  const trimmedName = name.trim();
+  const isNameValid = trimmedName.length >= 2;
+
+  const handleSave = async () => {
+    if (!isNameValid || isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(undefined);
+
+    const parsedAge = age.trim() ? Number.parseInt(age, 10) : null;
+
+    try {
+      const patient = await updatePatientProfile(phone, {
+        address: address.trim() || null,
+        age: Number.isNaN(parsedAge) ? null : parsedAge,
+        gender,
+        name: trimmedName,
+      });
+      await saveCachedPatientName(phone, patient.name).catch(() => undefined);
+      setSavedAt(Date.now());
+    } catch {
+      setErrorMessage('Unable to save your changes. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <View style={styles.header}>
+        <Pressable
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          hitSlop={12}
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons color={dashboardColors.text} name="chevron-back" size={24} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <View style={styles.backButton} />
+      </View>
+
+      {isLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={dashboardColors.primary} />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.flex}
+        >
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.avatarCard}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarInitials}>
+                  {getInitials(name || '?')}
+                </Text>
+              </View>
+              <Text style={styles.avatarName}>{name || 'Your name'}</Text>
+              <View style={styles.phoneRow}>
+                <Text style={styles.phoneText}>+91 {phone}</Text>
+                <Ionicons
+                  color={dashboardColors.success}
+                  name="checkmark-circle"
+                  size={16}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.sectionLabel}>Personal Details</Text>
+            <View style={styles.card}>
+              <Field label="Name">
+                <TextInput
+                  onChangeText={(value) => {
+                    setName(value);
+                    setSavedAt(undefined);
+                  }}
+                  placeholder="Enter your name"
+                  placeholderTextColor={dashboardColors.textFaint}
+                  style={styles.input}
+                  value={name}
+                />
+              </Field>
+
+              <Divider />
+
+              <Field label="Age">
+                <TextInput
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  onChangeText={(value) => {
+                    setAge(value.replace(/\D/g, ''));
+                    setSavedAt(undefined);
+                  }}
+                  placeholder="Add your age"
+                  placeholderTextColor={dashboardColors.textFaint}
+                  style={styles.input}
+                  value={age}
+                />
+              </Field>
+
+              <Divider />
+
+              <View style={styles.fieldColumn}>
+                <Text style={styles.fieldLabel}>Gender</Text>
+                <View style={styles.genderRow}>
+                  {GENDER_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option}
+                      onPress={() => {
+                        setGender(option);
+                        setSavedAt(undefined);
+                      }}
+                      style={[
+                        styles.genderChip,
+                        gender === option && styles.genderChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.genderChipText,
+                          gender === option && styles.genderChipTextActive,
+                        ]}
+                      >
+                        {option}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <Divider />
+
+              <View style={styles.fieldColumn}>
+                <Text style={styles.fieldLabel}>Address</Text>
+                <TextInput
+                  multiline
+                  numberOfLines={3}
+                  onChangeText={(value) => {
+                    setAddress(value);
+                    setSavedAt(undefined);
+                  }}
+                  placeholder="Add your delivery address"
+                  placeholderTextColor={dashboardColors.textFaint}
+                  style={[styles.input, styles.addressInput]}
+                  value={address}
+                />
+              </View>
+            </View>
+
+            {errorMessage ? (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            ) : null}
+
+            <PressableScale
+              accessibilityLabel="Save changes"
+              disabled={!isNameValid || isSaving}
+              onPress={handleSave}
+              pressedScale={0.98}
+              style={[
+                styles.saveButton,
+                (!isNameValid || isSaving) && styles.saveButtonDisabled,
+              ]}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveButtonText}>
+                  {savedAt ? 'Saved ✓' : 'Save changes'}
+                </Text>
+              )}
+            </PressableScale>
+
+            <Text style={styles.sectionLabel}>Preferences</Text>
+            <View style={styles.card}>
+              <View style={styles.row}>
+                <Ionicons
+                  color={dashboardColors.text}
+                  name="notifications-outline"
+                  size={20}
+                />
+                <Text style={styles.rowLabel}>Notifications</Text>
+                <View style={styles.rowSpacer} />
+                <MedicineToggle
+                  onValueChange={() => setNotificationsEnabled((v) => !v)}
+                  value={notificationsEnabled}
+                />
+              </View>
+              <Divider />
+              <Pressable
+                onPress={() => Alert.alert('Language', 'Coming soon.')}
+                style={styles.row}
+              >
+                <Ionicons color={dashboardColors.text} name="language-outline" size={20} />
+                <Text style={styles.rowLabel}>Language</Text>
+                <View style={styles.rowSpacer} />
+                <Text style={styles.rowValue}>English</Text>
+                <Ionicons color={dashboardColors.textFaint} name="chevron-forward" size={18} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.sectionLabel}>Support</Text>
+            <View style={styles.card}>
+              <Pressable
+                onPress={() => Alert.alert('Help Center', 'Coming soon.')}
+                style={styles.row}
+              >
+                <Ionicons
+                  color={dashboardColors.text}
+                  name="help-circle-outline"
+                  size={20}
+                />
+                <Text style={styles.rowLabel}>Help Center</Text>
+                <View style={styles.rowSpacer} />
+                <Ionicons color={dashboardColors.textFaint} name="chevron-forward" size={18} />
+              </Pressable>
+              <Divider />
+              <Pressable
+                onPress={() =>
+                  Alert.alert(
+                    'About DrJiva',
+                    `Version ${Constants.expoConfig?.version ?? '1.0.0'}`,
+                  )
+                }
+                style={styles.row}
+              >
+                <Ionicons
+                  color={dashboardColors.text}
+                  name="information-circle-outline"
+                  size={20}
+                />
+                <Text style={styles.rowLabel}>About DrJiva</Text>
+                <View style={styles.rowSpacer} />
+                <Ionicons color={dashboardColors.textFaint} name="chevron-forward" size={18} />
+              </Pressable>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function Field({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <View style={styles.fieldColumn}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: dashboardColors.bg,
+    flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: dashboardSpacing.pagePadding,
+    paddingVertical: dashboardSpacing.sm,
+  },
+  backButton: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  headerTitle: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+  },
+  loading: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  content: {
+    paddingBottom: dashboardSpacing.xxl,
+    paddingHorizontal: dashboardSpacing.pagePadding,
+  },
+  avatarCard: {
+    alignItems: 'center',
+    marginTop: dashboardSpacing.sm,
+    marginBottom: dashboardSpacing.xl,
+  },
+  avatar: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primary,
+    borderRadius: 40,
+    height: 80,
+    justifyContent: 'center',
+    marginBottom: dashboardSpacing.sm,
+    width: 80,
+  },
+  avatarInitials: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 28,
+  },
+  avatarName: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+  },
+  phoneRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  phoneText: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+  },
+  sectionLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    marginBottom: dashboardSpacing.sm,
+    marginTop: dashboardSpacing.gap,
+    textTransform: 'uppercase',
+  },
+  card: {
+    backgroundColor: dashboardColors.card,
+    borderRadius: dashboardRadii.card,
+    paddingHorizontal: dashboardSpacing.gap,
+    shadowColor: dashboardColors.shadow,
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+  },
+  fieldColumn: {
+    paddingVertical: dashboardSpacing.md,
+  },
+  fieldLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    marginBottom: 4,
+  },
+  input: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontSize: 16,
+    padding: 0,
+  },
+  addressInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    marginTop: 4,
+  },
+  genderChip: {
+    backgroundColor: dashboardColors.bg,
+    borderRadius: dashboardRadii.pill,
+    paddingHorizontal: dashboardSpacing.md,
+    paddingVertical: 8,
+  },
+  genderChipActive: {
+    backgroundColor: dashboardColors.primaryTint,
+  },
+  genderChipText: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+    fontSize: 14,
+  },
+  genderChipTextActive: {
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  divider: {
+    backgroundColor: dashboardColors.track,
+    height: 1,
+  },
+  errorText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.error,
+    marginTop: dashboardSpacing.sm,
+    textAlign: 'center',
+  },
+  saveButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.button,
+    height: 52,
+    justifyContent: 'center',
+    marginTop: dashboardSpacing.gap,
+  },
+  saveButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveButtonText: {
+    ...dashboardTypography.button,
+    color: '#FFFFFF',
+  },
+  row: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    paddingVertical: 14,
+  },
+  rowLabel: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontSize: 15,
+  },
+  rowSpacer: {
+    flex: 1,
+  },
+  rowValue: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textFaint,
+    fontSize: 14,
+    marginRight: 4,
+  },
+});
