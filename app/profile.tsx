@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MedicineToggle } from '../src/components/dashboard/MedicineToggle';
 import { PressableScale } from '../src/components/PressableScale';
+import { VerifiedBadge } from '../src/components/VerifiedBadge';
 import {
   dashboardColors,
   dashboardRadii,
@@ -169,11 +170,7 @@ export default function ProfileScreen() {
               <Text style={styles.avatarName}>{name || 'Your name'}</Text>
               <View style={styles.phoneRow}>
                 <Text style={styles.phoneText}>+91 {phone}</Text>
-                <Ionicons
-                  color={dashboardColors.success}
-                  name="checkmark-circle"
-                  size={16}
-                />
+                <VerifiedBadge />
               </View>
             </View>
 

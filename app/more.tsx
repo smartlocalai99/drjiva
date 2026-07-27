@@ -17,6 +17,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
+import { VerifiedBadge } from '../src/components/VerifiedBadge';
 import {
   dashboardColors,
   dashboardLayout,
@@ -122,6 +123,10 @@ export default function MoreScreen() {
     router.push({ params: { phone }, pathname: '/saved-addresses' });
   };
 
+  const handleOpenSupport = () => {
+    router.push({ params: { phone }, pathname: '/support' });
+  };
+
   const comingSoon = (title: string) => Alert.alert(title, t('comingSoon'));
 
   const handleLogout = () => {
@@ -171,11 +176,7 @@ export default function MoreScreen() {
             <Text style={styles.avatarName}>{name || 'Your name'}</Text>
             <View style={styles.phoneRow}>
               <Text style={styles.phoneText}>+91 {phone}</Text>
-              <Ionicons
-                color={dashboardColors.success}
-                name="checkmark-circle"
-                size={16}
-              />
+              <VerifiedBadge />
             </View>
           </View>
 
@@ -221,9 +222,9 @@ export default function MoreScreen() {
 
           <Section label={t('support')}>
             <Row
-              icon="help-circle-outline"
-              label={t('helpCenter')}
-              onPress={() => comingSoon(t('helpCenter'))}
+              icon="headset-outline"
+              label="Support"
+              onPress={handleOpenSupport}
             />
             <Divider />
             <Row
