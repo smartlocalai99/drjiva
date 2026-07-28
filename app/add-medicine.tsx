@@ -27,13 +27,14 @@ import {
 import {
   createCustomHospital,
   createMedicineCourse,
+  fetchMedicineCatalogue,
   fetchVerifiedHospitals,
   getNotificationSettings,
   saveNotificationIds,
   rollbackMedicineCourse,
-  searchMedicines,
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
+import { filterMedicineCatalogue } from '../src/lib/medicineSearch';
 import {
   cancelDoseNotifications,
   requestMedicineNotificationPermission,
@@ -75,7 +76,8 @@ export default function AddMedicineScreen() {
   const [customHospitalName, setCustomHospitalName] = useState('');
   const [isCustomHospital, setIsCustomHospital] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<MedicineCatalogueItem[]>([]);
+  const [catalogue, setCatalogue] = useState<MedicineCatalogueItem[]>([]);
+  const [isLoadingCatalogue, setIsLoadingCatalogue] = useState(false);
   const [medicine, setMedicine] = useState<MedicineCatalogueItem | null>(null);
   const [tablets, setTablets] = useState('1');
   const [days, setDays] = useState('7');
@@ -96,20 +98,42 @@ export default function AddMedicineScreen() {
   }, [phone, t]);
 
   useEffect(() => {
-    if (workflow.step !== 'medicine' || query.trim().length < 2) {
-      setResults([]);
+    if (workflow.step !== 'medicine') {
       return;
     }
-    const timer = setTimeout(() => {
-      void searchMedicines(
-        query,
-        isCustomHospital ? undefined : workflow.hospitalId,
-      )
-        .then(setResults)
-        .catch(() => setResults([]));
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [isCustomHospital, query, workflow.hospitalId, workflow.step]);
+
+    let cancelled = false;
+    setCatalogue([]);
+    setIsLoadingCatalogue(true);
+
+    void fetchMedicineCatalogue(
+      isCustomHospital ? undefined : workflow.hospitalId,
+    )
+      .then((items) => {
+        if (!cancelled) {
+          setCatalogue(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCatalogue([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingCatalogue(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCustomHospital, workflow.hospitalId, workflow.step]);
+
+  const results = useMemo(
+    () => filterMedicineCatalogue(catalogue, query),
+    [catalogue, query],
+  );
 
   const hospitalName = useMemo(
     () =>
@@ -269,27 +293,84 @@ export default function AddMedicineScreen() {
             <Animated.View entering={FadeIn} style={styles.stack}>
               <Text style={styles.eyebrow}>{hospitalName}</Text>
               <Text style={styles.heading}>{t('findMedicine')}</Text>
-              <TextInput
-                autoFocus
-                onChangeText={setQuery}
-                placeholder={t('searchMedicine')}
-                style={styles.textInput}
-                value={query}
-              />
-              {results.map((item) => (
-                <PressableScale
-                  key={item.id}
-                  onPress={() => {
-                    setMedicine(item);
-                    dispatch({ medicineId: item.id, type: 'selectMedicine' });
-                  }}
-                  style={styles.medicineRow}
-                >
-                  <Image source={{ uri: item.imageUrl }} style={styles.thumb} />
-                  <Text numberOfLines={2} style={styles.choiceText}>{item.name}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={dashboardColors.textFaint} />
-                </PressableScale>
-              ))}
+              <View style={styles.searchBox}>
+                <Ionicons
+                  color={dashboardColors.textFaint}
+                  name="search"
+                  size={20}
+                />
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                  onChangeText={setQuery}
+                  placeholder={t('searchMedicine')}
+                  placeholderTextColor={dashboardColors.textFaint}
+                  style={styles.searchInput}
+                  value={query}
+                />
+                {query ? (
+                  <PressableScale
+                    accessibilityLabel="Clear medicine search"
+                    onPress={() => setQuery('')}
+                    style={styles.clearSearch}
+                  >
+                    <Ionicons
+                      color={dashboardColors.textFaint}
+                      name="close-circle"
+                      size={20}
+                    />
+                  </PressableScale>
+                ) : null}
+              </View>
+              <View style={styles.dropdown}>
+                {isLoadingCatalogue ? (
+                  <ActivityIndicator
+                    color={dashboardColors.primary}
+                    style={styles.dropdownLoading}
+                  />
+                ) : null}
+                {!isLoadingCatalogue
+                  ? results.map((item) => (
+                      <PressableScale
+                        key={item.id}
+                        onPress={() => {
+                          setMedicine(item);
+                          setQuery(item.name);
+                          dispatch({
+                            medicineId: item.id,
+                            type: 'selectMedicine',
+                          });
+                        }}
+                        style={styles.medicineRow}
+                      >
+                        {item.imageUrl ? (
+                          <Image
+                            contentFit="cover"
+                            source={{ uri: item.imageUrl }}
+                            style={styles.thumb}
+                          />
+                        ) : (
+                          <View style={styles.thumbFallback}>
+                            <Ionicons
+                              color={dashboardColors.primary}
+                              name="medical"
+                              size={22}
+                            />
+                          </View>
+                        )}
+                        <Text numberOfLines={2} style={styles.choiceText}>
+                          {item.name}
+                        </Text>
+                        <Ionicons
+                          color={dashboardColors.textFaint}
+                          name="chevron-forward"
+                          size={18}
+                        />
+                      </PressableScale>
+                    ))
+                  : null}
+              </View>
             </Animated.View>
           ) : null}
 
@@ -328,7 +409,21 @@ export default function AddMedicineScreen() {
 
           {workflow.step === 'review' && medicine ? (
             <Animated.View entering={FadeIn} style={styles.stack}>
-              <Image source={{ uri: medicine.imageUrl }} style={styles.hero} />
+              {medicine.imageUrl ? (
+                <Image
+                  contentFit="cover"
+                  source={{ uri: medicine.imageUrl }}
+                  style={styles.hero}
+                />
+              ) : (
+                <View style={[styles.hero, styles.heroFallback]}>
+                  <Ionicons
+                    color={dashboardColors.primary}
+                    name="medical"
+                    size={54}
+                  />
+                </View>
+              )}
               <Text style={styles.heading}>{medicine.name}</Text>
               <Text style={styles.summary}>{hospitalName}</Text>
               <Text style={styles.summary}>
@@ -382,12 +477,19 @@ const styles = StyleSheet.create({
   heading: { ...dashboardTypography.title, color: dashboardColors.text, textAlign: 'center' },
   eyebrow: { ...dashboardTypography.caption, color: dashboardColors.primary, textAlign: 'center' },
   textInput: { ...dashboardTypography.body, backgroundColor: dashboardColors.card, borderColor: dashboardColors.track, borderRadius: 16, borderWidth: 1, color: dashboardColors.text, padding: 15 },
+  searchBox: { alignItems: 'center', backgroundColor: dashboardColors.card, borderColor: dashboardColors.primary, borderRadius: 16, borderWidth: 1.5, flexDirection: 'row', gap: 10, paddingHorizontal: 14 },
+  searchInput: { ...dashboardTypography.body, color: dashboardColors.text, flex: 1, paddingVertical: 15 },
+  clearSearch: { alignItems: 'center', height: 36, justifyContent: 'center', width: 36 },
+  dropdown: { backgroundColor: dashboardColors.card, borderColor: dashboardColors.track, borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  dropdownLoading: { paddingVertical: 24 },
   choice: { alignItems: 'center', backgroundColor: dashboardColors.card, borderRadius: 18, flexDirection: 'row', gap: 12, padding: 15 },
   choiceText: { ...dashboardTypography.body, color: dashboardColors.text, flex: 1 },
   disabled: { opacity: 0.45 },
-  medicineRow: { alignItems: 'center', backgroundColor: dashboardColors.card, borderRadius: 18, flexDirection: 'row', gap: 12, padding: 10 },
+  medicineRow: { alignItems: 'center', borderBottomColor: dashboardColors.track, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, padding: 10 },
   thumb: { borderRadius: 12, height: 58, width: 68 },
+  thumbFallback: { alignItems: 'center', backgroundColor: dashboardColors.primaryTint, borderRadius: 12, height: 58, justifyContent: 'center', width: 68 },
   hero: { borderRadius: dashboardRadii.card, height: 210, width: '100%' },
+  heroFallback: { alignItems: 'center', backgroundColor: dashboardColors.primaryTint, justifyContent: 'center' },
   label: { ...dashboardTypography.caption, color: dashboardColors.textMuted, marginBottom: 5 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: dashboardColors.card, borderColor: dashboardColors.track, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },

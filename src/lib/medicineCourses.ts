@@ -1,4 +1,4 @@
-import { matchesMedicineSearch, normalizeMedicineSearch } from './medicineSearch';
+import { normalizeMedicineSearch } from './medicineSearch';
 import type { DayPattern, DoseSlot, DraftDoseEvent } from './medicineSchedule';
 import { createCourseWithRepository } from './medicineCourseRepository';
 import { ensureSecureReportSession } from './reportAuth';
@@ -8,7 +8,7 @@ export type MedicineCatalogueItem = {
   hospitalId: string | null;
   hospitalName: string;
   id: string;
-  imageUrl: string;
+  imageUrl: string | null;
   name: string;
 };
 
@@ -36,38 +36,27 @@ export async function fetchVerifiedHospitals() {
   return (data ?? []) as { id: string; name: string }[];
 }
 
-export async function searchMedicines(
-  query: string,
+export async function fetchMedicineCatalogue(
   hospitalId?: string,
 ): Promise<MedicineCatalogueItem[]> {
-  const normalized = normalizeMedicineSearch(query);
-  if (normalized.length < 2) return [];
-  const candidate = normalized.split(' ')[0]!.replace(/[%_,()]/g, '');
   let request = supabase
     .from('medicines')
     .select('id, name, image_url, hospital_id, hospital_name')
-    .not('image_url', 'is', null)
-    .ilike('name', `%${candidate}%`)
-    .limit(40);
+    .order('name')
+    .limit(1000);
   if (hospitalId) request = request.eq('hospital_id', hospitalId);
   const { data, error } = await request;
   if (error) throw error;
-  return ((data ?? []) as Array<Record<string, unknown>>)
-    .filter(
-      (row) =>
-        typeof row.image_url === 'string' &&
-        row.image_url.trim() &&
-        matchesMedicineSearch(String(row.name ?? ''), normalized),
-    )
-    .slice(0, 20)
-    .map((row) => ({
-      hospitalId:
-        typeof row.hospital_id === 'string' ? row.hospital_id : null,
-      hospitalName: String(row.hospital_name ?? ''),
-      id: String(row.id),
-      imageUrl: String(row.image_url).trim(),
-      name: String(row.name),
-    }));
+  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    hospitalId: typeof row.hospital_id === 'string' ? row.hospital_id : null,
+    hospitalName: String(row.hospital_name ?? ''),
+    id: String(row.id),
+    imageUrl:
+      typeof row.image_url === 'string' && row.image_url.trim()
+        ? row.image_url.trim()
+        : null,
+    name: String(row.name),
+  }));
 }
 
 export async function getNotificationSettings(

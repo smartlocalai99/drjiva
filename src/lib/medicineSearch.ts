@@ -17,3 +17,44 @@ export function matchesMedicineSearch(name: string, query: string): boolean {
     .split(' ')
     .every((token) => normalizedName.includes(token));
 }
+
+type NamedMedicine = {
+  name: string;
+};
+
+function medicineSearchRank(name: string, query: string): number {
+  const normalizedName = normalizeMedicineSearch(name);
+  if (normalizedName === query) {
+    return 0;
+  }
+  if (normalizedName.startsWith(query)) {
+    return 1;
+  }
+  if (normalizedName.split(' ').some((word) => word.startsWith(query))) {
+    return 2;
+  }
+  return 3;
+}
+
+export function filterMedicineCatalogue<T extends NamedMedicine>(
+  medicines: readonly T[],
+  query: string,
+  limit = 20,
+): T[] {
+  const normalizedQuery = normalizeMedicineSearch(query);
+  const matches = normalizedQuery
+    ? medicines.filter((medicine) =>
+        matchesMedicineSearch(medicine.name, normalizedQuery),
+      )
+    : [...medicines];
+
+  if (normalizedQuery) {
+    matches.sort(
+      (left, right) =>
+        medicineSearchRank(left.name, normalizedQuery) -
+        medicineSearchRank(right.name, normalizedQuery),
+    );
+  }
+
+  return matches.slice(0, limit);
+}

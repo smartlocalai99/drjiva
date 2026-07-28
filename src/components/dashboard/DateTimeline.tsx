@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -201,11 +200,7 @@ function DateSlot({ date, isSelected, isToday, onPress }: DateSlotProps) {
         {formatWeekdayShort(date).toUpperCase()}
       </Text>
       <Animated.View
-        style={[
-          styles.circle,
-          isEmphasized ? styles.circleSelected : styles.circleUnselected,
-          circleStyle,
-        ]}
+        style={[styles.circle, styles.circleUnselected, circleStyle]}
       >
         {marker === 'selected-gradient' ? (
           <LinearGradient
@@ -218,6 +213,7 @@ function DateSlot({ date, isSelected, isToday, onPress }: DateSlotProps) {
         {marker === 'today-streak' ? (
           <Image
             contentFit="contain"
+            contentPosition="center"
             source={streakIconSource}
             style={styles.streakMarker}
           />
@@ -274,22 +270,6 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  circleSelected: {
-    ...Platform.select({
-      android: {
-        elevation: 6,
-      },
-      ios: {
-        shadowColor: '#F97316',
-        shadowOffset: { height: 4, width: 0 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-      },
-      web: {
-        boxShadow: '0 4px 14px #F9731659',
-      },
-    }),
-  },
   circleUnselected: {
     backgroundColor: 'transparent',
   },
@@ -301,9 +281,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   dateNumberOnStreak: {
-    textShadowColor: '#9A3412',
-    textShadowOffset: { height: 1, width: 0 },
-    textShadowRadius: 2,
     zIndex: 1,
   },
   dateNumberUnselected: {
@@ -323,7 +300,9 @@ const styles = StyleSheet.create({
   },
   streakMarker: {
     height: dashboardLayout.dateCircleSize + 8,
+    left: -4,
     position: 'absolute',
+    top: -4,
     width: dashboardLayout.dateCircleSize + 8,
   },
 });
