@@ -1,4 +1,7 @@
-import type { ReportType } from './documentClassifier';
+import type {
+  HospitalOption,
+  ReportType,
+} from './documentClassifier';
 
 export type PatientReportRow = {
   created_at: string;
@@ -20,6 +23,12 @@ export type PatientReport = {
   patientId: string;
   reportType: ReportType | null;
   storagePath: string | null;
+};
+
+export type PatientReportHospitalGroup = {
+  hospitalId: string | null;
+  hospitalName: string;
+  reports: PatientReport[];
 };
 
 const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -70,4 +79,42 @@ export function mapPatientReportRow(row: PatientReportRow): PatientReport {
     reportType: row.report_type,
     storagePath: row.storage_path,
   };
+}
+
+export function groupPatientReportsByHospital(
+  reports: PatientReport[],
+  hospitals: HospitalOption[],
+): PatientReportHospitalGroup[] {
+  const hospitalNames = new Map(
+    hospitals.map((hospital) => [hospital.id, hospital.name]),
+  );
+  const groups = new Map<string, PatientReportHospitalGroup>();
+
+  for (const report of reports) {
+    const key = report.hospitalId ?? 'unknown';
+    const group = groups.get(key) ?? {
+      hospitalId: report.hospitalId,
+      hospitalName: report.hospitalId
+        ? hospitalNames.get(report.hospitalId) ?? 'Hospital'
+        : 'Other hospital',
+      reports: [],
+    };
+    group.reports.push(report);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      reports: [...group.reports].sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime(),
+      ),
+    }))
+    .sort(
+      (left, right) =>
+        new Date(right.reports[0]!.createdAt).getTime() -
+        new Date(left.reports[0]!.createdAt).getTime(),
+    );
 }

@@ -1,6 +1,7 @@
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
+import { PermissionsAndroid, Platform } from 'react-native';
 import DocumentScanner, {
   ResponseType,
   ScanDocumentResponseStatus,
@@ -11,6 +12,10 @@ import {
   scanReportPages,
   type DocumentScannerAdapter,
 } from './documentCapture';
+import {
+  requestDocumentCameraPermission,
+  type CameraPermissionResult,
+} from './documentPermission';
 
 const nativeScanner: DocumentScannerAdapter = {
   async scanDocument(options) {
@@ -38,6 +43,13 @@ function temporaryImageName(): string {
 
 export function scanDocuments(): Promise<string[] | null> {
   return scanReportPages(nativeScanner);
+}
+
+export function requestDocumentCameraAccess(): Promise<CameraPermissionResult> {
+  return requestDocumentCameraPermission(Platform.OS, {
+    request: () =>
+      PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA),
+  });
 }
 
 export async function recognizeFirstPage(base64Page: string): Promise<string> {

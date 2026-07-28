@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPatientReportInsert,
   buildReportStoragePath,
+  groupPatientReportsByHospital,
   mapPatientReportRow,
 } from './patientReportModel';
 
@@ -62,5 +63,45 @@ describe('mapPatientReportRow', () => {
       reportType: 'Lab Report',
       storagePath: 'user-1/patient-1/document-1.pdf',
     });
+  });
+});
+
+describe('groupPatientReportsByHospital', () => {
+  it('groups reports into named hospital folders with newest first', () => {
+    const base = {
+      hospitalId: 'hospital-1',
+      label: null,
+      pageCount: 1,
+      patientId: 'patient-1',
+      reportType: null,
+      storagePath: null,
+    } as const;
+
+    expect(
+      groupPatientReportsByHospital(
+        [
+          {
+            ...base,
+            createdAt: '2026-07-27T12:00:00.000Z',
+            id: 'older',
+          },
+          {
+            ...base,
+            createdAt: '2026-07-28T12:00:00.000Z',
+            id: 'newer',
+          },
+        ],
+        [{ id: 'hospital-1', name: 'Medico Hospital' }],
+      ),
+    ).toEqual([
+      {
+        hospitalId: 'hospital-1',
+        hospitalName: 'Medico Hospital',
+        reports: [
+          expect.objectContaining({ id: 'newer' }),
+          expect.objectContaining({ id: 'older' }),
+        ],
+      },
+    ]);
   });
 });

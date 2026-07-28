@@ -19,6 +19,7 @@ import {
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
 import { DocumentReviewSheet } from '../src/components/documents/DocumentReviewSheet';
+import { HospitalFolderList } from '../src/components/documents/HospitalFolderList';
 import { ReportList } from '../src/components/documents/ReportList';
 import { PressableScale } from '../src/components/PressableScale';
 import {
@@ -37,9 +38,11 @@ import { getDocumentPrimaryAction } from '../src/lib/documentMenu';
 import {
   createReportPdf,
   recognizeFirstPage,
+  requestDocumentCameraAccess,
   scanDocuments,
 } from '../src/lib/documentScanner';
 import { getTabRoute } from '../src/lib/dashboardNav';
+import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
   createPatientReportSignedUrl,
@@ -47,7 +50,10 @@ import {
   fetchPatientReports,
   uploadPatientReport,
 } from '../src/lib/patientReports';
-import type { PatientReport } from '../src/lib/patientReportModel';
+import {
+  groupPatientReportsByHospital,
+  type PatientReport,
+} from '../src/lib/patientReportModel';
 import { ensureSecureReportSession } from '../src/lib/reportAuth';
 
 const FILTERS = ['All', 'Recent'] as const;
@@ -55,6 +61,7 @@ type Filter = (typeof FILTERS)[number];
 
 export default function DocumentsScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
@@ -77,6 +84,8 @@ export default function DocumentsScreen() {
   const [patientId, setPatientId] = useState<string | null>(null);
   const [reports, setReports] = useState<PatientReport[]>([]);
   const [reviewVisible, setReviewVisible] = useState(false);
+  const [selectedHospitalKey, setSelectedHospitalKey] =
+    useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
     if (!phone) {
@@ -119,6 +128,15 @@ export default function DocumentsScreen() {
       (report) => new Date(report.createdAt).getTime() >= recentBoundary,
     );
   }, [filter, reports]);
+  const reportGroups = useMemo(
+    () => groupPatientReportsByHospital(visibleReports, hospitals),
+    [hospitals, visibleReports],
+  );
+  const selectedGroup =
+    reportGroups.find(
+      (group) =>
+        (group.hospitalId ?? 'unknown') === selectedHospitalKey,
+    ) ?? null;
 
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const addButtonBottomOffset =
@@ -152,6 +170,29 @@ export default function DocumentsScreen() {
 
     setIsScanning(true);
     try {
+      const cameraPermission = await requestDocumentCameraAccess();
+      if (cameraPermission === 'blocked') {
+        Alert.alert(
+          'Camera permission required',
+          'Allow camera access in Settings to scan medical documents.',
+          [
+            { style: 'cancel', text: 'Not now' },
+            {
+              onPress: () => void Linking.openSettings(),
+              text: 'Open Settings',
+            },
+          ],
+        );
+        return;
+      }
+      if (cameraPermission === 'denied') {
+        Alert.alert(
+          'Camera permission required',
+          'Allow camera access to scan a medical document.',
+        );
+        return;
+      }
+
       const pages = await scanDocuments();
       if (!pages) {
         return;
@@ -230,7 +271,7 @@ export default function DocumentsScreen() {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.headerSide} />
-        <Text style={styles.headerTitle}>Documents</Text>
+        <Text style={styles.headerTitle}>{t('documents')}</Text>
         <View style={styles.headerSide} />
       </View>
 
@@ -251,35 +292,62 @@ export default function DocumentsScreen() {
             />
           </View>
           <View style={styles.introBody}>
-            <Text style={styles.introTitle}>Private medical PDFs</Text>
+            <Text style={styles.introTitle}>{t('privateMedicalPdfs')}</Text>
             <Text style={styles.introText}>
-              Scanning and document recognition happen on this device.
+              {t('scanOnDevice')}
             </Text>
           </View>
         </View>
 
-        <View style={styles.filterRow}>
-          {FILTERS.map((option) => (
+        {selectedGroup ? (
+          <View style={styles.folderHeader}>
             <PressableScale
-              key={option}
-              onPress={() => setFilter(option)}
-              pressedScale={0.95}
-              style={[
-                styles.filterChip,
-                filter === option && styles.filterChipActive,
-              ]}
+              accessibilityLabel="Back to hospitals"
+              onPress={() => setSelectedHospitalKey(null)}
+              style={styles.backButton}
             >
-              <Text
+              <Ionicons
+                color={dashboardColors.text}
+                name="chevron-back"
+                size={20}
+              />
+            </PressableScale>
+            <View style={styles.folderHeaderBody}>
+              <Text numberOfLines={1} style={styles.folderTitle}>
+                {selectedGroup.hospitalName}
+              </Text>
+              <Text style={styles.folderSubtitle}>
+                {selectedGroup.reports.length}{' '}
+                {selectedGroup.reports.length === 1
+                  ? t('document')
+                  : t('documentPlural')}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.filterRow}>
+            {FILTERS.map((option) => (
+              <PressableScale
+                key={option}
+                onPress={() => setFilter(option)}
+                pressedScale={0.95}
                 style={[
-                  styles.filterChipText,
-                  filter === option && styles.filterChipTextActive,
+                  styles.filterChip,
+                  filter === option && styles.filterChipActive,
                 ]}
               >
-                {option}
-              </Text>
-            </PressableScale>
-          ))}
-        </View>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    filter === option && styles.filterChipTextActive,
+                  ]}
+                >
+                  {option === 'All' ? t('all') : t('recent')}
+                </Text>
+              </PressableScale>
+            ))}
+          </View>
+        )}
 
         {isLoading ? (
           <View style={styles.center}>
@@ -292,19 +360,28 @@ export default function DocumentsScreen() {
               name="cloud-offline-outline"
               size={38}
             />
-            <Text style={styles.emptyTitle}>Documents unavailable</Text>
+            <Text style={styles.emptyTitle}>
+              {t('documentsUnavailable')}
+            </Text>
             <Text style={styles.emptySubtitle}>{errorMessage}</Text>
             <PressableScale onPress={() => void loadDocuments()} style={styles.retry}>
-              <Text style={styles.retryText}>Try again</Text>
+              <Text style={styles.retryText}>{t('tryAgain')}</Text>
             </PressableScale>
           </View>
         ) : visibleReports.length === 0 ? (
           <EmptyDocuments />
-        ) : (
+        ) : selectedGroup ? (
           <ReportList
             hospitals={hospitals}
             onOpen={(report) => void handleOpenReport(report)}
-            reports={visibleReports}
+            reports={selectedGroup.reports}
+          />
+        ) : (
+          <HospitalFolderList
+            groups={reportGroups}
+            onOpen={(group) =>
+              setSelectedHospitalKey(group.hospitalId ?? 'unknown')
+            }
           />
         )}
       </ScrollView>
@@ -312,7 +389,7 @@ export default function DocumentsScreen() {
       <FloatingAddButton
         bottomOffset={addButtonBottomOffset}
         icon={isScanning ? 'hourglass-outline' : action.icon}
-        label={isScanning ? 'Opening scanner…' : action.label}
+        label={isScanning ? t('openingScanner') : t('scanDocument')}
         onPress={() => void handleScan()}
       />
 
@@ -342,6 +419,8 @@ export default function DocumentsScreen() {
 }
 
 function EmptyDocuments() {
+  const { t } = useLanguage();
+
   return (
     <View style={styles.center}>
       <View style={styles.emptyIcon}>
@@ -351,9 +430,9 @@ function EmptyDocuments() {
           size={42}
         />
       </View>
-      <Text style={styles.emptyTitle}>No scanned documents</Text>
+      <Text style={styles.emptyTitle}>{t('noScannedDocuments')}</Text>
       <Text style={styles.emptySubtitle}>
-        Scan a prescription or report and save it as one private PDF.
+        {t('noScannedDocumentsSubtitle')}
       </Text>
     </View>
   );
@@ -410,6 +489,32 @@ const styles = StyleSheet.create({
     color: dashboardColors.primaryDark,
   },
   introText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: 1,
+  },
+  folderHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    marginTop: dashboardSpacing.gap,
+  },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  folderHeaderBody: {
+    flex: 1,
+  },
+  folderTitle: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+  },
+  folderSubtitle: {
     ...dashboardTypography.caption,
     color: dashboardColors.textMuted,
     marginTop: 1,

@@ -8,7 +8,12 @@ export type ReportAuthAdapter = {
   signInAnonymously: () => Promise<ReportAuthResult>;
 };
 
-export async function ensureReportSession(
+const inFlightSessions = new WeakMap<
+  ReportAuthAdapter,
+  Promise<string>
+>();
+
+async function establishReportSession(
   auth: ReportAuthAdapter,
 ): Promise<string> {
   const current = await auth.getUser();
@@ -28,4 +33,23 @@ export async function ensureReportSession(
   }
 
   return created.userId;
+}
+
+export function ensureReportSession(
+  auth: ReportAuthAdapter,
+): Promise<string> {
+  const existing = inFlightSessions.get(auth);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = establishReportSession(auth);
+  inFlightSessions.set(auth, pending);
+  const clear = () => {
+    if (inFlightSessions.get(auth) === pending) {
+      inFlightSessions.delete(auth);
+    }
+  };
+  void pending.then(clear, clear);
+  return pending;
 }

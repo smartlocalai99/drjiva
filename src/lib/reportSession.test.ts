@@ -42,6 +42,18 @@ describe('ensureReportSession', () => {
     expect(adapter.anonymousSignIns).toBe(1);
   });
 
+  it('shares one anonymous sign-in across concurrent callers', async () => {
+    const adapter = createAdapter({ signedInUserId: 'anonymous-user' });
+
+    await expect(
+      Promise.all([
+        ensureReportSession(adapter),
+        ensureReportSession(adapter),
+      ]),
+    ).resolves.toEqual(['anonymous-user', 'anonymous-user']);
+    expect(adapter.anonymousSignIns).toBe(1);
+  });
+
   it('rejects a sign-in response without a user id', async () => {
     const adapter = createAdapter({});
 
