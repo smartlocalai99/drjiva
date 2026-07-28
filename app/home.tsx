@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import {
   useSafeAreaInsets,
@@ -13,7 +13,10 @@ import { DateTimeline } from '../src/components/dashboard/DateTimeline';
 import { EmptyMedicines } from '../src/components/dashboard/EmptyMedicines';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
 import { MedicineCard } from '../src/components/dashboard/MedicineCard';
-import { getMedicinesForDate } from '../src/data/medicines';
+import {
+  fetchMedicinesForDate,
+  type Medicine,
+} from '../src/data/medicines';
 import {
   dashboardColors,
   dashboardLayout,
@@ -39,7 +42,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [medicines, setMedicines] = useState(() => getMedicinesForDate(today));
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [isLoadingMedicines, setIsLoadingMedicines] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTabKey>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [patientName, setPatientName] = useState<string | undefined>();
@@ -77,11 +81,27 @@ export default function HomeScreen() {
     };
   }, [phone]);
 
+  const loadMedicines = useCallback(async (date: Date) => {
+    try {
+      const nextMedicines = await fetchMedicinesForDate(date);
+      setMedicines(nextMedicines);
+    } catch {
+      setMedicines([]);
+    } finally {
+      setIsLoadingMedicines(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMedicines(today);
+  }, [loadMedicines, today]);
+
   const completedCount = medicines.filter((medicine) => medicine.completed).length;
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(date);
-    setMedicines(getMedicinesForDate(date));
+    setIsLoadingMedicines(true);
+    void loadMedicines(date);
   };
 
   const handleToggleMedicine = (id: string) => {
@@ -94,10 +114,10 @@ export default function HomeScreen() {
     );
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setMedicines(getMedicinesForDate(selectedDate));
-    setTimeout(() => setRefreshing(false), 400);
+    await loadMedicines(selectedDate);
+    setRefreshing(false);
   };
 
   const handleSelectTab = (tab: NavTabKey) => {
@@ -158,7 +178,11 @@ export default function HomeScreen() {
 
         <Text style={styles.sectionTitle}>{t('today')}</Text>
 
-        {medicines.length === 0 ? (
+        {isLoadingMedicines ? (
+          <View style={styles.medicineLoading}>
+            <ActivityIndicator color={dashboardColors.primary} />
+          </View>
+        ) : medicines.length === 0 ? (
           <EmptyMedicines />
         ) : (
           medicines.map((medicine, index) => (
@@ -206,5 +230,10 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     marginBottom: dashboardSpacing.gap,
     marginTop: dashboardSpacing.xl,
+  },
+  medicineLoading: {
+    alignItems: 'center',
+    minHeight: 150,
+    paddingTop: dashboardSpacing.xl,
   },
 });

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -10,10 +11,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import type { Medicine } from '../../data/medicines';
+import {
+  getHospitalInitials,
+  type Medicine,
+} from '../../data/medicineCourse';
 import {
   dashboardColors,
-  dashboardLayout,
   dashboardRadii,
   dashboardSpacing,
   dashboardTypography,
@@ -51,39 +54,80 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
       style={bounceStyle}
     >
       <PressableScale
-        accessibilityLabel={`${medicine.name}, ${medicine.dosage}, ${medicine.timing}`}
+        accessibilityLabel={`${medicine.name}, ${medicine.tabletCount}, ${medicine.timing}`}
         pressedScale={0.98}
         style={[
           styles.card,
           medicine.completed && styles.cardCompleted,
         ]}
       >
-        <View style={styles.icon}>
-          <Ionicons color={dashboardColors.primary} name="medical" size={20} />
+        <View style={styles.imageFrame}>
+          <Image
+            accessibilityLabel={`${medicine.name} medicine`}
+            contentFit="cover"
+            source={{ uri: medicine.imageUrl }}
+            style={styles.image}
+            transition={180}
+          />
+          <View style={styles.toggle}>
+            <MedicineToggle
+              onValueChange={onToggle}
+              value={medicine.completed}
+            />
+          </View>
+          {medicine.completed ? (
+            <View style={styles.badge}>
+              <Ionicons color="#FFFFFF" name="checkmark" size={11} />
+              <Text style={styles.badgeText}>Completed</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.body}>
-          <View style={styles.titleRow}>
-            <Text numberOfLines={1} style={styles.name}>
-              {medicine.name}
-            </Text>
-            {medicine.completed ? (
-              <View style={styles.badge}>
-                <Ionicons color="#FFFFFF" name="checkmark" size={11} />
-                <Text style={styles.badgeText}>Completed</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.meta}>
-            {medicine.dosage} · {medicine.timing}
+          <Text numberOfLines={1} style={styles.name}>
+            {medicine.name}
           </Text>
-          {medicine.doctorName ? (
-            <Text style={styles.doctor}>{medicine.doctorName}</Text>
-          ) : null}
-          <Text style={styles.reminder}>Next: {medicine.nextReminderTime}</Text>
-        </View>
+          <Text style={styles.meta}>{medicine.timing}</Text>
 
-        <MedicineToggle onValueChange={onToggle} value={medicine.completed} />
+          <View style={styles.detailRow}>
+            <View style={[styles.detailCell, styles.detailLeft]}>
+              <Ionicons
+                color={dashboardColors.primary}
+                name="medical-outline"
+                size={15}
+              />
+              <Text numberOfLines={1} style={styles.detailText}>
+                {medicine.tabletCount}
+              </Text>
+            </View>
+
+            <View style={styles.hospitalCell}>
+              <View style={styles.hospitalLogo}>
+                <Text style={styles.hospitalLogoText}>
+                  {getHospitalInitials(medicine.hospitalName)}
+                </Text>
+              </View>
+              <Text numberOfLines={1} style={styles.hospitalName}>
+                {medicine.hospitalName}
+              </Text>
+            </View>
+
+            <View style={[styles.detailCell, styles.detailRight]}>
+              <Ionicons
+                color={dashboardColors.textMuted}
+                name="person-circle-outline"
+                size={16}
+              />
+              <Text numberOfLines={1} style={styles.doctor}>
+                {medicine.doctorName}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.reminder}>
+            Next dose {medicine.nextReminderTime}
+          </Text>
+        </View>
       </PressableScale>
     </Animated.View>
   );
@@ -91,14 +135,10 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    alignItems: 'center',
     backgroundColor: dashboardColors.card,
     borderRadius: dashboardRadii.card,
-    flexDirection: 'row',
-    gap: dashboardSpacing.md,
     marginBottom: dashboardSpacing.gap,
-    minHeight: dashboardLayout.medicineCardMinHeight,
-    padding: 18,
+    overflow: 'hidden',
     shadowColor: dashboardColors.shadow,
     shadowOffset: { height: 6, width: 0 },
     shadowOpacity: 0.06,
@@ -107,36 +147,45 @@ const styles = StyleSheet.create({
   cardCompleted: {
     backgroundColor: dashboardColors.successTint,
   },
-  icon: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardLayout.medicineIconSize / 2,
-    height: dashboardLayout.medicineIconSize,
-    justifyContent: 'center',
-    width: dashboardLayout.medicineIconSize,
+  imageFrame: {
+    height: 148,
+    position: 'relative',
+    width: '100%',
+  },
+  image: {
+    height: '100%',
+    width: '100%',
+  },
+  toggle: {
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: dashboardRadii.pill,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    position: 'absolute',
+    right: dashboardSpacing.sm,
+    top: dashboardSpacing.sm,
   },
   body: {
-    flex: 1,
-    gap: 2,
-  },
-  titleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: dashboardSpacing.sm,
+    gap: 3,
+    paddingHorizontal: dashboardSpacing.md,
+    paddingVertical: 11,
   },
   name: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    flexShrink: 1,
+    fontSize: 17,
   },
   badge: {
     alignItems: 'center',
     backgroundColor: dashboardColors.success,
+    bottom: dashboardSpacing.sm,
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
     gap: 3,
+    left: dashboardSpacing.sm,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    position: 'absolute',
   },
   badgeText: {
     ...dashboardTypography.caption,
@@ -144,16 +193,72 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   meta: {
-    ...dashboardTypography.body,
+    ...dashboardTypography.caption,
     color: dashboardColors.textMuted,
+  },
+  detailRow: {
+    alignItems: 'center',
+    borderTopColor: dashboardColors.track,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    marginTop: 5,
+    minHeight: 48,
+    paddingTop: 7,
+  },
+  detailCell: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  detailLeft: {
+    justifyContent: 'flex-start',
+  },
+  detailRight: {
+    justifyContent: 'flex-end',
+  },
+  detailText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.text,
+    flexShrink: 1,
+  },
+  hospitalCell: {
+    alignItems: 'center',
+    flex: 0.9,
+    paddingHorizontal: 4,
+  },
+  hospitalLogo: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderColor: dashboardColors.primary,
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  hospitalLogoText: {
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+  },
+  hospitalName: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    fontSize: 9,
+    marginTop: 2,
+    maxWidth: 92,
   },
   doctor: {
     ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
+    color: dashboardColors.textMuted,
+    flexShrink: 1,
+    fontSize: 10,
   },
   reminder: {
     ...dashboardTypography.caption,
     color: dashboardColors.primary,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 1,
   },
 });
