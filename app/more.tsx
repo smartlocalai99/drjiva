@@ -27,6 +27,7 @@ import {
 } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
+import { getAccountMenuItems } from '../src/lib/moreMenu';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
   clearSessionPhone,
@@ -119,10 +120,6 @@ export default function MoreScreen() {
     router.push({ params: { phone }, pathname: '/profile' });
   };
 
-  const handleOpenAddresses = () => {
-    router.push({ params: { phone }, pathname: '/saved-addresses' });
-  };
-
   const handleOpenSupport = () => {
     router.push({ params: { phone }, pathname: '/support' });
   };
@@ -181,30 +178,33 @@ export default function MoreScreen() {
           </View>
 
           <Section label={t('account')}>
-            <Row
-              icon="person-circle-outline"
-              label={t('manageProfile')}
-              onPress={handleOpenProfile}
-            />
-            <Divider />
-            <Row
-              icon="location-outline"
-              label="Saved Addresses"
-              onPress={handleOpenAddresses}
-            />
-            <Divider />
-            <Row
-              icon="notifications-outline"
-              label={t('notifications')}
-              onPress={() => comingSoon(t('notifications'))}
-            />
-            <Divider />
-            <Row
-              icon="language-outline"
-              label={t('language')}
-              onPress={handleChangeLanguage}
-              value={language === 'te' ? 'తెలుగు' : 'English'}
-            />
+            {getAccountMenuItems().map((item, index) => (
+              <View key={item.key}>
+                {index > 0 ? <Divider /> : null}
+                {item.key === 'profile' ? (
+                  <Row
+                    icon="person-circle-outline"
+                    label={t('manageProfile')}
+                    onPress={handleOpenProfile}
+                  />
+                ) : null}
+                {item.key === 'notifications' ? (
+                  <Row
+                    icon="notifications-outline"
+                    label={t('notifications')}
+                    onPress={() => comingSoon(t('notifications'))}
+                  />
+                ) : null}
+                {item.key === 'language' ? (
+                  <Row
+                    icon="language-outline"
+                    label={t('language')}
+                    onPress={handleChangeLanguage}
+                    value={language === 'te' ? 'తెలుగు' : 'English'}
+                  />
+                ) : null}
+              </View>
+            ))}
           </Section>
 
           <Section label={t('preferences')}>
