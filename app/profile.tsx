@@ -37,7 +37,11 @@ import {
   validateProfilePhoto,
 } from '../src/lib/profilePhotos';
 
-const GENDER_OPTIONS = ['Male', 'Female', 'Other'] as const;
+const GENDER_OPTIONS = [
+  { label: 'Male', value: 'male' },
+  { label: 'Female', value: 'female' },
+  { label: 'Other', value: 'other' },
+] as const;
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -63,7 +67,10 @@ export default function ProfileScreen() {
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
-  const [gender, setGender] = useState<string | null>(null);
+  const [address, setAddress] = useState('');
+  const [gender, setGender] = useState<
+    'female' | 'male' | 'other' | null
+  >(null);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] =
@@ -90,7 +97,14 @@ export default function ProfileScreen() {
         }
         setName(patient.name);
         setAge(patient.age != null ? String(patient.age) : '');
-        setGender(patient.gender);
+        setAddress(patient.address ?? '');
+        setGender(
+          patient.gender === 'female' ||
+            patient.gender === 'male' ||
+            patient.gender === 'other'
+            ? patient.gender
+            : null,
+        );
         setPatientId(patient.patientId);
         setAvatarUrl(patient.avatarUrl);
         void saveCachedPatientName(phone, patient.name).catch(
@@ -114,22 +128,22 @@ export default function ProfileScreen() {
 
   const trimmedName = name.trim();
   const isNameValid = trimmedName.length >= 2;
+  const parsedAge = age.trim() ? Number.parseInt(age, 10) : null;
+  const isAgeValid =
+    parsedAge === null ||
+    (!Number.isNaN(parsedAge) && parsedAge >= 1 && parsedAge <= 120);
 
   const selectProfilePhoto = async (source: 'camera' | 'gallery') => {
     try {
-      const permission =
-        source === 'camera'
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        Alert.alert(
-          'Permission needed',
-          source === 'camera'
-            ? 'Allow camera access to take a profile photo.'
-            : 'Allow photo access to choose a profile photo.',
-        );
-        return;
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert(
+            'Permission needed',
+            'Allow camera access to take a profile photo.',
+          );
+          return;
+        }
       }
 
       const options: ImagePicker.ImagePickerOptions = {
@@ -154,7 +168,10 @@ export default function ProfileScreen() {
 
       const validationMessage = validateProfilePhoto(asset);
       if (validationMessage) {
-        Alert.alert('Photo not supported', validationMessage);
+        Alert.alert(
+          'Photo not supported',
+          validationMessage,
+        );
         return;
       }
 
@@ -172,13 +189,13 @@ export default function ProfileScreen() {
     Alert.alert('Profile photo', 'Choose a photo source.', [
       {
         onPress: () => {
-          void selectProfilePhoto('camera');
+          setTimeout(() => void selectProfilePhoto('camera'), 250);
         },
         text: 'Camera',
       },
       {
         onPress: () => {
-          void selectProfilePhoto('gallery');
+          setTimeout(() => void selectProfilePhoto('gallery'), 250);
         },
         text: 'Gallery',
       },
@@ -187,14 +204,12 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!isNameValid || isSaving) {
+    if (!isNameValid || !isAgeValid || isSaving) {
       return;
     }
 
     setIsSaving(true);
     setErrorMessage(undefined);
-
-    const parsedAge = age.trim() ? Number.parseInt(age, 10) : null;
 
     try {
       let nextAvatarUrl = avatarUrl;
@@ -206,7 +221,8 @@ export default function ProfileScreen() {
       }
 
       const patient = await updatePatientProfile(phone, {
-        age: Number.isNaN(parsedAge) ? null : parsedAge,
+        address: address.trim() || null,
+        age: parsedAge,
         avatar_url: nextAvatarUrl,
         gender,
         name: trimmedName,
@@ -318,28 +334,45 @@ export default function ProfileScreen() {
 
               <Divider />
 
+              <Field label="Address">
+                <TextInput
+                  multiline
+                  onChangeText={(value) => {
+                    setAddress(value);
+                    setSavedAt(undefined);
+                  }}
+                  placeholder="Add your address"
+                  placeholderTextColor={dashboardColors.textFaint}
+                  style={[styles.input, styles.addressInput]}
+                  value={address}
+                />
+              </Field>
+
+              <Divider />
+
               <View style={styles.fieldColumn}>
                 <Text style={styles.fieldLabel}>Gender</Text>
                 <View style={styles.genderRow}>
                   {GENDER_OPTIONS.map((option) => (
                     <Pressable
-                      key={option}
+                      key={option.value}
                       onPress={() => {
-                        setGender(option);
+                        setGender(option.value);
                         setSavedAt(undefined);
                       }}
                       style={[
                         styles.genderChip,
-                        gender === option && styles.genderChipActive,
+                        gender === option.value && styles.genderChipActive,
                       ]}
                     >
                       <Text
                         style={[
                           styles.genderChipText,
-                          gender === option && styles.genderChipTextActive,
+                          gender === option.value &&
+                            styles.genderChipTextActive,
                         ]}
                       >
-                        {option}
+                        {option.label}
                       </Text>
                     </Pressable>
                   ))}
@@ -350,15 +383,21 @@ export default function ProfileScreen() {
             {errorMessage ? (
               <Text style={styles.errorText}>{errorMessage}</Text>
             ) : null}
+            {!isAgeValid ? (
+              <Text style={styles.errorText}>
+                Enter an age between 1 and 120.
+              </Text>
+            ) : null}
 
             <PressableScale
               accessibilityLabel="Save changes"
-              disabled={!isNameValid || isSaving}
+              disabled={!isNameValid || !isAgeValid || isSaving}
               onPress={handleSave}
               pressedScale={0.98}
               style={[
                 styles.saveButton,
-                (!isNameValid || isSaving) && styles.saveButtonDisabled,
+                (!isNameValid || !isAgeValid || isSaving) &&
+                  styles.saveButtonDisabled,
               ]}
             >
               {isSaving ? (
@@ -570,6 +609,10 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     fontSize: 16,
     padding: 0,
+  },
+  addressInput: {
+    minHeight: 48,
+    textAlignVertical: 'top',
   },
   genderRow: {
     flexDirection: 'row',

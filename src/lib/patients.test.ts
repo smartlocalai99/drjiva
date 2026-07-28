@@ -43,6 +43,10 @@ vi.mock('./supabase', () => ({
   },
 }));
 
+vi.mock('./reportAuth', () => ({
+  ensureSecureReportSession: vi.fn(async () => 'anonymous-user'),
+}));
+
 import { getPatientByPhone, updatePatientProfile } from './patients';
 
 describe('patient profile photos', () => {
@@ -62,18 +66,20 @@ describe('patient profile photos', () => {
 
   it('updates the avatar without requiring an address field', async () => {
     await updatePatientProfile('9876543210', {
+      address: 'Existing saved address',
       age: 34,
       avatar_url:
         'https://example.supabase.co/profile-pictures/patient-1/new.jpg',
-      gender: 'Female',
+      gender: 'female',
       name: 'Asha Rao',
     });
 
     expect(updatePayload).toEqual({
+      address: 'Existing saved address',
       age: 34,
       avatar_url:
         'https://example.supabase.co/profile-pictures/patient-1/new.jpg',
-      gender: 'Female',
+      gender: 'female',
       name: 'Asha Rao',
     });
   });

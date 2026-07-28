@@ -31,6 +31,7 @@ const SLOT_WIDTH = dashboardLayout.dateCircleSize + 4;
 const ITEM_PITCH = SLOT_WIDTH + dashboardLayout.dateItemGap;
 const DAYS_BEFORE = 90;
 const DAYS_AFTER = 90;
+const DATE_RANGE_PADDING = 14;
 
 type DateEntry = {
   key: string;
@@ -42,6 +43,16 @@ type DateTimelineProps = {
   onSelectDate: (date: Date) => void;
 };
 
+function calendarDayOffset(from: Date, to: Date): number {
+  const fromUtc = Date.UTC(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate(),
+  );
+  const toUtc = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((toUtc - fromUtc) / 86_400_000);
+}
+
 export function DateTimeline({ selectedDate, onSelectDate }: DateTimelineProps) {
   const scrollRef = useRef<FlatList<DateEntry>>(null);
   const lastHapticIndex = useRef<number | null>(null);
@@ -52,12 +63,21 @@ export function DateTimeline({ selectedDate, onSelectDate }: DateTimelineProps) 
 
   const dates = useMemo<DateEntry[]>(() => {
     const entries: DateEntry[] = [];
-    for (let offset = -DAYS_BEFORE; offset <= DAYS_AFTER; offset += 1) {
+    const selectedOffset = calendarDayOffset(today, selectedDate);
+    const firstOffset = Math.min(
+      -DAYS_BEFORE,
+      selectedOffset - DATE_RANGE_PADDING,
+    );
+    const lastOffset = Math.max(
+      DAYS_AFTER,
+      selectedOffset + DATE_RANGE_PADDING,
+    );
+    for (let offset = firstOffset; offset <= lastOffset; offset += 1) {
       const date = addDays(today, offset);
       entries.push({ date, key: dateKey(date) });
     }
     return entries;
-  }, [today]);
+  }, [selectedDate, today]);
 
   const selectedIndex = useMemo(
     () => dates.findIndex((entry) => isSameDay(entry.date, selectedDate)),
@@ -78,6 +98,13 @@ export function DateTimeline({ selectedDate, onSelectDate }: DateTimelineProps) 
     isSyncingScroll.current = true;
     snapToIndex(index, animated);
   };
+
+  useEffect(() => {
+    if (!hasCentered.current || selectedIndex < 0) {
+      return;
+    }
+    syncToIndex(selectedIndex, true);
+  }, [containerWidth, selectedIndex]);
 
   const commitIndex = (index: number) => {
     const entry = dates[index];
@@ -218,17 +245,18 @@ function DateSlot({ date, isSelected, isToday, onPress }: DateSlotProps) {
             style={styles.streakMarker}
           />
         ) : null}
-        <Text
-          style={[
-            styles.dateNumber,
-            isEmphasized
-              ? styles.dateNumberSelected
-              : styles.dateNumberUnselected,
-            marker === 'today-streak' && styles.dateNumberOnStreak,
-          ]}
-        >
-          {date.getDate()}
-        </Text>
+        {marker !== 'today-streak' ? (
+          <Text
+            style={[
+              styles.dateNumber,
+              isEmphasized
+                ? styles.dateNumberSelected
+                : styles.dateNumberUnselected,
+            ]}
+          >
+            {date.getDate()}
+          </Text>
+        ) : null}
         {marker === 'selected-gradient' ? <View style={styles.dot} /> : null}
       </Animated.View>
     </Pressable>
@@ -280,10 +308,6 @@ const styles = StyleSheet.create({
   dateNumberSelected: {
     color: '#FFFFFF',
   },
-  dateNumberOnStreak: {
-    color: dashboardColors.text,
-    zIndex: 1,
-  },
   dateNumberUnselected: {
     color: dashboardColors.textFaint,
     opacity: 0.7,
@@ -300,10 +324,10 @@ const styles = StyleSheet.create({
     width: 6,
   },
   streakMarker: {
-    height: dashboardLayout.dateCircleSize - 6,
-    left: 3,
+    height: dashboardLayout.dateCircleSize - 12,
+    left: 6,
     position: 'absolute',
-    top: 3,
-    width: dashboardLayout.dateCircleSize - 6,
+    top: 6,
+    width: dashboardLayout.dateCircleSize - 12,
   },
 });

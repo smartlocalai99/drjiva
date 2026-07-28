@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 };
 
 export async function fetchVerifiedHospitals() {
+  await ensureSecureReportSession();
   const { data, error } = await supabase
     .from('hospitals')
     .select('id, name')
@@ -36,9 +37,22 @@ export async function fetchVerifiedHospitals() {
   return (data ?? []) as { id: string; name: string }[];
 }
 
+export async function fetchPatientCustomHospitals(patientId: string) {
+  await ensureSecureReportSession();
+  const { data, error } = await supabase
+    .from('patient_custom_hospitals')
+    .select('id, name')
+    .eq('patient_id', patientId)
+    .order('name')
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []) as { id: string; name: string }[];
+}
+
 export async function fetchMedicineCatalogue(
   hospitalId?: string,
 ): Promise<MedicineCatalogueItem[]> {
+  await ensureSecureReportSession();
   let request = supabase
     .from('medicines')
     .select('id, name, image_url, hospital_id, hospital_name')

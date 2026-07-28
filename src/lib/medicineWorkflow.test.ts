@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import { medicineWorkflowReducer, initialMedicineWorkflow } from './medicineWorkflow';
+import {
+  getMedicineWorkflowTitleKey,
+  initialMedicineWorkflow,
+  medicineWorkflowReducer,
+} from './medicineWorkflow';
+
+describe('getMedicineWorkflowTitleKey', () => {
+  it('uses the current step as the screen heading', () => {
+    expect(getMedicineWorkflowTitleKey('hospital')).toBe('addMedicine');
+    expect(getMedicineWorkflowTitleKey('medicine')).toBe('findMedicine');
+    expect(getMedicineWorkflowTitleKey('details')).toBe('courseDetails');
+    expect(getMedicineWorkflowTitleKey('review')).toBe('reviewReminder');
+  });
+});
 
 describe('medicineWorkflowReducer', () => {
   it('moves through hospital, medicine, details and review', () => {

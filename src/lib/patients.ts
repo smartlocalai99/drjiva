@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { toIndianE164 } from './phone';
+import { ensureSecureReportSession } from './reportAuth';
 
 export type Patient = {
   patientId: string;
@@ -12,7 +13,8 @@ export type Patient = {
 };
 
 const CORE_COLUMNS = 'id, name, mobile, age, gender';
-const FULL_COLUMNS = `${CORE_COLUMNS}, address, avatar_url`;
+const PHOTO_COLUMNS = `${CORE_COLUMNS}, avatar_url`;
+const FULL_COLUMNS = `${PHOTO_COLUMNS}, address`;
 
 type PatientRow = {
   id: string;
@@ -26,9 +28,8 @@ type PatientRow = {
 
 type PostgrestErrorLike = { code?: string } | null;
 
-// The `address` column is a newer addition and may not exist in every
-// environment yet — fall back to the core columns instead of breaking
-// onboarding/login entirely when it's missing (Postgres 42703).
+// Profile columns were added after the core patient record. Keep older
+// environments usable while migrations are being rolled out.
 function isMissingColumnError(error: PostgrestErrorLike): boolean {
   return error?.code === '42703';
 }
@@ -64,6 +65,13 @@ export async function getPatientByPhone(
     .eq('mobile', mobile)
     .maybeSingle();
 
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('patients')
+      .select(PHOTO_COLUMNS)
+      .eq('mobile', mobile)
+      .maybeSingle());
+  }
   if (error && isMissingColumnError(error)) {
     ({ data, error } = await supabase
       .from('patients')
@@ -113,6 +121,13 @@ export async function createPatient(
     ({ data, error } = await supabase
       .from('patients')
       .insert({ mobile, name })
+      .select(PHOTO_COLUMNS)
+      .single());
+  }
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('patients')
+      .insert({ mobile, name })
       .select(CORE_COLUMNS)
       .single());
   }
@@ -136,16 +151,18 @@ export async function createPatient(
 }
 
 export type PatientProfileUpdate = {
-  name: string;
+  address: string | null;
   age: number | null;
-  gender: string | null;
   avatar_url?: string | null;
+  gender: 'female' | 'male' | 'other' | null;
+  name: string;
 };
 
 export async function updatePatientProfile(
   phone: string,
   update: PatientProfileUpdate,
 ): Promise<Patient> {
+  await ensureSecureReportSession();
   const mobile = toIndianE164(phone);
 
   let { data, error } = await supabase
@@ -156,7 +173,20 @@ export async function updatePatientProfile(
     .single();
 
   if (error && isMissingColumnError(error)) {
-    const { avatar_url: _avatarUrl, ...coreUpdate } = update;
+    const { address: _address, ...photoUpdate } = update;
+    ({ data, error } = await supabase
+      .from('patients')
+      .update(photoUpdate)
+      .eq('mobile', mobile)
+      .select(PHOTO_COLUMNS)
+      .single());
+  }
+  if (error && isMissingColumnError(error)) {
+    const {
+      address: _address,
+      avatar_url: _avatarUrl,
+      ...coreUpdate
+    } = update;
     ({ data, error } = await supabase
       .from('patients')
       .update(coreUpdate)
@@ -174,4 +204,18 @@ export async function updatePatientProfile(
   }
 
   return mapPatientRow(data);
+}
+
+export async function updatePatientAddress(
+  phone: string,
+  address: string | null,
+): Promise<void> {
+  await ensureSecureReportSession();
+  const { error } = await supabase
+    .from('patients')
+    .update({ address })
+    .eq('mobile', toIndianE164(phone));
+  if (error) {
+    throw error;
+  }
 }

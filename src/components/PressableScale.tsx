@@ -61,14 +61,19 @@ export function PressableScale({
           )
         : backgroundColor;
 
+    const transform = [
+      {
+        scale: 1 - pressProgress.value * Math.max(0, 1 - pressedScale),
+      },
+    ];
+
+    if (!animatedBackgroundColor) {
+      return { transform };
+    }
+
     return {
       backgroundColor: animatedBackgroundColor,
-      transform: [
-        {
-          scale:
-            1 - pressProgress.value * Math.max(0, 1 - pressedScale),
-        },
-      ],
+      transform,
     };
   }, [backgroundColor, pressedBackgroundColor, pressedScale]);
 

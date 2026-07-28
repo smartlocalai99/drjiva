@@ -57,6 +57,9 @@ const translations = {
     documentPlural: 'documents',
     documentSaved: 'Document saved',
     delete: 'Delete',
+    deleteReminder: 'Delete reminder?',
+    deleteReminderMessage:
+      'This removes the medicine course and all of its upcoming alerts.',
     deleteDocument: 'Delete document?',
     deleteDocumentMessage:
       'This permanently deletes the PDF and cannot be undone.',
@@ -72,12 +75,11 @@ const translations = {
       'The private PDF could not be removed, so its record was kept.',
     unableDeleteDocumentRecord:
       'The PDF was removed, but its record could not be cleared. Please retry.',
+    unableDeleteReminder: 'Unable to delete reminder',
+    unableDeleteReminderMessage:
+      'The reminder was kept. Please check your connection and try again.',
     dischargeSummary: 'Discharge Summary',
-    documentsUnavailable: 'Documents unavailable',
-    documentsEmptySubtitle:
-      'Documents you add will appear here, grouped by hospital.',
-    documentsEmptyTitle: 'No documents yet',
-    documentsGroupedBy: 'Grouped by hospital',
+    documentsUnavailable: 'No documents uploaded',
     deliveryAddresses: 'Delivery Addresses',
     hospital: 'Hospital',
     imaging: 'Imaging',
@@ -98,7 +100,6 @@ const translations = {
     patientUnavailable: 'Patient unavailable',
     pdfAttached: 'The PDF is attached to this patient.',
     pdfCouldNotBeSaved: 'The PDF could not be saved. Please try again.',
-    privateMedicalPdfs: 'Private medical PDFs',
     prescription: 'Prescription',
     reloadBeforeScanning: 'Reload the Documents screen before scanning.',
     reportType: 'Report type',
@@ -106,7 +107,6 @@ const translations = {
     reviewScannedDocument: 'Review scanned document',
     savePdf: 'Save PDF',
     scanDocument: 'Scan Document',
-    scanOnDevice: 'Scanning and document recognition happen on this device.',
     scannerReviewHelper:
       'We filled what could be identified on-device. Please confirm it.',
     scannerValidation: 'Choose both the hospital and report type.',
@@ -127,7 +127,7 @@ const translations = {
     notifications: 'Notifications',
     notificationTimings: 'Notification Timings',
     notificationTimingsHelp:
-      'Set the time used for phone alerts and dashboard dose cards.',
+      'Choose separate AM/PM times for Morning, Afternoon, and Night.',
     unableLoadNotificationTimings:
       'Unable to load notification timings',
     morning: 'Morning',
@@ -137,7 +137,7 @@ const translations = {
     timingsSaved: 'Notification timings saved',
     oldAlertsCleanupPending:
       'Timings were saved. Old alerts will be cleaned up automatically.',
-    invalidTimings: 'Use HH:MM and keep Morning before Afternoon before Night.',
+    invalidTimings: 'Keep Morning before Afternoon before Night.',
     preferences: 'Preferences',
     recent: 'Recent',
     searchMedicine: 'Search medicine',
@@ -189,6 +189,9 @@ const translations = {
     documentPlural: 'పత్రాలు',
     documentSaved: 'పత్రం సేవ్ అయింది',
     delete: 'తొలగించండి',
+    deleteReminder: 'రిమైండర్‌ను తొలగించాలా?',
+    deleteReminderMessage:
+      'ఇది మందుల కోర్స్ మరియు రాబోయే అన్ని అలర్ట్‌లను తొలగిస్తుంది.',
     deleteDocument: 'పత్రాన్ని తొలగించాలా?',
     deleteDocumentMessage:
       'ఇది PDFను శాశ్వతంగా తొలగిస్తుంది. తిరిగి పొందడం సాధ్యం కాదు.',
@@ -204,12 +207,11 @@ const translations = {
       'ప్రైవేట్ PDF తొలగించబడలేదు, కాబట్టి దాని నమోదు అలాగే ఉంచబడింది.',
     unableDeleteDocumentRecord:
       'PDF తొలగించబడింది, కానీ నమోదు తొలగించబడలేదు. మళ్లీ ప్రయత్నించండి.',
+    unableDeleteReminder: 'రిమైండర్‌ను తొలగించలేకపోయాము',
+    unableDeleteReminderMessage:
+      'రిమైండర్ అలాగే ఉంచబడింది. కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.',
     dischargeSummary: 'డిశ్చార్జ్ సారాంశం',
-    documentsUnavailable: 'పత్రాలు అందుబాటులో లేవు',
-    documentsEmptySubtitle:
-      'మీరు జోడించే పత్రాలు ఇక్కడ, ఆసుపత్రి వారీగా కనిపిస్తాయి.',
-    documentsEmptyTitle: 'ఇంకా పత్రాలు లేవు',
-    documentsGroupedBy: 'ఆసుపత్రి వారీగా గ్రూప్ చేయబడింది',
+    documentsUnavailable: 'పత్రాలు అప్‌లోడ్ చేయలేదు',
     deliveryAddresses: 'డెలివరీ చిరునామాలు',
     hospital: 'ఆసుపత్రి',
     imaging: 'ఇమేజింగ్',
@@ -230,7 +232,6 @@ const translations = {
     patientUnavailable: 'రోగి అందుబాటులో లేరు',
     pdfAttached: 'PDF ఈ రోగికి జత చేయబడింది.',
     pdfCouldNotBeSaved: 'PDF సేవ్ కాలేదు. మళ్లీ ప్రయత్నించండి.',
-    privateMedicalPdfs: 'ప్రైవేట్ వైద్య PDFలు',
     prescription: 'ప్రిస్క్రిప్షన్',
     reloadBeforeScanning: 'స్కాన్ చేసే ముందు పత్రాల స్క్రీన్‌ను మళ్లీ లోడ్ చేయండి.',
     reportType: 'రిపోర్ట్ రకం',
@@ -238,7 +239,6 @@ const translations = {
     reviewScannedDocument: 'స్కాన్ చేసిన పత్రాన్ని పరిశీలించండి',
     savePdf: 'PDF సేవ్ చేయండి',
     scanDocument: 'పత్రాన్ని స్కాన్ చేయండి',
-    scanOnDevice: 'స్కానింగ్ మరియు పత్ర గుర్తింపు ఈ పరికరంలోనే జరుగుతాయి.',
     scannerReviewHelper:
       'పరికరంలో గుర్తించిన వివరాలను నింపాము. దయచేసి నిర్ధారించండి.',
     scannerValidation: 'ఆసుపత్రి మరియు రిపోర్ట్ రకాన్ని ఎంచుకోండి.',
@@ -260,7 +260,7 @@ const translations = {
     notifications: 'నోటిఫికేషన్‌లు',
     notificationTimings: 'నోటిఫికేషన్ సమయాలు',
     notificationTimingsHelp:
-      'ఫోన్ అలర్ట్‌లు మరియు డ్యాష్‌బోర్డ్ మందుల కోసం సమయాలను సెట్ చేయండి.',
+      'ఉదయం, మధ్యాహ్నం, రాత్రికి వేర్వేరు AM/PM సమయాలను ఎంచుకోండి.',
     unableLoadNotificationTimings:
       'నోటిఫికేషన్ సమయాలను లోడ్ చేయలేకపోయాము',
     morning: 'ఉదయం',
@@ -271,7 +271,7 @@ const translations = {
     oldAlertsCleanupPending:
       'సమయాలు సేవ్ అయ్యాయి. పాత అలర్ట్‌లు ఆటోమేటిక్‌గా తొలగించబడతాయి.',
     invalidTimings:
-      'HH:MM ఉపయోగించి ఉదయం, మధ్యాహ్నం, రాత్రి క్రమంలో ఉంచండి.',
+      'ఉదయం, మధ్యాహ్నం, రాత్రి సమయాలను అదే క్రమంలో ఉంచండి.',
     preferences: 'ప్రాధాన్యతలు',
     recent: 'ఇటీవలివి',
     searchMedicine: 'మందు వెతకండి',

@@ -18,12 +18,20 @@ import { supabase } from './supabase';
 const REPORT_COLUMNS =
   'id, patient_id, hospital_id, label, report_type, page_count, storage_path, created_at';
 const MAX_REPORT_BYTES = 20 * 1024 * 1024;
+const HOSPITALS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let hospitalsCache: { expiresAt: number; hospitals: HospitalOption[] } | null =
+  null;
 
 function createDocumentId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 export async function fetchHospitals(): Promise<HospitalOption[]> {
+  if (hospitalsCache && hospitalsCache.expiresAt > Date.now()) {
+    return hospitalsCache.hospitals;
+  }
+
   const { data, error } = await supabase
     .from('hospitals')
     .select('id, name')
@@ -33,7 +41,9 @@ export async function fetchHospitals(): Promise<HospitalOption[]> {
     throw error;
   }
 
-  return (data ?? []) as HospitalOption[];
+  const hospitals = (data ?? []) as HospitalOption[];
+  hospitalsCache = { expiresAt: Date.now() + HOSPITALS_CACHE_TTL_MS, hospitals };
+  return hospitals;
 }
 
 export async function fetchPatientReports(

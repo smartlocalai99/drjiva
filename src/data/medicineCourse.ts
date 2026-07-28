@@ -1,17 +1,23 @@
+import type { DoseSlot } from '../lib/medicineSchedule';
+import { formatScheduledTime12Hour } from '../lib/medicineTime';
+
 export type Medicine = {
   completed: boolean;
+  courseId: string;
   doctorName: string;
   hospitalName: string;
   id: string;
   imageUrl: string;
   name: string;
   nextReminderTime: string;
+  slot: DoseSlot;
   tabletCount: string;
   timing: string;
 };
 
 export type DoseRow = {
   completed: boolean;
+  courseId: string;
   eventId: string;
   hospitalName: string;
   imageUrl: string;
@@ -44,15 +50,14 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
     .filter((row) => Boolean(row.imageUrl.trim()))
     .map((row) => ({
       completed: row.completed,
+      courseId: row.courseId,
       doctorName: 'Care team',
       hospitalName: row.hospitalName,
       id: row.eventId,
       imageUrl: row.imageUrl.trim(),
       name: row.medicineName,
-      nextReminderTime: new Date(row.scheduledFor).toLocaleTimeString([], {
-        hour: 'numeric',
-        minute: '2-digit',
-      }),
+      nextReminderTime: formatScheduledTime12Hour(row.scheduledFor),
+      slot: row.slot as DoseSlot,
       tabletCount: `${row.tabletsPerDose} tablet${
         row.tabletsPerDose === 1 ? '' : 's'
       }`,
@@ -65,12 +70,20 @@ export function selectRelevantDoseRows(
   now: Date,
   times: Record<'morning' | 'afternoon' | 'night', string>,
 ): DoseRow[] {
+  const ordered = [...rows].sort(
+    (left, right) =>
+      new Date(left.scheduledFor).getTime() -
+      new Date(right.scheduledFor).getTime(),
+  );
+  const latestStarted = ordered.findLast(
+    (row) => new Date(row.scheduledFor).getTime() <= now.getTime(),
+  );
   const minutes = now.getHours() * 60 + now.getMinutes();
   const toMinutes = (value: string) => {
     const [hour, minute] = value.split(':').map(Number);
     return hour! * 60 + minute!;
   };
-  const currentSlot =
+  const configuredSlot =
     minutes >= toMinutes(times.night)
       ? 'night'
       : minutes >= toMinutes(times.afternoon)
@@ -78,14 +91,22 @@ export function selectRelevantDoseRows(
         : minutes >= toMinutes(times.morning)
           ? 'morning'
           : null;
+  const slotRank = { afternoon: 1, morning: 0, night: 2 };
+  const currentSlot =
+    latestStarted &&
+    (!configuredSlot ||
+      slotRank[latestStarted.slot as keyof typeof slotRank] >
+        slotRank[configuredSlot])
+      ? latestStarted.slot
+      : configuredSlot;
   const current = currentSlot
-    ? rows.filter(
+    ? ordered.filter(
         (row) =>
           row.slot === currentSlot &&
           new Date(row.scheduledFor).getTime() <= now.getTime(),
       )
     : [];
-  const next = rows.find(
+  const next = ordered.find(
     (row) => new Date(row.scheduledFor).getTime() > now.getTime(),
   );
   return next && !current.some((row) => row.eventId === next.eventId)

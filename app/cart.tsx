@@ -1,7 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../src/components/PressableScale';
@@ -12,6 +24,11 @@ import {
   dashboardTypography,
 } from '../src/dashboardTheme';
 import { SHOP_PRODUCTS, type ShopProduct } from '../src/data/shopProducts';
+import { loadAddresses } from '../src/lib/addressStorage';
+import {
+  getDefaultAddress,
+  type SavedAddress,
+} from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
 import { useLanguage } from '../src/lib/i18n';
 
@@ -35,6 +52,8 @@ export default function CartScreen() {
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
   const { decrement, increment, quantities } = useCart();
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
 
   const lines = useMemo<CartLine[]>(() => {
     return SHOP_PRODUCTS.filter((product) => (quantities[product.id] ?? 0) > 0).map(
@@ -51,6 +70,37 @@ export default function CartScreen() {
     () => lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0),
     [lines],
   );
+  const deliveryAddress = useMemo(
+    () => getDefaultAddress(addresses),
+    [addresses],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoadingAddress(true);
+      void loadAddresses(phone)
+        .then((nextAddresses) => {
+          if (!cancelled) {
+            setAddresses(nextAddresses);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAddresses([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoadingAddress(false);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [phone]),
+  );
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -60,6 +110,18 @@ export default function CartScreen() {
 
   const handleBrowseShop = () => {
     router.replace({ params: { phone }, pathname: '/shop' });
+  };
+
+  const openDeliveryAddresses = () => {
+    router.push({ params: { phone }, pathname: '/saved-addresses' });
+  };
+
+  const handleCheckout = () => {
+    if (!deliveryAddress) {
+      router.push({ params: { phone }, pathname: '/address-editor' });
+      return;
+    }
+    Alert.alert(t('checkout'), t('comingSoon'));
   };
 
   return (
@@ -107,6 +169,11 @@ export default function CartScreen() {
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
+            <DeliveryAddressCard
+              address={deliveryAddress}
+              isLoading={isLoadingAddress}
+              onPress={openDeliveryAddresses}
+            />
             {lines.map((line) => {
               const tint = TINTS[line.product.tint];
               return (
@@ -154,7 +221,7 @@ export default function CartScreen() {
             </View>
             <PressableScale
               accessibilityLabel={t('checkout')}
-              onPress={() => Alert.alert(t('checkout'), t('comingSoon'))}
+              onPress={handleCheckout}
               pressedScale={0.98}
               style={styles.checkoutButton}
             >
@@ -164,6 +231,68 @@ export default function CartScreen() {
         </>
       )}
     </SafeAreaView>
+  );
+}
+
+function DeliveryAddressCard({
+  address,
+  isLoading,
+  onPress,
+}: {
+  address: SavedAddress | undefined;
+  isLoading: boolean;
+  onPress: () => void;
+}) {
+  const label = address
+    ? address.label === 'Other'
+      ? address.customLabel || 'Other'
+      : address.label
+    : '';
+  const addressLine = address
+    ? [address.building, address.area, address.city, address.pinCode]
+        .filter(Boolean)
+        .join(', ')
+    : '';
+
+  return (
+    <View style={styles.addressCard}>
+      <View style={styles.addressHeader}>
+        <View style={styles.addressTitleRow}>
+          <Ionicons
+            color={dashboardColors.primary}
+            name="location-outline"
+            size={20}
+          />
+          <Text style={styles.addressTitle}>Delivery address</Text>
+        </View>
+        {!isLoading ? (
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={onPress}>
+            <Text style={styles.addressAction}>
+              {address ? 'Change' : 'Add address'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {isLoading ? (
+        <ActivityIndicator
+          color={dashboardColors.primary}
+          style={styles.addressLoading}
+        />
+      ) : address ? (
+        <>
+          <Text style={styles.addressLabel}>
+            {label} · {address.recipientName}
+          </Text>
+          <Text numberOfLines={2} style={styles.addressLine}>
+            {addressLine}
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.addressEmpty}>
+          Add an address before checking out.
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -236,6 +365,54 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: dashboardSpacing.pagePadding,
+  },
+  addressCard: {
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.track,
+    borderRadius: dashboardRadii.card,
+    borderWidth: 1,
+    marginBottom: dashboardSpacing.gap,
+    padding: dashboardSpacing.md,
+  },
+  addressHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  addressTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+  },
+  addressTitle: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+  },
+  addressAction: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  addressLoading: {
+    alignSelf: 'flex-start',
+    marginTop: dashboardSpacing.md,
+  },
+  addressLabel: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_600SemiBold',
+    marginTop: dashboardSpacing.md,
+  },
+  addressLine: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  addressEmpty: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+    marginTop: dashboardSpacing.md,
   },
   row: {
     alignItems: 'center',

@@ -15,7 +15,9 @@
         "aps-environment": "production"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Allow DrJiva to take your profile photo.",
+        "NSPhotoLibraryUsageDescription": "Allow DrJiva to choose your profile photo."
       }
     },
     "android": {

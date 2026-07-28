@@ -18,6 +18,7 @@ import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../src/components/PressableScale';
+import { SlotTimeEditor } from '../src/components/medicine/SlotTimeEditor';
 import {
   dashboardColors,
   dashboardRadii,
@@ -27,21 +28,20 @@ import {
 import { useLanguage } from '../src/lib/i18n';
 import {
   formatDateOnly,
-  getCalendarCells,
   getCourseEndDate,
-  isDateInRange,
-  parseDateOnly,
 } from '../src/lib/medicineCalendar';
 import {
   createCustomHospital,
   createMedicineCourse,
   fetchMedicineCatalogue,
+  fetchPatientCustomHospitals,
   fetchVerifiedHospitals,
   getNotificationSettings,
   rollbackMedicineCourse,
   saveNotificationIds,
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
+import { DOSE_SLOT_THEME } from '../src/lib/doseSlotTheme';
 import {
   cancelDoseNotifications,
   requestMedicineNotificationPermission,
@@ -53,8 +53,16 @@ import {
   type DayPattern,
   type DoseSlot,
 } from '../src/lib/medicineSchedule';
-import { filterMedicineCatalogue } from '../src/lib/medicineSearch';
 import {
+  areSelectedSlotTimesOrdered,
+  formatTime12Hour,
+} from '../src/lib/medicineTime';
+import {
+  filterMedicineCatalogue,
+  getNewCatalogueEntryName,
+} from '../src/lib/medicineSearch';
+import {
+  getMedicineWorkflowTitleKey,
   initialMedicineWorkflow,
   medicineWorkflowReducer,
 } from '../src/lib/medicineWorkflow';
@@ -62,21 +70,18 @@ import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 
 const SLOT_KEYS: DoseSlot[] = ['morning', 'afternoon', 'night'];
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+
+type MedicineReminderDetails = {
+  slotTimes: Record<DoseSlot, string>;
+  slots: DoseSlot[];
+  tablets: string;
+};
+
+type HospitalOption = {
+  id: string;
+  isCustom: boolean;
+  name: string;
+};
 
 function todayString() {
   return formatDateOnly(new Date());
@@ -92,24 +97,27 @@ export default function AddMedicineScreen() {
     initialMedicineWorkflow,
   );
   const [patientId, setPatientId] = useState('');
-  const [hospitals, setHospitals] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
   const [hospitalQuery, setHospitalQuery] = useState('');
   const [customHospitalName, setCustomHospitalName] = useState('');
   const [isCustomHospital, setIsCustomHospital] = useState(false);
+  const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [medicineDropdownOpen, setMedicineDropdownOpen] = useState(false);
   const [catalogue, setCatalogue] = useState<MedicineCatalogueItem[]>([]);
   const [isLoadingCatalogue, setIsLoadingCatalogue] = useState(false);
-  const [tablets, setTablets] = useState('1');
   const [days, setDays] = useState('7');
-  const [startDate, setStartDate] = useState(todayString());
-  const [calendarVisible, setCalendarVisible] = useState(false);
-  const [visibleMonth, setVisibleMonth] = useState(() => {
-    const date = new Date();
-    return new Date(date.getFullYear(), date.getMonth(), 1);
+  const [startDate] = useState(todayString);
+  const [defaultSlotTimes, setDefaultSlotTimes] = useState<
+    Record<DoseSlot, string>
+  >({
+    afternoon: '13:00',
+    morning: '08:00',
+    night: '20:00',
   });
-  const [slots, setSlots] = useState<DoseSlot[]>(['morning']);
+  const [medicineDetails, setMedicineDetails] = useState<
+    Record<string, MedicineReminderDetails>
+  >({});
   const [pattern, setPattern] = useState<DayPattern>('daily');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -120,10 +128,30 @@ export default function AddMedicineScreen() {
       return;
     }
     void Promise.all([getPatientByPhone(phone), fetchVerifiedHospitals()])
-      .then(([patient, nextHospitals]) => {
+      .then(async ([patient, verifiedHospitals]) => {
         if (!patient) throw new Error('Patient unavailable');
         setPatientId(patient.patientId);
-        setHospitals(nextHospitals);
+        const [customHospitals, notificationSettings] = await Promise.all([
+          fetchPatientCustomHospitals(patient.patientId).catch(() => []),
+          getNotificationSettings(patient.patientId).catch(() => null),
+        ]);
+        if (notificationSettings) {
+          setDefaultSlotTimes({
+            afternoon: notificationSettings.afternoonTime,
+            morning: notificationSettings.morningTime,
+            night: notificationSettings.nightTime,
+          });
+        }
+        setHospitals([
+          ...verifiedHospitals.map((hospital) => ({
+            ...hospital,
+            isCustom: false,
+          })),
+          ...customHospitals.map((hospital) => ({
+            ...hospital,
+            isCustom: true,
+          })),
+        ]);
       })
       .catch(() => Alert.alert(t('patientUnavailable')));
   }, [phone, t]);
@@ -165,8 +193,12 @@ export default function AddMedicineScreen() {
     () => filterMedicineCatalogue(hospitals, hospitalQuery, 100),
     [hospitalQuery, hospitals],
   );
+  const newHospitalName = useMemo(
+    () => getNewCatalogueEntryName(hospitals, hospitalQuery),
+    [hospitalQuery, hospitals],
+  );
   const results = useMemo(
-    () => filterMedicineCatalogue(catalogue, query, 50),
+    () => filterMedicineCatalogue(catalogue, query, 1000),
     [catalogue, query],
   );
   const selectedMedicines = useMemo(
@@ -184,48 +216,60 @@ export default function AddMedicineScreen() {
     [customHospitalName, hospitals, isCustomHospital, workflow.hospitalId],
   );
   const durationDays = Number(days);
+  const previewDurationDays =
+    Number.isInteger(durationDays) && durationDays > 0 ? durationDays : 1;
   const endDate = getCourseEndDate(
     startDate,
-    Number.isInteger(durationDays) ? durationDays : 1,
+    previewDurationDays,
   );
 
   const submit = async () => {
     if (selectedMedicines.length === 0 || !patientId) return;
-    const tabletsPerDose = Number(tablets);
-    const validation = validateMedicineCourseInput({
-      durationDays,
-      hospitalId: workflow.hospitalId || customHospitalName,
-      medicineId: selectedMedicines[0]!.id,
-      slots,
-      tabletsPerDose,
-    });
-    if (validation || !parseDateOnly(startDate)) {
-      Alert.alert(t('courseDetails'), t('tryAgain'));
-      return;
+    for (const medicine of selectedMedicines) {
+      const details = medicineDetails[medicine.id];
+      const validation =
+        !details ||
+        validateMedicineCourseInput({
+          durationDays,
+          hospitalId: workflow.hospitalId || customHospitalName,
+          medicineId: medicine.id,
+          slots: details.slots,
+          tabletsPerDose: Number(details.tablets),
+        });
+      if (validation) {
+        Alert.alert(
+          medicine.name,
+          'Enter a valid quantity and choose at least one reminder period.',
+        );
+        return;
+      }
+      if (!areSelectedSlotTimesOrdered(details.slots, details.slotTimes)) {
+        Alert.alert(medicine.name, t('invalidTimings'));
+        return;
+      }
     }
 
     setBusy(true);
     const createdCourseIds: string[] = [];
-    const scheduledIds: string[] = [];
     try {
-      const settings = await getNotificationSettings(patientId);
       const customHospital = isCustomHospital
         ? await createCustomHospital(patientId, customHospitalName)
         : null;
-      const drafts = expandDoseEvents({
-        dayPattern: pattern,
-        durationDays,
-        slotTimes: {
-          afternoon: settings.afternoonTime,
-          morning: settings.morningTime,
-          night: settings.nightTime,
-        },
-        slots,
-        startDate,
-      });
-      const permitted = await requestMedicineNotificationPermission();
+      const permitted = await requestMedicineNotificationPermission().catch(
+        () => false,
+      );
+      let notificationWarning = false;
 
       for (const medicine of selectedMedicines) {
+        const details = medicineDetails[medicine.id]!;
+        const tabletsPerDose = Number(details.tablets);
+        const drafts = expandDoseEvents({
+          dayPattern: pattern,
+          durationDays,
+          slotTimes: details.slotTimes,
+          slots: details.slots,
+          startDate,
+        });
         const created = await createMedicineCourse({
           customHospitalId: customHospital?.id,
           dayPattern: pattern,
@@ -234,36 +278,46 @@ export default function AddMedicineScreen() {
           hospitalId: isCustomHospital ? undefined : workflow.hospitalId,
           medicineId: medicine.id,
           patientId,
-          slots,
+          slots: details.slots,
           startDate,
           tabletsPerDose,
         });
         createdCourseIds.push(created.courseId);
 
         if (permitted) {
-          const identifiers = [];
-          for (const [index, draft] of drafts.entries()) {
-            const next = await scheduleDoseNotifications(
-              [
+          const identifiers: Array<{
+            eventId: string;
+            notificationId: string;
+          }> = [];
+          try {
+            for (const [index, draft] of drafts.entries()) {
+              const eventId = created.eventIds[index];
+              if (!eventId) {
+                throw new Error('A saved reminder event is missing.');
+              }
+              const next = await scheduleDoseNotifications(
+                [{ eventId, scheduledFor: draft.scheduledFor }],
                 {
-                  eventId: created.eventIds[index]!,
-                  scheduledFor: draft.scheduledFor,
+                  medicineName: medicine.name,
+                  slot: t(draft.slot),
+                  slotKey: draft.slot,
+                  tablets: tabletsPerDose,
                 },
-              ],
-              {
-                medicineName: medicine.name,
-                slot: t(draft.slot),
-                tablets: tabletsPerDose,
-              },
-            );
-            identifiers.push(...next);
-            scheduledIds.push(...next.map((item) => item.notificationId));
+              );
+              identifiers.push(...next);
+            }
+            await saveNotificationIds(identifiers);
+          } catch (error) {
+            notificationWarning = true;
+            await cancelDoseNotifications(
+              identifiers.map((item) => item.notificationId),
+            ).catch(() => undefined);
+            console.warn('Medicine reminder phone alert failed', error);
           }
-          await saveNotificationIds(identifiers);
         }
       }
 
-      if (!permitted) {
+      if (!permitted || notificationWarning) {
         Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
           { style: 'cancel', text: t('notNow') },
           {
@@ -275,35 +329,103 @@ export default function AddMedicineScreen() {
       setSuccess(true);
       setTimeout(() => {
         router.replace({
-          params: { phone, refresh: Date.now() },
+          params: { phone, refresh: Date.now(), selectedDate: startDate },
           pathname: '/home',
         });
       }, 1400);
-    } catch {
-      await cancelDoseNotifications(scheduledIds).catch(() => undefined);
+    } catch (error) {
       await Promise.all(
         createdCourseIds.map((courseId) =>
           rollbackMedicineCourse(courseId).catch(() => undefined),
         ),
       );
+      console.error('Unable to create medicine reminder', error);
       Alert.alert(t('addMedicine'), t('tryAgain'));
     } finally {
       setBusy(false);
     }
   };
 
-  const toggleSlot = (slot: DoseSlot) =>
-    setSlots((current) =>
-      current.includes(slot)
-        ? current.filter((item) => item !== slot)
-        : [...current, slot],
-    );
+  const selectMedicine = (medicine: MedicineCatalogueItem) => {
+    const selected = workflow.medicineIds.includes(medicine.id);
+    if (!selected) {
+      setMedicineDetails((current) => ({
+        ...current,
+        [medicine.id]: current[medicine.id] ?? {
+          slotTimes: { ...defaultSlotTimes },
+          slots: ['morning'],
+          tablets: '1',
+        },
+      }));
+    }
+    dispatch({ medicineId: medicine.id, type: 'toggleMedicine' });
+    setQuery('');
+    setMedicineDropdownOpen(false);
+  };
 
-  const selectStartDate = (value: string) => {
-    const date = parseDateOnly(value);
-    if (!date) return;
-    setStartDate(value);
-    setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+  const updateMedicineDetails = (
+    medicineId: string,
+    update: (
+      current: MedicineReminderDetails,
+    ) => MedicineReminderDetails,
+  ) =>
+    setMedicineDetails((current) => ({
+      ...current,
+      [medicineId]: update(
+        current[medicineId] ?? {
+          slotTimes: { ...defaultSlotTimes },
+          slots: ['morning'],
+          tablets: '1',
+        },
+      ),
+    }));
+
+  const reviewReminder = () => {
+    for (const medicine of selectedMedicines) {
+      const details = medicineDetails[medicine.id];
+      if (
+        !details ||
+        validateMedicineCourseInput({
+          durationDays,
+          hospitalId: workflow.hospitalId || customHospitalName,
+          medicineId: medicine.id,
+          slots: details.slots,
+          tabletsPerDose: Number(details.tablets),
+        })
+      ) {
+        Alert.alert(
+          medicine.name,
+          'Enter a valid quantity and choose at least one reminder period.',
+        );
+        return;
+      }
+    }
+    dispatch({ type: 'continue' });
+  };
+
+  const selectHospital = (hospital: HospitalOption) => {
+    setIsCustomHospital(hospital.isCustom);
+    setCustomHospitalName(hospital.isCustom ? hospital.name : '');
+    setHospitalQuery(hospital.name);
+    setHospitalDropdownOpen(false);
+    setQuery('');
+    dispatch({
+      hospitalId: hospital.isCustom ? 'custom' : hospital.id,
+      type: 'selectHospital',
+    });
+  };
+
+  const selectNewHospital = (name: string) => {
+    setHospitals((current) => [
+      ...current,
+      { id: `draft:${name}`, isCustom: true, name },
+    ]);
+    setIsCustomHospital(true);
+    setCustomHospitalName(name);
+    setHospitalQuery(name);
+    setHospitalDropdownOpen(false);
+    setQuery('');
+    dispatch({ hospitalId: 'custom', type: 'selectHospital' });
   };
 
   return (
@@ -323,7 +445,9 @@ export default function AddMedicineScreen() {
             size={22}
           />
         </PressableScale>
-        <Text style={styles.title}>{t('addMedicine')}</Text>
+        <Text style={styles.title}>
+          {t(getMedicineWorkflowTitleKey(workflow.step))}
+        </Text>
         <View style={styles.back} />
       </View>
       <KeyboardAvoidingView
@@ -341,182 +465,201 @@ export default function AddMedicineScreen() {
                 accessibilityLabel="Search hospitals"
                 onChange={setHospitalQuery}
                 onClear={() => setHospitalQuery('')}
+                onFocus={() => setHospitalDropdownOpen(true)}
                 placeholder="Search hospitals"
                 value={hospitalQuery}
               />
-              <View style={styles.dropdown}>
-                {hospitalResults.map((hospital) => (
-                  <Choice
-                    key={hospital.id}
-                    label={hospital.name}
-                    onPress={() => {
-                      setIsCustomHospital(false);
-                      setQuery('');
-                      dispatch({
-                        hospitalId: hospital.id,
-                        type: 'selectHospital',
-                      });
-                    }}
-                  />
-                ))}
-                {hospitalResults.length === 0 ? (
-                  <Text style={styles.emptyResult}>No hospitals found</Text>
-                ) : null}
-              </View>
-              <Text style={styles.orText}>or add another hospital</Text>
-              <TextInput
-                onChangeText={setCustomHospitalName}
-                placeholder={t('hospitalName')}
-                placeholderTextColor={dashboardColors.textFaint}
-                style={styles.textInput}
-                value={customHospitalName}
-              />
-              <Choice
-                disabled={customHospitalName.trim().length < 2}
-                label={t('addNewHospital')}
-                onPress={() => {
-                  setIsCustomHospital(true);
-                  setQuery('');
-                  dispatch({ hospitalId: 'custom', type: 'selectHospital' });
-                }}
-              />
+              {hospitalDropdownOpen ? (
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                  style={styles.dropdown}
+                >
+                  {hospitalResults.map((hospital) => (
+                    <Choice
+                      key={`${hospital.isCustom ? 'custom' : 'verified'}-${hospital.id}`}
+                      label={hospital.name}
+                      meta={hospital.isCustom ? 'Your hospital' : undefined}
+                      onPress={() => selectHospital(hospital)}
+                    />
+                  ))}
+                  {newHospitalName ? (
+                    <Choice
+                      icon="add-circle-outline"
+                      label={`Add “${newHospitalName}”`}
+                      meta="New hospital"
+                      onPress={() => selectNewHospital(newHospitalName)}
+                    />
+                  ) : null}
+                  {hospitalResults.length === 0 && !newHospitalName ? (
+                    <Text style={styles.emptyResult}>No hospitals found</Text>
+                  ) : null}
+                </ScrollView>
+              ) : (
+                <Text style={styles.dropdownHint}>
+                  Tap the search field to see all hospitals.
+                </Text>
+              )}
             </Animated.View>
           ) : null}
 
           {workflow.step === 'medicine' ? (
             <Animated.View entering={FadeIn} style={styles.stack}>
               <Text style={styles.eyebrow}>{hospitalName}</Text>
-              <Text style={styles.heading}>{t('findMedicine')}</Text>
               {selectedMedicines.length > 0 ? (
                 <SelectedMedicineStrip medicines={selectedMedicines} />
               ) : null}
               <SearchBox
                 accessibilityLabel="Search medicines"
-                autoFocus
                 onChange={setQuery}
                 onClear={() => setQuery('')}
+                onFocus={() => setMedicineDropdownOpen(true)}
                 placeholder={t('searchMedicine')}
                 value={query}
               />
-              <View style={styles.dropdown}>
-                {isLoadingCatalogue ? (
-                  <ActivityIndicator
-                    color={dashboardColors.primary}
-                    style={styles.dropdownLoading}
-                  />
-                ) : null}
-                {!isLoadingCatalogue
-                  ? results.map((item) => {
-                      const selected = workflow.medicineIds.includes(item.id);
-                      return (
-                        <PressableScale
-                          accessibilityState={{ selected }}
-                          key={item.id}
-                          onPress={() =>
-                            dispatch({
-                              medicineId: item.id,
-                              type: 'toggleMedicine',
-                            })
-                          }
-                          style={[
-                            styles.medicineRow,
-                            selected && styles.medicineRowSelected,
-                          ]}
-                        >
-                          <MedicineImage item={item} style={styles.thumb} />
-                          <Text numberOfLines={2} style={styles.choiceText}>
-                            {item.name}
-                          </Text>
-                          <Ionicons
-                            color={
-                              selected
-                                ? dashboardColors.primary
-                                : dashboardColors.textFaint
-                            }
-                            name={
-                              selected
-                                ? 'checkmark-circle'
-                                : 'ellipse-outline'
-                            }
-                            size={24}
-                          />
-                        </PressableScale>
-                      );
-                    })
-                  : null}
-              </View>
-              <Primary
-                disabled={selectedMedicines.length === 0}
-                label={`Continue${
-                  selectedMedicines.length
-                    ? ` (${selectedMedicines.length} selected)`
-                    : ''
-                }`}
-                onPress={() => dispatch({ type: 'continue' })}
-              />
+              {medicineDropdownOpen ? (
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                  style={styles.dropdown}
+                >
+                  {isLoadingCatalogue ? (
+                    <ActivityIndicator
+                      color={dashboardColors.primary}
+                      style={styles.dropdownLoading}
+                    />
+                  ) : null}
+                  {!isLoadingCatalogue
+                    ? results.map((item) => {
+                        const selected = workflow.medicineIds.includes(item.id);
+                        return (
+                          <PressableScale
+                            accessibilityState={{ selected }}
+                            key={item.id}
+                            onPress={() => selectMedicine(item)}
+                            style={[
+                              styles.medicineRow,
+                              selected && styles.medicineRowSelected,
+                            ]}
+                          >
+                            <MedicineImage item={item} style={styles.thumb} />
+                            <Text numberOfLines={2} style={styles.choiceText}>
+                              {item.name}
+                            </Text>
+                            <Ionicons
+                              color={
+                                selected
+                                  ? dashboardColors.primary
+                                  : dashboardColors.textFaint
+                              }
+                              name={
+                                selected
+                                  ? 'checkmark-circle'
+                                  : 'ellipse-outline'
+                              }
+                              size={24}
+                            />
+                          </PressableScale>
+                        );
+                      })
+                    : null}
+                  {!isLoadingCatalogue && results.length === 0 ? (
+                    <Text style={styles.emptyResult}>No medicines found</Text>
+                  ) : null}
+                </ScrollView>
+              ) : (
+                <Text style={styles.dropdownHint}>
+                  Tap the search field to see all medicines.
+                </Text>
+              )}
             </Animated.View>
           ) : null}
 
           {workflow.step === 'details' ? (
             <Animated.View entering={FadeIn} style={styles.stack}>
-              <Text style={styles.heading}>{t('courseDetails')}</Text>
-              <SelectedMedicineStrip medicines={selectedMedicines} />
-              <LabelInput
-                label={t('tabletsPerDose')}
-                onChange={setTablets}
-                value={tablets}
-              />
               <LabelInput
                 label={t('durationDays')}
                 onChange={setDays}
                 value={days}
               />
-              <View>
-                <Text style={styles.label}>Start date</Text>
-                <PressableScale
-                  onPress={() => setCalendarVisible((current) => !current)}
-                  style={styles.dateButton}
-                >
-                  <Ionicons
-                    color={dashboardColors.primary}
-                    name="calendar-outline"
-                    size={22}
-                  />
-                  <View style={styles.dateButtonCopy}>
-                    <Text style={styles.dateButtonValue}>{startDate}</Text>
-                    <Text style={styles.dateButtonRange}>
-                      Through {endDate}
+              <Text style={styles.courseRange}>
+                Starts today · ends {endDate}
+              </Text>
+              {selectedMedicines.map((medicine) => {
+                const details = medicineDetails[medicine.id] ?? {
+                  slotTimes: { ...defaultSlotTimes },
+                  slots: ['morning'] as DoseSlot[],
+                  tablets: '1',
+                };
+                return (
+                  <View key={medicine.id} style={styles.medicineDetailsCard}>
+                    <View style={styles.medicineDetailsHeader}>
+                      <MedicineImage
+                        item={medicine}
+                        style={styles.detailsThumb}
+                      />
+                      <Text numberOfLines={2} style={styles.detailsName}>
+                        {medicine.name}
+                      </Text>
+                    </View>
+                    <LabelInput
+                      label={t('tabletsPerDose')}
+                      onChange={(value) =>
+                        updateMedicineDetails(medicine.id, (current) => ({
+                          ...current,
+                          tablets: value,
+                        }))
+                      }
+                      value={details.tablets}
+                    />
+                    <Text style={styles.sectionLabel}>
+                      When should this medicine be taken?
                     </Text>
+                    <View style={styles.chips}>
+                      {SLOT_KEYS.map((slot) => (
+                        <Chip
+                          active={details.slots.includes(slot)}
+                          key={slot}
+                          label={`${t(slot)} · ${formatTime12Hour(
+                            details.slotTimes[slot],
+                          )}`}
+                          onPress={() =>
+                            updateMedicineDetails(
+                              medicine.id,
+                              (current) => ({
+                                ...current,
+                                slots: SLOT_KEYS.filter((item) =>
+                                  item === slot
+                                    ? !current.slots.includes(slot)
+                                    : current.slots.includes(item),
+                                ),
+                              }),
+                            )
+                          }
+                          slot={slot}
+                        />
+                      ))}
+                    </View>
+                    {details.slots.map((slot) => (
+                      <SlotTimeEditor
+                        key={slot}
+                        label={t(slot)}
+                        onChange={(value) =>
+                          updateMedicineDetails(medicine.id, (current) => ({
+                            ...current,
+                            slotTimes: {
+                              ...current.slotTimes,
+                              [slot]: value,
+                            },
+                          }))
+                        }
+                        slot={slot}
+                        value={details.slotTimes[slot]}
+                      />
+                    ))}
                   </View>
-                  <Ionicons
-                    color={dashboardColors.textFaint}
-                    name={calendarVisible ? 'chevron-up' : 'chevron-down'}
-                    size={18}
-                  />
-                </PressableScale>
-                {calendarVisible ? (
-                  <InlineCalendar
-                    durationDays={
-                      Number.isInteger(durationDays) ? durationDays : 1
-                    }
-                    onChangeMonth={setVisibleMonth}
-                    onSelect={selectStartDate}
-                    selectedDate={startDate}
-                    visibleMonth={visibleMonth}
-                  />
-                ) : null}
-              </View>
-              <Text style={styles.sectionLabel}>Reminder time</Text>
-              <View style={styles.chips}>
-                {SLOT_KEYS.map((slot) => (
-                  <Chip
-                    active={slots.includes(slot)}
-                    key={slot}
-                    label={t(slot)}
-                    onPress={() => toggleSlot(slot)}
-                  />
-                ))}
-              </View>
+                );
+              })}
               <Text style={styles.sectionLabel}>Repeat</Text>
               <View style={styles.chips}>
                 <Chip
@@ -532,7 +675,7 @@ export default function AddMedicineScreen() {
               </View>
               <Primary
                 label={t('reviewReminder')}
-                onPress={() => dispatch({ type: 'continue' })}
+                onPress={reviewReminder}
               />
             </Animated.View>
           ) : null}
@@ -543,15 +686,35 @@ export default function AddMedicineScreen() {
                 {selectedMedicines.length} medicine
                 {selectedMedicines.length === 1 ? '' : 's'}
               </Text>
-              <View style={styles.reviewGrid}>
-                {selectedMedicines.map((medicine) => (
-                  <View key={medicine.id} style={styles.reviewMedicine}>
-                    <MedicineImage item={medicine} style={styles.reviewImage} />
-                    <Text numberOfLines={2} style={styles.reviewName}>
-                      {medicine.name}
-                    </Text>
-                  </View>
-                ))}
+              <View style={styles.reviewList}>
+                {selectedMedicines.map((medicine) => {
+                  const details = medicineDetails[medicine.id]!;
+                  return (
+                    <View key={medicine.id} style={styles.reviewMedicine}>
+                      <MedicineImage
+                        item={medicine}
+                        style={styles.reviewImage}
+                      />
+                      <View style={styles.reviewCopy}>
+                        <Text numberOfLines={2} style={styles.reviewName}>
+                          {medicine.name}
+                        </Text>
+                        <Text style={styles.reviewMeta}>
+                          {details.tablets} tablet
+                          {Number(details.tablets) === 1 ? '' : 's'} ·{' '}
+                          {details.slots
+                            .map(
+                              (slot) =>
+                                `${t(slot)} ${formatTime12Hour(
+                                  details.slotTimes[slot],
+                                )}`,
+                            )
+                            .join(', ')}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
               <Text style={styles.summary}>{hospitalName}</Text>
               <Text style={styles.summary}>
@@ -559,7 +722,6 @@ export default function AddMedicineScreen() {
                 {endDate}
               </Text>
               <Text style={styles.summary}>
-                {slots.map((slot) => t(slot)).join(', ')} ·{' '}
                 {pattern === 'daily' ? t('everyDay') : t('alternateDays')}
               </Text>
               <Primary
@@ -570,6 +732,19 @@ export default function AddMedicineScreen() {
             </Animated.View>
           ) : null}
         </ScrollView>
+        {workflow.step === 'medicine' ? (
+          <View style={styles.continueFooter}>
+            <Primary
+              disabled={selectedMedicines.length === 0}
+              label={`Continue${
+                selectedMedicines.length
+                  ? ` (${selectedMedicines.length} selected)`
+                  : ''
+              }`}
+              onPress={() => dispatch({ type: 'continue' })}
+            />
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
       {success ? (
         <View style={styles.overlay}>
@@ -593,6 +768,7 @@ function SearchBox({
   autoFocus,
   onChange,
   onClear,
+  onFocus,
   placeholder,
   value,
 }: {
@@ -600,6 +776,7 @@ function SearchBox({
   autoFocus?: boolean;
   onChange: (value: string) => void;
   onClear: () => void;
+  onFocus?: () => void;
   placeholder: string;
   value: string;
 }) {
@@ -616,6 +793,7 @@ function SearchBox({
         autoCorrect={false}
         autoFocus={autoFocus}
         onChangeText={onChange}
+        onFocus={onFocus}
         placeholder={placeholder}
         placeholderTextColor={dashboardColors.textFaint}
         style={styles.searchInput}
@@ -640,11 +818,15 @@ function SearchBox({
 
 function Choice({
   disabled,
+  icon = 'business-outline',
   label,
+  meta,
   onPress,
 }: {
   disabled?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
   label: string;
+  meta?: string;
   onPress: () => void;
 }) {
   return (
@@ -655,10 +837,13 @@ function Choice({
     >
       <Ionicons
         color={dashboardColors.primary}
-        name="business-outline"
+        name={icon}
         size={20}
       />
-      <Text style={styles.choiceText}>{label}</Text>
+      <View style={styles.choiceCopy}>
+        <Text style={styles.choiceText}>{label}</Text>
+        {meta ? <Text style={styles.choiceMeta}>{meta}</Text> : null}
+      </View>
       <Ionicons
         color={dashboardColors.textFaint}
         name="chevron-forward"
@@ -717,123 +902,41 @@ function SelectedMedicineStrip({
   );
 }
 
-function InlineCalendar({
-  durationDays,
-  onChangeMonth,
-  onSelect,
-  selectedDate,
-  visibleMonth,
-}: {
-  durationDays: number;
-  onChangeMonth: (date: Date) => void;
-  onSelect: (date: string) => void;
-  selectedDate: string;
-  visibleMonth: Date;
-}) {
-  const cells = getCalendarCells(
-    visibleMonth.getFullYear(),
-    visibleMonth.getMonth(),
-  );
-  const moveMonth = (offset: number) =>
-    onChangeMonth(
-      new Date(
-        visibleMonth.getFullYear(),
-        visibleMonth.getMonth() + offset,
-        1,
-      ),
-    );
-
-  return (
-    <View style={styles.calendar}>
-      <View style={styles.calendarHeader}>
-        <PressableScale
-          accessibilityLabel="Previous month"
-          onPress={() => moveMonth(-1)}
-          style={styles.calendarArrow}
-        >
-          <Ionicons
-            color={dashboardColors.text}
-            name="chevron-back"
-            size={18}
-          />
-        </PressableScale>
-        <Text style={styles.calendarTitle}>
-          {MONTHS[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}
-        </Text>
-        <PressableScale
-          accessibilityLabel="Next month"
-          onPress={() => moveMonth(1)}
-          style={styles.calendarArrow}
-        >
-          <Ionicons
-            color={dashboardColors.text}
-            name="chevron-forward"
-            size={18}
-          />
-        </PressableScale>
-      </View>
-      <View style={styles.calendarGrid}>
-        {WEEKDAYS.map((weekday, index) => (
-          <Text key={`${weekday}-${index}`} style={styles.weekdayLabel}>
-            {weekday}
-          </Text>
-        ))}
-        {cells.map((cell) => {
-          const inRange = isDateInRange(
-            cell.date,
-            selectedDate,
-            durationDays,
-          );
-          const isStart = cell.date === selectedDate;
-          return (
-            <PressableScale
-              accessibilityLabel={cell.date}
-              accessibilityState={{ selected: isStart }}
-              key={cell.date}
-              onPress={() => onSelect(cell.date)}
-              style={[
-                styles.calendarDay,
-                inRange && styles.calendarDayInRange,
-                isStart && styles.calendarDayStart,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.calendarDayText,
-                  !cell.inMonth && styles.calendarDayOutside,
-                  inRange && styles.calendarDayTextInRange,
-                  isStart && styles.calendarDayTextStart,
-                ]}
-              >
-                {cell.day}
-              </Text>
-            </PressableScale>
-          );
-        })}
-      </View>
-      <Text style={styles.calendarRange}>
-        {selectedDate} – {getCourseEndDate(selectedDate, durationDays)}
-      </Text>
-    </View>
-  );
-}
-
 function Chip({
   active,
   label,
   onPress,
+  slot,
 }: {
   active: boolean;
   label: string;
   onPress: () => void;
+  slot?: DoseSlot;
 }) {
+  const theme = slot ? DOSE_SLOT_THEME[slot] : null;
   return (
     <PressableScale
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={[styles.chip, active && styles.chipActive]}
+      style={[
+        styles.chip,
+        active && styles.chipActive,
+        theme && {
+          backgroundColor: active ? theme.tint : dashboardColors.card,
+          borderColor: theme.accent,
+        },
+      ]}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+      {theme ? (
+        <Ionicons color={theme.accent} name={theme.icon} size={15} />
+      ) : null}
+      <Text
+        style={[
+          styles.chipText,
+          active && styles.chipTextActive,
+          theme && { color: theme.accent },
+        ]}
+      >
         {label}
       </Text>
     </PressableScale>
@@ -917,11 +1020,6 @@ const styles = StyleSheet.create({
     color: dashboardColors.primary,
     textAlign: 'center',
   },
-  orText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    textAlign: 'center',
-  },
   textInput: {
     ...dashboardTypography.body,
     backgroundColor: dashboardColors.card,
@@ -968,6 +1066,11 @@ const styles = StyleSheet.create({
     padding: 20,
     textAlign: 'center',
   },
+  dropdownHint: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    paddingHorizontal: 4,
+  },
   choice: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
@@ -980,7 +1083,12 @@ const styles = StyleSheet.create({
   choiceText: {
     ...dashboardTypography.body,
     color: dashboardColors.text,
-    flex: 1,
+  },
+  choiceCopy: { flex: 1 },
+  choiceMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    marginTop: 2,
   },
   disabled: { opacity: 0.45 },
   medicineRow: {
@@ -1023,86 +1131,42 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     marginTop: 2,
   },
-  dateButton: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderColor: dashboardColors.track,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 14,
-  },
-  dateButtonCopy: { flex: 1 },
-  dateButtonValue: {
-    ...dashboardTypography.body,
-    color: dashboardColors.text,
-  },
-  dateButtonRange: {
+  courseRange: {
     ...dashboardTypography.caption,
     color: dashboardColors.textMuted,
-    marginTop: 2,
   },
-  calendar: {
+  medicineDetailsCard: {
     backgroundColor: dashboardColors.card,
     borderColor: dashboardColors.track,
-    borderRadius: 18,
+    borderRadius: dashboardRadii.card,
     borderWidth: 1,
-    marginTop: 8,
-    padding: 12,
+    gap: dashboardSpacing.md,
+    padding: dashboardSpacing.md,
   },
-  calendarHeader: {
+  medicineDetailsHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: dashboardSpacing.md,
   },
-  calendarArrow: {
-    alignItems: 'center',
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
+  detailsThumb: {
+    borderRadius: 12,
+    height: 58,
+    width: 68,
   },
-  calendarTitle: {
-    ...dashboardTypography.body,
+  detailsName: {
+    ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-  },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  weekdayLabel: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    paddingVertical: 5,
-    textAlign: 'center',
-    width: '14.2857%',
-  },
-  calendarDay: {
-    alignItems: 'center',
-    borderRadius: 9,
-    height: 36,
-    justifyContent: 'center',
-    width: '14.2857%',
-  },
-  calendarDayInRange: { backgroundColor: dashboardColors.primaryTint },
-  calendarDayStart: { backgroundColor: dashboardColors.primary },
-  calendarDayText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.text,
-  },
-  calendarDayOutside: { color: dashboardColors.textFaint, opacity: 0.45 },
-  calendarDayTextInRange: { color: dashboardColors.primaryDark },
-  calendarDayTextStart: { color: '#FFFFFF' },
-  calendarRange: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primaryDark,
-    marginTop: 8,
-    textAlign: 'center',
+    flex: 1,
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
+    alignItems: 'center',
     backgroundColor: dashboardColors.card,
     borderColor: dashboardColors.track,
     borderRadius: 999,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -1115,26 +1179,37 @@ const styles = StyleSheet.create({
     color: dashboardColors.primaryDark,
     fontFamily: 'Inter_700Bold',
   },
-  reviewGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  reviewList: {
     gap: 10,
-    justifyContent: 'center',
   },
   reviewMedicine: {
+    alignItems: 'center',
     backgroundColor: dashboardColors.card,
     borderColor: dashboardColors.track,
     borderRadius: 16,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
     overflow: 'hidden',
-    width: '47%',
+    padding: dashboardSpacing.sm,
   },
-  reviewImage: { height: 105, width: '100%' },
+  reviewImage: { borderRadius: 12, height: 72, width: 82 },
+  reviewCopy: { flex: 1 },
   reviewName: {
-    ...dashboardTypography.body,
+    ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    minHeight: 50,
-    padding: 9,
+  },
+  reviewMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: 4,
+  },
+  continueFooter: {
+    backgroundColor: dashboardColors.bg,
+    borderTopColor: dashboardColors.track,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: dashboardSpacing.pagePadding,
+    paddingVertical: dashboardSpacing.sm,
   },
   primary: {
     alignItems: 'center',

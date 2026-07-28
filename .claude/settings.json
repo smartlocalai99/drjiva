@@ -1,5 +1,13 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx --yes eas-cli@latest build:list *)",
+      "Bash(npx --yes eas-cli@latest build:view *)",
+      "Bash(npx skills find *)"
+    ]
   }
 }

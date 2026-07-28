@@ -1,3 +1,7 @@
+import { DOSE_SLOT_THEME } from './doseSlotTheme';
+import type { DoseSlot } from './medicineSchedule';
+import { formatScheduledTime12Hour } from './medicineTime';
+
 type NotificationEvent = {
   eventId: string;
   scheduledFor: string;
@@ -6,6 +10,7 @@ type NotificationEvent = {
 type NotificationContent = {
   medicineName: string;
   slot: string;
+  slotKey: DoseSlot;
   tablets: number;
 };
 
@@ -74,7 +79,10 @@ export async function scheduleDoseNotifications(
           content: {
             body: `${notificationContent.tablets} tablet${
               notificationContent.tablets === 1 ? '' : 's'
-            } · ${notificationContent.slot}`,
+            } · ${notificationContent.slot} · ${formatScheduledTime12Hour(
+              event.scheduledFor,
+            )}`,
+            color: DOSE_SLOT_THEME[notificationContent.slotKey].accent,
             data: { eventId: event.eventId, route: '/home' },
             sound: 'default',
             title: `Time for ${notificationContent.medicineName}`,

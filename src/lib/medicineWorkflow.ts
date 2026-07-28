@@ -4,6 +4,21 @@ export type MedicineWorkflowState = {
   step: 'hospital' | 'medicine' | 'details' | 'review';
 };
 
+export type MedicineWorkflowTitleKey =
+  | 'addMedicine'
+  | 'courseDetails'
+  | 'findMedicine'
+  | 'reviewReminder';
+
+export function getMedicineWorkflowTitleKey(
+  step: MedicineWorkflowState['step'],
+): MedicineWorkflowTitleKey {
+  if (step === 'medicine') return 'findMedicine';
+  if (step === 'details') return 'courseDetails';
+  if (step === 'review') return 'reviewReminder';
+  return 'addMedicine';
+}
+
 export const initialMedicineWorkflow: MedicineWorkflowState = {
   hospitalId: '',
   medicineIds: [],

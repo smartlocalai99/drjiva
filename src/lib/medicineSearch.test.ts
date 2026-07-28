@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   filterMedicineCatalogue,
+  getNewCatalogueEntryName,
   matchesMedicineSearch,
   normalizeMedicineSearch,
 } from './medicineSearch';
@@ -63,5 +64,18 @@ describe('medicine search', () => {
 
     expect(filterMedicineCatalogue(medicines, '', 20)).toHaveLength(20);
     expect(medicines).toHaveLength(30);
+  });
+
+  it('offers a trimmed new entry only when there is no exact match', () => {
+    const hospitals = [
+      { id: '1', name: 'Apollo Hospital' },
+      { id: '2', name: 'Care Hospital' },
+    ];
+
+    expect(getNewCatalogueEntryName(hospitals, '  New Life Hospital  ')).toBe(
+      'New Life Hospital',
+    );
+    expect(getNewCatalogueEntryName(hospitals, 'apollo-hospital')).toBeNull();
+    expect(getNewCatalogueEntryName(hospitals, 'a')).toBeNull();
   });
 });

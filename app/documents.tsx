@@ -344,22 +344,6 @@ export default function DocumentsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.intro}>
-          <View style={styles.introIcon}>
-            <Ionicons
-              color={dashboardColors.primary}
-              name="shield-checkmark-outline"
-              size={20}
-            />
-          </View>
-          <View style={styles.introBody}>
-            <Text style={styles.introTitle}>{t('privateMedicalPdfs')}</Text>
-            <Text style={styles.introText}>
-              {t('scanOnDevice')}
-            </Text>
-          </View>
-        </View>
-
         {selectedGroup ? (
           <View style={styles.folderHeader}>
             <PressableScale
@@ -526,35 +510,6 @@ const styles = StyleSheet.create({
   },
   contentEmpty: {
     flexGrow: 1,
-  },
-  intro: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.card,
-    flexDirection: 'row',
-    gap: dashboardSpacing.md,
-    marginTop: dashboardSpacing.sm,
-    padding: dashboardSpacing.md,
-  },
-  introIcon: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderRadius: 19,
-    height: 38,
-    justifyContent: 'center',
-    width: 38,
-  },
-  introBody: {
-    flex: 1,
-  },
-  introTitle: {
-    ...dashboardTypography.body,
-    color: dashboardColors.primaryDark,
-  },
-  introText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    marginTop: 1,
   },
   folderHeader: {
     alignItems: 'center',

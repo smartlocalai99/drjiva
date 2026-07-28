@@ -22,6 +22,22 @@ type NamedMedicine = {
   name: string;
 };
 
+export function getNewCatalogueEntryName<T extends NamedMedicine>(
+  entries: readonly T[],
+  query: string,
+): string | null {
+  const displayName = query.trim().replace(/\s+/g, ' ');
+  const normalizedQuery = normalizeMedicineSearch(displayName);
+  if (displayName.length < 2 || !normalizedQuery) {
+    return null;
+  }
+
+  const hasExactMatch = entries.some(
+    (entry) => normalizeMedicineSearch(entry.name) === normalizedQuery,
+  );
+  return hasExactMatch ? null : displayName;
+}
+
 function medicineSearchRank(name: string, query: string): number {
   const normalizedName = normalizeMedicineSearch(name);
   if (normalizedName === query) {

@@ -1,5 +1,10 @@
 import { supabase } from '../lib/supabase';
-import { cancelDoseNotifications } from '../lib/medicineNotifications';
+import { deleteMedicineReminderWithAdapter } from '../lib/deleteMedicineReminder';
+import { deleteMedicineCourse } from '../lib/medicineCourses';
+import {
+  cancelDoseNotifications,
+  queueNotificationCancellations,
+} from '../lib/medicineNotifications';
 import {
   mapDoseRows,
   selectRelevantDoseRows,
@@ -25,6 +30,7 @@ type RawDose = {
   status: string;
   patient_medicine_courses:
     | {
+        id: string;
         tablets_per_dose: number;
         hospitals: { name: string } | Array<{ name: string }> | null;
         patient_custom_hospitals:
@@ -36,6 +42,7 @@ type RawDose = {
           | Array<{ image_url: string | null; name: string; hospital_name: string }>;
       }
     | Array<{
+        id: string;
         tablets_per_dose: number;
         hospitals: { name: string } | Array<{ name: string }> | null;
         patient_custom_hospitals:
@@ -61,7 +68,7 @@ export async function fetchMedicinesForDate(
     supabase
       .from('patient_medicine_dose_events')
       .select(
-        'id, scheduled_for, slot, status, patient_medicine_courses!inner(tablets_per_dose, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
+        'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
       )
       .eq('patient_id', patientId)
       .gte('scheduled_for', start.toISOString())
@@ -86,6 +93,7 @@ export async function fetchMedicinesForDate(
       medicine.hospital_name;
     return [{
       completed: event.status === 'completed',
+      courseId: course.id,
       eventId: event.id,
       hospitalName: hospital,
       imageUrl: medicine.image_url,
@@ -105,6 +113,26 @@ export async function fetchMedicinesForDate(
       morning: String(settings?.morning_time ?? '08:00').slice(0, 5),
       night: String(settings?.night_time ?? '20:00').slice(0, 5),
     }),
+  );
+}
+
+export async function deleteMedicineReminder(courseId: string): Promise<void> {
+  await deleteMedicineReminderWithAdapter(
+    {
+      cancelNotifications: cancelDoseNotifications,
+      deleteCourse: deleteMedicineCourse,
+      listNotificationIds: async (id) => {
+        const { data, error } = await supabase
+          .from('patient_medicine_dose_events')
+          .select('notification_id')
+          .eq('course_id', id)
+          .not('notification_id', 'is', null);
+        if (error) throw error;
+        return (data ?? []).map((row) => row.notification_id);
+      },
+      queueCancellations: queueNotificationCancellations,
+    },
+    courseId,
   );
 }
 

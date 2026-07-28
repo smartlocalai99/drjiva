@@ -14,8 +14,9 @@ import { EmptyMedicines } from '../src/components/dashboard/EmptyMedicines';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
 import { MedicineCard } from '../src/components/dashboard/MedicineCard';
 import {
-  fetchMedicinesForDate,
   completeDoseEvent,
+  deleteMedicineReminder,
+  fetchMedicinesForDate,
   type Medicine,
 } from '../src/data/medicines';
 import {
@@ -27,6 +28,7 @@ import {
 import { getGreeting, isSameDay } from '../src/lib/dates';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
+import { getInitialTimelineDate } from '../src/lib/medicineCalendar';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
   getCachedPatientName,
@@ -36,19 +38,28 @@ import {
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const params = useLocalSearchParams<{ phone?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    phone?: string | string[];
+    selectedDate?: string | string[];
+  }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
+  const selectedDateParam = Array.isArray(params.selectedDate)
+    ? params.selectedDate[0]
+    : params.selectedDate;
 
   const insets = useSafeAreaInsets();
   const today = useMemo(() => new Date(), []);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    getInitialTimelineDate(selectedDateParam, today),
+  );
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [isLoadingMedicines, setIsLoadingMedicines] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTabKey>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [patientName, setPatientName] = useState<string | undefined>();
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!phone) {
@@ -89,6 +100,7 @@ export default function HomeScreen() {
       setIsLoadingMedicines(false);
       return;
     }
+    setIsLoadingMedicines(true);
     try {
       const nextMedicines = await fetchMedicinesForDate(patientId, date);
       setMedicines(nextMedicines);
@@ -100,15 +112,17 @@ export default function HomeScreen() {
   }, [patientId]);
 
   useEffect(() => {
-    void loadMedicines(today);
-  }, [loadMedicines, today]);
+    void loadMedicines(selectedDate);
+  }, [loadMedicines, selectedDate]);
+
+  useEffect(() => {
+    setSelectedDate(getInitialTimelineDate(selectedDateParam, today));
+  }, [selectedDateParam, today]);
 
   const completedCount = medicines.filter((medicine) => medicine.completed).length;
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(date);
-    setIsLoadingMedicines(true);
-    void loadMedicines(date);
   };
 
   const handleToggleMedicine = async (id: string) => {
@@ -130,6 +144,34 @@ export default function HomeScreen() {
     setRefreshing(true);
     await loadMedicines(selectedDate);
     setRefreshing(false);
+  };
+
+  const handleDeleteMedicine = (medicine: Medicine) => {
+    Alert.alert(t('deleteReminder'), t('deleteReminderMessage'), [
+      { style: 'cancel', text: t('cancel') },
+      {
+        onPress: () => {
+          setDeletingCourseId(medicine.courseId);
+          void deleteMedicineReminder(medicine.courseId)
+            .then(() => {
+              setMedicines((current) =>
+                current.filter(
+                  (item) => item.courseId !== medicine.courseId,
+                ),
+              );
+            })
+            .catch(() =>
+              Alert.alert(
+                t('unableDeleteReminder'),
+                t('unableDeleteReminderMessage'),
+              ),
+            )
+            .finally(() => setDeletingCourseId(null));
+        },
+        style: 'destructive',
+        text: t('delete'),
+      },
+    ]);
   };
 
   const handleSelectTab = (tab: NavTabKey) => {
@@ -202,6 +244,8 @@ export default function HomeScreen() {
               index={index}
               key={medicine.id}
               medicine={medicine}
+              deleting={deletingCourseId === medicine.courseId}
+              onDelete={() => handleDeleteMedicine(medicine)}
               onToggle={() => void handleToggleMedicine(medicine.id)}
             />
           ))

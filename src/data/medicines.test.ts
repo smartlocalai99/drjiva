@@ -12,6 +12,7 @@ describe('mapDoseRows', () => {
       mapDoseRows([
         {
           completed: true,
+          courseId: 'course-1',
           eventId: 'event-1',
           hospitalName: 'Medico Hospital',
           imageUrl: 'https://db.test/dolo.jpg',
@@ -24,8 +25,10 @@ describe('mapDoseRows', () => {
     ).toEqual([
       expect.objectContaining({
         completed: true,
+        courseId: 'course-1',
         id: 'event-1',
         imageUrl: 'https://db.test/dolo.jpg',
+        slot: 'morning',
         tabletCount: '1.5 tablets',
         timing: 'Morning',
       }),
@@ -37,6 +40,7 @@ describe('mapDoseRows', () => {
       mapDoseRows([
         {
           completed: false,
+          courseId: 'course-1',
           eventId: 'event-1',
           hospitalName: 'Hospital',
           imageUrl: '',
@@ -62,6 +66,7 @@ describe('selectRelevantDoseRows', () => {
     const rows = [
       {
         completed: false,
+        courseId: 'course-1',
         eventId: 'morning',
         hospitalName: 'Hospital',
         imageUrl: 'https://db.test/m.jpg',
@@ -72,6 +77,7 @@ describe('selectRelevantDoseRows', () => {
       },
       {
         completed: false,
+        courseId: 'course-1',
         eventId: 'night',
         hospitalName: 'Hospital',
         imageUrl: 'https://db.test/m.jpg',
@@ -88,5 +94,40 @@ describe('selectRelevantDoseRows', () => {
         { afternoon: '13:00', morning: '08:00', night: '20:00' },
       ).map((row) => row.eventId),
     ).toEqual(['night']);
+  });
+
+  it('uses each saved event time instead of global period defaults', () => {
+    const rows = [
+      {
+        completed: false,
+        courseId: 'course-1',
+        eventId: 'afternoon',
+        hospitalName: 'Hospital',
+        imageUrl: 'https://db.test/m.jpg',
+        medicineName: 'Medicine',
+        scheduledFor: '2026-07-28T16:00:00+05:30',
+        slot: 'afternoon',
+        tabletsPerDose: 1,
+      },
+      {
+        completed: false,
+        courseId: 'course-1',
+        eventId: 'custom-night',
+        hospitalName: 'Hospital',
+        imageUrl: 'https://db.test/m.jpg',
+        medicineName: 'Medicine',
+        scheduledFor: '2026-07-28T19:00:00+05:30',
+        slot: 'night',
+        tabletsPerDose: 1,
+      },
+    ];
+
+    expect(
+      selectRelevantDoseRows(
+        rows,
+        new Date('2026-07-28T19:30:00+05:30'),
+        { afternoon: '13:00', morning: '08:00', night: '20:00' },
+      ).map((row) => row.eventId),
+    ).toEqual(['custom-night']);
   });
 });

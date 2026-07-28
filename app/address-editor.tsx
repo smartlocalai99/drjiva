@@ -322,6 +322,8 @@ export default function AddressEditorScreen() {
               </View>
             </View>
 
+          </ScrollView>
+          <View style={styles.footer}>
             <PressableScale
               accessibilityLabel={addressId ? 'Update address' : 'Save address'}
               disabled={isSaving}
@@ -340,7 +342,7 @@ export default function AddressEditorScreen() {
                 </>
               )}
             </PressableScale>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       )}
     </SafeAreaView>
@@ -403,8 +405,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingBottom: dashboardSpacing.xxl,
+    paddingBottom: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.pagePadding,
+  },
+  footer: {
+    backgroundColor: dashboardColors.bg,
+    borderTopColor: dashboardColors.track,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    padding: dashboardSpacing.pagePadding,
   },
   sectionTitle: {
     ...dashboardTypography.caption,
@@ -488,7 +496,6 @@ const styles = StyleSheet.create({
     gap: dashboardSpacing.sm,
     height: 56,
     justifyContent: 'center',
-    marginTop: dashboardSpacing.xl,
   },
   saveButtonDisabled: {
     opacity: 0.6,

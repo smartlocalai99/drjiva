@@ -4,9 +4,14 @@ const asyncStorage = vi.hoisted(() => ({
   getItem: vi.fn(),
   setItem: vi.fn(),
 }));
+const updatePatientAddress = vi.hoisted(() => vi.fn());
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: asyncStorage,
+}));
+
+vi.mock('./patients', () => ({
+  updatePatientAddress,
 }));
 
 import {
@@ -33,6 +38,8 @@ describe('addressStorage', () => {
   beforeEach(() => {
     asyncStorage.getItem.mockReset();
     asyncStorage.setItem.mockReset();
+    updatePatientAddress.mockReset();
+    updatePatientAddress.mockResolvedValue(undefined);
   });
 
   it('scopes persisted addresses to the normalized phone number', () => {
@@ -71,6 +78,10 @@ describe('addressStorage', () => {
     expect(asyncStorage.setItem).toHaveBeenCalledWith(
       'drjiva.addresses.v1.9876543210',
       JSON.stringify([address]),
+    );
+    expect(updatePatientAddress).toHaveBeenCalledWith(
+      '9876543210',
+      'Flat 302, Banjara Hills, Hyderabad, Telangana, 500034',
     );
   });
 });

@@ -50,6 +50,12 @@ function enforceSingleDefault(addresses: SavedAddress[]): SavedAddress[] {
   );
 }
 
+export function getDefaultAddress(
+  addresses: readonly SavedAddress[],
+): SavedAddress | undefined {
+  return addresses.find((address) => address.isDefault) ?? addresses[0];
+}
+
 function isSavedAddress(value: unknown): value is SavedAddress {
   if (!value || typeof value !== 'object') {
     return false;

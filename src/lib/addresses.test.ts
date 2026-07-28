@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getDefaultAddress,
   normalizeAddress,
   parseStoredAddresses,
   removeAddress,
@@ -113,6 +114,17 @@ describe('normalizeAddress', () => {
 });
 
 describe('address list rules', () => {
+  it('returns the default delivery address with a safe first-item fallback', () => {
+    const first = savedAddress('first', homeDraft, false);
+    const second = savedAddress('second', workDraft, true);
+
+    expect(getDefaultAddress([first, second])).toEqual(second);
+    expect(
+      getDefaultAddress([{ ...first, isDefault: false }]),
+    ).toEqual({ ...first, isDefault: false });
+    expect(getDefaultAddress([])).toBeUndefined();
+  });
+
   it('makes the first address default and preserves exactly one default', () => {
     const first = normalizeAddress(homeDraft, 'home-1');
     const second = normalizeAddress(workDraft, 'work-1');

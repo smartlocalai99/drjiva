@@ -23,7 +23,12 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
           { eventId: 'event-1', scheduledFor: '2026-08-01T08:00:00.000Z' },
           { eventId: 'event-2', scheduledFor: '2026-08-01T13:00:00.000Z' },
         ],
-        { medicineName: 'Dolo 650', slot: 'Morning', tablets: 1 },
+        {
+          medicineName: 'Dolo 650',
+          slot: 'Morning',
+          slotKey: 'morning',
+          tablets: 1,
+        },
       ),
     ).rejects.toThrow('schedule failed');
 

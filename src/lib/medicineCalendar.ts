@@ -1,3 +1,5 @@
+import type { DayPattern } from './medicineSchedule';
+
 export type CalendarCell = {
   date: string;
   day: number;
@@ -26,6 +28,13 @@ export function formatDateOnly(date: Date): string {
     String(date.getMonth() + 1).padStart(2, '0'),
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
+}
+
+export function getInitialTimelineDate(
+  selectedDate: string | undefined,
+  fallback: Date,
+): Date {
+  return (selectedDate && parseDateOnly(selectedDate)) || fallback;
 }
 
 export function addCalendarDays(value: string, amount: number): string {
@@ -59,6 +68,25 @@ export function isDateInRange(
       date.getTime() >= start.getTime() &&
       date.getTime() <= end.getTime(),
   );
+}
+
+export function isCourseDoseDate(
+  value: string,
+  startDate: string,
+  durationDays: number,
+  pattern: DayPattern,
+): boolean {
+  const date = parseDateOnly(value);
+  const start = parseDateOnly(startDate);
+  if (!date || !start || !isDateInRange(value, startDate, durationDays)) {
+    return false;
+  }
+  const dayOffset = Math.round(
+    (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) -
+      Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) /
+      (24 * 60 * 60 * 1000),
+  );
+  return pattern === 'daily' || dayOffset % 2 === 0;
 }
 
 export function getCalendarCells(year: number, month: number): CalendarCell[] {

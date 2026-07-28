@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -21,18 +21,28 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../../dashboardTheme';
+import { DOSE_SLOT_THEME } from '../../lib/doseSlotTheme';
 import { PressableScale } from '../PressableScale';
 import { MedicineToggle } from './MedicineToggle';
 
 type MedicineCardProps = {
+  deleting: boolean;
   medicine: Medicine;
   index: number;
+  onDelete: () => void;
   onToggle: () => void;
 };
 
-export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
+export function MedicineCard({
+  deleting,
+  medicine,
+  index,
+  onDelete,
+  onToggle,
+}: MedicineCardProps) {
   const scale = useSharedValue(1);
   const wasCompleted = useRef(medicine.completed);
+  const slotTheme = DOSE_SLOT_THEME[medicine.slot];
 
   useEffect(() => {
     if (medicine.completed && !wasCompleted.current) {
@@ -53,9 +63,7 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
       entering={FadeInDown.delay(index * 60).duration(320)}
       style={bounceStyle}
     >
-      <PressableScale
-        accessibilityLabel={`${medicine.name}, ${medicine.tabletCount}, ${medicine.timing}`}
-        pressedScale={0.98}
+      <View
         style={[
           styles.card,
           medicine.completed && styles.cardCompleted,
@@ -76,6 +84,23 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
               value={medicine.completed}
             />
           </View>
+          <PressableScale
+            accessibilityLabel={`Delete ${medicine.name} reminder`}
+            disabled={deleting}
+            hitSlop={8}
+            onPress={onDelete}
+            style={styles.deleteButton}
+          >
+            {deleting ? (
+              <ActivityIndicator color={dashboardColors.error} size="small" />
+            ) : (
+              <Ionicons
+                color={dashboardColors.error}
+                name="trash-outline"
+                size={18}
+              />
+            )}
+          </PressableScale>
           {medicine.completed ? (
             <View style={styles.badge}>
               <Ionicons color="#FFFFFF" name="checkmark" size={11} />
@@ -88,7 +113,18 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
           <Text numberOfLines={1} style={styles.name}>
             {medicine.name}
           </Text>
-          <Text style={styles.meta}>{medicine.timing}</Text>
+          <View
+            style={[styles.slotBadge, { backgroundColor: slotTheme.tint }]}
+          >
+            <Ionicons
+              color={slotTheme.accent}
+              name={slotTheme.icon}
+              size={13}
+            />
+            <Text style={[styles.meta, { color: slotTheme.accent }]}>
+              {medicine.timing} · {medicine.nextReminderTime}
+            </Text>
+          </View>
 
           <View style={styles.detailRow}>
             <View style={[styles.detailCell, styles.detailLeft]}>
@@ -125,11 +161,11 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
             </View>
           </View>
 
-          <Text style={styles.reminder}>
+          <Text style={[styles.reminder, { color: slotTheme.accent }]}>
             Next dose {medicine.nextReminderTime}
           </Text>
         </View>
-      </PressableScale>
+      </View>
     </Animated.View>
   );
 }
@@ -166,6 +202,17 @@ const styles = StyleSheet.create({
     right: dashboardSpacing.sm,
     top: dashboardSpacing.sm,
   },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: dashboardRadii.pill,
+    height: 36,
+    justifyContent: 'center',
+    left: dashboardSpacing.sm,
+    position: 'absolute',
+    top: dashboardSpacing.sm,
+    width: 36,
+  },
   body: {
     gap: 3,
     paddingHorizontal: dashboardSpacing.md,
@@ -195,7 +242,17 @@ const styles = StyleSheet.create({
   },
   meta: {
     ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
+    fontFamily: 'Inter_700Bold',
+  },
+  slotBadge: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   detailRow: {
     alignItems: 'center',

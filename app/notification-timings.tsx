@@ -9,12 +9,12 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../src/components/PressableScale';
+import { SlotTimeEditor } from '../src/components/medicine/SlotTimeEditor';
 import {
   dashboardColors,
   dashboardRadii,
@@ -34,12 +34,14 @@ import {
   scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
 import { replaceEventSlotTime, type DoseSlot } from '../src/lib/medicineSchedule';
+import {
+  areSelectedSlotTimesOrdered,
+  isStoredTime,
+} from '../src/lib/medicineTime';
 import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 import { getSessionPhone } from '../src/lib/session';
-
-const VALID_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export default function NotificationTimingsScreen() {
   const router = useRouter();
@@ -111,8 +113,11 @@ export default function NotificationTimingsScreen() {
       return;
     }
     if (
-      ![morning, afternoon, night].every((value) => VALID_TIME.test(value)) ||
-      !(morning < afternoon && afternoon < night)
+      ![morning, afternoon, night].every(isStoredTime) ||
+      !areSelectedSlotTimesOrdered(
+        ['morning', 'afternoon', 'night'],
+        { afternoon, morning, night },
+      )
     ) {
       Alert.alert(t('invalidTimings'));
       return;
@@ -161,6 +166,7 @@ export default function NotificationTimingsScreen() {
                 {
                   medicineName: reminder.medicineName,
                   slot: t(reminder.slot),
+                  slotKey: reminder.slot,
                   tablets: reminder.tablets,
                 },
               );
@@ -246,28 +252,24 @@ export default function NotificationTimingsScreen() {
           style={styles.content}
         >
           <Text style={styles.help}>{t('notificationTimingsHelp')}</Text>
-          {[
-            [t('morning'), morning, setMorning, 'sunny-outline'],
-            [t('afternoon'), afternoon, setAfternoon, 'partly-sunny-outline'],
-            [t('night'), night, setNight, 'moon-outline'],
-          ].map(([label, value, setter, icon]) => (
-            <View key={label as string} style={styles.row}>
-              <Ionicons
-                color={dashboardColors.primary}
-                name={icon as keyof typeof Ionicons.glyphMap}
-                size={22}
-              />
-              <Text style={styles.label}>{label as string}</Text>
-              <TextInput
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-                onChangeText={setter as (value: string) => void}
-                placeholder="HH:MM"
-                style={styles.input}
-                value={value as string}
-              />
-            </View>
-          ))}
+          <SlotTimeEditor
+            label={t('morning')}
+            onChange={setMorning}
+            slot="morning"
+            value={morning}
+          />
+          <SlotTimeEditor
+            label={t('afternoon')}
+            onChange={setAfternoon}
+            slot="afternoon"
+            value={afternoon}
+          />
+          <SlotTimeEditor
+            label={t('night')}
+            onChange={setNight}
+            slot="night"
+            value={night}
+          />
           <PressableScale
             disabled={saving}
             onPress={() => void save()}
@@ -306,25 +308,6 @@ const styles = StyleSheet.create({
     ...dashboardTypography.body,
     color: dashboardColors.textMuted,
     marginBottom: dashboardSpacing.sm,
-  },
-  row: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderRadius: dashboardRadii.card,
-    flexDirection: 'row',
-    gap: dashboardSpacing.md,
-    padding: dashboardSpacing.gap,
-  },
-  label: { ...dashboardTypography.body, color: dashboardColors.text, flex: 1 },
-  input: {
-    ...dashboardTypography.cardTitle,
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: 12,
-    color: dashboardColors.primaryDark,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    textAlign: 'center',
-    width: 88,
   },
   save: {
     alignItems: 'center',

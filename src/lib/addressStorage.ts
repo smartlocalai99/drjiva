@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { parseStoredAddresses, type SavedAddress } from './addresses';
+import {
+  getDefaultAddress,
+  parseStoredAddresses,
+  type SavedAddress,
+} from './addresses';
+import { updatePatientAddress } from './patients';
 
 const ADDRESS_KEY_PREFIX = 'drjiva.addresses.v1';
 
@@ -21,5 +26,21 @@ export async function saveAddresses(
   await AsyncStorage.setItem(
     getAddressStorageKey(phone),
     JSON.stringify(addresses),
+  );
+  const defaultAddress = getDefaultAddress(addresses);
+  await updatePatientAddress(
+    phone,
+    defaultAddress
+      ? [
+          defaultAddress.building,
+          defaultAddress.area,
+          defaultAddress.landmark,
+          defaultAddress.city,
+          defaultAddress.state,
+          defaultAddress.pinCode,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : null,
   );
 }

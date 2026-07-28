@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  expandDoseEvents,
   generateCourseDates,
   getActiveDose,
   replaceEventSlotTime,
@@ -75,6 +76,30 @@ describe('generateCourseDates', () => {
       '2026-07-28',
       '2026-07-30',
       '2026-08-01',
+    ]);
+  });
+});
+
+describe('expandDoseEvents', () => {
+  it('keeps a different saved time for each selected period', () => {
+    const events = expandDoseEvents({
+      dayPattern: 'alternate',
+      durationDays: 3,
+      slotTimes: { morning: '09:15', night: '21:30' },
+      slots: ['morning', 'night'],
+      startDate: '2026-07-28',
+    });
+
+    expect(events).toHaveLength(4);
+    expect(
+      events.slice(0, 2).map((event) => [
+        event.slot,
+        new Date(event.scheduledFor).getHours(),
+        new Date(event.scheduledFor).getMinutes(),
+      ]),
+    ).toEqual([
+      ['morning', 9, 15],
+      ['night', 21, 30],
     ]);
   });
 });
