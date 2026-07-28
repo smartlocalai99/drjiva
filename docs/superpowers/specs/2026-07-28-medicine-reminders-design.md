@@ -115,6 +115,7 @@ scheduled, closes automatically, and refreshes the dashboard.
 - `status text` constrained to `scheduled`, `completed`, `missed`, or
   `cancelled`
 - `completed_at timestamptz`
+- `notification_id text`
 - unique course/scheduled-time constraint
 
 All tables use RLS. Patient operations require
