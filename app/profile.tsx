@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -30,6 +32,10 @@ import {
   getCachedPatientName,
   saveCachedPatientName,
 } from '../src/lib/session';
+import {
+  uploadProfilePhoto,
+  validateProfilePhoto,
+} from '../src/lib/profilePhotos';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'] as const;
 
@@ -58,7 +64,10 @@ export default function ProfileScreen() {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<string | null>(null);
-  const [address, setAddress] = useState('');
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [pendingPhoto, setPendingPhoto] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
 
   useEffect(() => {
     if (!phone) {
@@ -82,7 +91,8 @@ export default function ProfileScreen() {
         setName(patient.name);
         setAge(patient.age != null ? String(patient.age) : '');
         setGender(patient.gender);
-        setAddress(patient.address ?? '');
+        setPatientId(patient.patientId);
+        setAvatarUrl(patient.avatarUrl);
         void saveCachedPatientName(phone, patient.name).catch(
           () => undefined,
         );
@@ -105,6 +115,70 @@ export default function ProfileScreen() {
   const trimmedName = name.trim();
   const isNameValid = trimmedName.length >= 2;
 
+  const selectProfilePhoto = async (source: 'camera' | 'gallery') => {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        'Permission needed',
+        source === 'camera'
+          ? 'Allow camera access to take a profile photo.'
+          : 'Allow photo access to choose a profile photo.',
+      );
+      return;
+    }
+
+    const options: ImagePicker.ImagePickerOptions = {
+      allowsEditing: true,
+      aspect: [1, 1],
+      mediaTypes: ['images'],
+      quality: 0.85,
+    };
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    if (!asset) {
+      return;
+    }
+
+    const validationMessage = validateProfilePhoto(asset);
+    if (validationMessage) {
+      Alert.alert('Photo not supported', validationMessage);
+      return;
+    }
+
+    setPendingPhoto(asset);
+    setSavedAt(undefined);
+  };
+
+  const showPhotoOptions = () => {
+    Alert.alert('Profile photo', 'Choose a photo source.', [
+      {
+        onPress: () => {
+          void selectProfilePhoto('camera');
+        },
+        text: 'Camera',
+      },
+      {
+        onPress: () => {
+          void selectProfilePhoto('gallery');
+        },
+        text: 'Gallery',
+      },
+      { style: 'cancel', text: 'Cancel' },
+    ]);
+  };
+
   const handleSave = async () => {
     if (!isNameValid || isSaving) {
       return;
@@ -116,13 +190,23 @@ export default function ProfileScreen() {
     const parsedAge = age.trim() ? Number.parseInt(age, 10) : null;
 
     try {
+      let nextAvatarUrl = avatarUrl;
+      if (pendingPhoto) {
+        if (!patientId) {
+          throw new Error('Patient profile is unavailable.');
+        }
+        nextAvatarUrl = await uploadProfilePhoto(patientId, pendingPhoto);
+      }
+
       const patient = await updatePatientProfile(phone, {
-        address: address.trim() || null,
         age: Number.isNaN(parsedAge) ? null : parsedAge,
+        avatar_url: nextAvatarUrl,
         gender,
         name: trimmedName,
       });
       await saveCachedPatientName(phone, patient.name).catch(() => undefined);
+      setAvatarUrl(patient.avatarUrl ?? nextAvatarUrl);
+      setPendingPhoto(null);
       setSavedAt(Date.now());
     } catch {
       setErrorMessage('Unable to save your changes. Please try again.');
@@ -162,11 +246,30 @@ export default function ProfileScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.avatarCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarInitials}>
-                  {getInitials(name || '?')}
-                </Text>
-              </View>
+              <Pressable
+                accessibilityHint="Opens camera and gallery options"
+                accessibilityLabel="Change profile photo"
+                accessibilityRole="button"
+                onPress={showPhotoOptions}
+                style={styles.avatarButton}
+              >
+                <View style={styles.avatar}>
+                  {pendingPhoto?.uri || avatarUrl ? (
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: pendingPhoto?.uri ?? avatarUrl ?? '' }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Text style={styles.avatarInitials}>
+                      {getInitials(name || '?')}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.cameraBadge}>
+                  <Ionicons color="#FFFFFF" name="camera" size={15} />
+                </View>
+              </Pressable>
               <Text style={styles.avatarName}>{name || 'Your name'}</Text>
               <View style={styles.phoneRow}>
                 <Text style={styles.phoneText}>+91 {phone}</Text>
@@ -234,24 +337,6 @@ export default function ProfileScreen() {
                     </Pressable>
                   ))}
                 </View>
-              </View>
-
-              <Divider />
-
-              <View style={styles.fieldColumn}>
-                <Text style={styles.fieldLabel}>Address</Text>
-                <TextInput
-                  multiline
-                  numberOfLines={3}
-                  onChangeText={(value) => {
-                    setAddress(value);
-                    setSavedAt(undefined);
-                  }}
-                  placeholder="Add your delivery address"
-                  placeholderTextColor={dashboardColors.textFaint}
-                  style={[styles.input, styles.addressInput]}
-                  value={address}
-                />
               </View>
             </View>
 
@@ -406,13 +491,34 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     height: 80,
     justifyContent: 'center',
-    marginBottom: dashboardSpacing.sm,
+    overflow: 'hidden',
     width: 80,
+  },
+  avatarButton: {
+    marginBottom: dashboardSpacing.sm,
+    position: 'relative',
+  },
+  avatarImage: {
+    height: '100%',
+    width: '100%',
   },
   avatarInitials: {
     color: '#FFFFFF',
     fontFamily: 'Inter_700Bold',
     fontSize: 28,
+  },
+  cameraBadge: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.text,
+    borderColor: dashboardColors.card,
+    borderRadius: 14,
+    borderWidth: 2,
+    bottom: -2,
+    height: 28,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: 28,
   },
   avatarName: {
     ...dashboardTypography.title,
@@ -457,10 +563,6 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     fontSize: 16,
     padding: 0,
-  },
-  addressInput: {
-    minHeight: 60,
-    textAlignVertical: 'top',
   },
   genderRow: {
     flexDirection: 'row',
