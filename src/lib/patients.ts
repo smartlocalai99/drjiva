@@ -8,10 +8,11 @@ export type Patient = {
   age: number | null;
   gender: string | null;
   address: string | null;
+  avatarUrl: string | null;
 };
 
 const CORE_COLUMNS = 'id, name, mobile, age, gender';
-const FULL_COLUMNS = `${CORE_COLUMNS}, address`;
+const FULL_COLUMNS = `${CORE_COLUMNS}, address, avatar_url`;
 
 type PatientRow = {
   id: string;
@@ -20,6 +21,7 @@ type PatientRow = {
   age: number | null;
   gender: string | null;
   address?: string | null;
+  avatar_url?: string | null;
 };
 
 type PostgrestErrorLike = { code?: string } | null;
@@ -43,6 +45,7 @@ function mapPatientRow(data: PatientRow): Patient {
   return {
     address: data.address ?? null,
     age: data.age,
+    avatarUrl: data.avatar_url ?? null,
     gender: data.gender,
     name: data.name,
     patientId: data.id,
@@ -136,7 +139,7 @@ export type PatientProfileUpdate = {
   name: string;
   age: number | null;
   gender: string | null;
-  address: string | null;
+  avatar_url?: string | null;
 };
 
 export async function updatePatientProfile(
@@ -153,7 +156,7 @@ export async function updatePatientProfile(
     .single();
 
   if (error && isMissingColumnError(error)) {
-    const { address: _address, ...coreUpdate } = update;
+    const { avatar_url: _avatarUrl, ...coreUpdate } = update;
     ({ data, error } = await supabase
       .from('patients')
       .update(coreUpdate)
