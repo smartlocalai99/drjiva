@@ -281,6 +281,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   dateNumberOnStreak: {
+    color: dashboardColors.text,
     zIndex: 1,
   },
   dateNumberUnselected: {
@@ -299,10 +300,10 @@ const styles = StyleSheet.create({
     width: 6,
   },
   streakMarker: {
-    height: dashboardLayout.dateCircleSize + 8,
-    left: -4,
+    height: dashboardLayout.dateCircleSize - 6,
+    left: 3,
     position: 'absolute',
-    top: -4,
-    width: dashboardLayout.dateCircleSize + 8,
+    top: 3,
+    width: dashboardLayout.dateCircleSize - 6,
   },
 });

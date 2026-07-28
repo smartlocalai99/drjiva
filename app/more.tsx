@@ -29,6 +29,7 @@ import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
 import { getAccountMenuItems } from '../src/lib/moreMenu';
 import { getPatientByPhone } from '../src/lib/patients';
+import { normalizeRoutePhone } from '../src/lib/routePhone';
 import {
   clearSessionPhone,
   getCachedPatientName,
@@ -49,8 +50,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
-  const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
-  const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
+  const phone = normalizeRoutePhone(params.phone);
 
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<NavTabKey>('more');
@@ -196,6 +196,18 @@ export default function MoreScreen() {
                       router.push({
                         params: { phone },
                         pathname: '/notification-timings',
+                      })
+                    }
+                  />
+                ) : null}
+                {item.key === 'savedAddresses' ? (
+                  <Row
+                    icon="location-outline"
+                    label={t('deliveryAddresses')}
+                    onPress={() =>
+                      router.push({
+                        params: { phone },
+                        pathname: '/saved-addresses',
                       })
                     }
                   />

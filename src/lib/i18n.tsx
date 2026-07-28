@@ -78,6 +78,7 @@ const translations = {
       'Documents you add will appear here, grouped by hospital.',
     documentsEmptyTitle: 'No documents yet',
     documentsGroupedBy: 'Grouped by hospital',
+    deliveryAddresses: 'Delivery Addresses',
     hospital: 'Hospital',
     imaging: 'Imaging',
     labReport: 'Lab Report',
@@ -127,6 +128,8 @@ const translations = {
     notificationTimings: 'Notification Timings',
     notificationTimingsHelp:
       'Set the time used for phone alerts and dashboard dose cards.',
+    unableLoadNotificationTimings:
+      'Unable to load notification timings',
     morning: 'Morning',
     afternoon: 'Afternoon',
     night: 'Night',
@@ -207,6 +210,7 @@ const translations = {
       'మీరు జోడించే పత్రాలు ఇక్కడ, ఆసుపత్రి వారీగా కనిపిస్తాయి.',
     documentsEmptyTitle: 'ఇంకా పత్రాలు లేవు',
     documentsGroupedBy: 'ఆసుపత్రి వారీగా గ్రూప్ చేయబడింది',
+    deliveryAddresses: 'డెలివరీ చిరునామాలు',
     hospital: 'ఆసుపత్రి',
     imaging: 'ఇమేజింగ్',
     labReport: 'ల్యాబ్ రిపోర్ట్',
@@ -257,6 +261,8 @@ const translations = {
     notificationTimings: 'నోటిఫికేషన్ సమయాలు',
     notificationTimingsHelp:
       'ఫోన్ అలర్ట్‌లు మరియు డ్యాష్‌బోర్డ్ మందుల కోసం సమయాలను సెట్ చేయండి.',
+    unableLoadNotificationTimings:
+      'నోటిఫికేషన్ సమయాలను లోడ్ చేయలేకపోయాము',
     morning: 'ఉదయం',
     afternoon: 'మధ్యాహ్నం',
     night: 'రాత్రి',

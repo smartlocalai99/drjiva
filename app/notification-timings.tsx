@@ -36,14 +36,16 @@ import {
 import { replaceEventSlotTime, type DoseSlot } from '../src/lib/medicineSchedule';
 import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
+import { normalizeRoutePhone } from '../src/lib/routePhone';
+import { getSessionPhone } from '../src/lib/session';
 
 const VALID_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export default function NotificationTimingsScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const params = useLocalSearchParams<{ phone?: string }>();
-  const phone = (params.phone ?? '').replace(/\D/g, '').slice(-10);
+  const params = useLocalSearchParams<{ phone?: string | string[] }>();
+  const routePhone = normalizeRoutePhone(params.phone);
   const [patientId, setPatientId] = useState('');
   const [morning, setMorning] = useState('08:00');
   const [afternoon, setAfternoon] = useState('13:00');
@@ -52,20 +54,62 @@ export default function NotificationTimingsScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    void getPatientByPhone(phone)
-      .then(async (patient) => {
-        if (!patient) throw new Error('Patient unavailable');
+    let cancelled = false;
+
+    const loadSettings = async () => {
+      const phone =
+        routePhone ||
+        normalizeRoutePhone((await getSessionPhone().catch(() => null)) ?? undefined);
+      if (!phone) {
+        Alert.alert(t('patientUnavailable'));
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const patient = await getPatientByPhone(phone);
+        if (!patient) {
+          Alert.alert(t('patientUnavailable'));
+          return;
+        }
+        if (cancelled) {
+          return;
+        }
         setPatientId(patient.patientId);
-        const settings = await getNotificationSettings(patient.patientId);
-        setMorning(settings.morningTime);
-        setAfternoon(settings.afternoonTime);
-        setNight(settings.nightTime);
-      })
-      .catch(() => Alert.alert(t('patientUnavailable')))
-      .finally(() => setLoading(false));
-  }, [phone, t]);
+        try {
+          const settings = await getNotificationSettings(patient.patientId);
+          if (!cancelled) {
+            setMorning(settings.morningTime);
+            setAfternoon(settings.afternoonTime);
+            setNight(settings.nightTime);
+          }
+        } catch {
+          if (!cancelled) {
+            Alert.alert(t('unableLoadNotificationTimings'), t('tryAgain'));
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          Alert.alert(t('unableLoadNotificationTimings'), t('tryAgain'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [routePhone, t]);
 
   const save = async () => {
+    if (!patientId) {
+      Alert.alert(t('unableLoadNotificationTimings'), t('tryAgain'));
+      return;
+    }
     if (
       ![morning, afternoon, night].every((value) => VALID_TIME.test(value)) ||
       !(morning < afternoon && afternoon < night)

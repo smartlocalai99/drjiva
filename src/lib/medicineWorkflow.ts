@@ -1,18 +1,18 @@
 export type MedicineWorkflowState = {
   hospitalId: string;
-  medicineId: string;
+  medicineIds: string[];
   step: 'hospital' | 'medicine' | 'details' | 'review';
 };
 
 export const initialMedicineWorkflow: MedicineWorkflowState = {
   hospitalId: '',
-  medicineId: '',
+  medicineIds: [],
   step: 'hospital',
 };
 
 export type MedicineWorkflowAction =
   | { hospitalId: string; type: 'selectHospital' }
-  | { medicineId: string; type: 'selectMedicine' }
+  | { medicineId: string; type: 'toggleMedicine' }
   | { type: 'continue' }
   | { type: 'back' };
 
@@ -21,10 +21,20 @@ export function medicineWorkflowReducer(
   action: MedicineWorkflowAction,
 ): MedicineWorkflowState {
   if (action.type === 'selectHospital') {
-    return { hospitalId: action.hospitalId, medicineId: '', step: 'medicine' };
+    return { hospitalId: action.hospitalId, medicineIds: [], step: 'medicine' };
   }
-  if (action.type === 'selectMedicine') {
-    return { ...state, medicineId: action.medicineId, step: 'details' };
+  if (action.type === 'toggleMedicine' && state.step === 'medicine') {
+    const medicineIds = state.medicineIds.includes(action.medicineId)
+      ? state.medicineIds.filter((id) => id !== action.medicineId)
+      : [...state.medicineIds, action.medicineId];
+    return { ...state, medicineIds };
+  }
+  if (
+    action.type === 'continue' &&
+    state.step === 'medicine' &&
+    state.medicineIds.length > 0
+  ) {
+    return { ...state, step: 'details' };
   }
   if (action.type === 'continue' && state.step === 'details') {
     return { ...state, step: 'review' };
