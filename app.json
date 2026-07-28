@@ -36,6 +36,14 @@
           "resizeMode": "contain"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow DrJiva to choose your profile photo.",
+          "cameraPermission": "Allow DrJiva to take your profile photo.",
+          "microphonePermission": false
+        }
+      ],
       "expo-font"
     ],
     "extra": {
