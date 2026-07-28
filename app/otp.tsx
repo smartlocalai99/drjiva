@@ -25,6 +25,7 @@ import { PrimaryButton } from '../src/components/PrimaryButton';
 import { copy } from '../src/copy';
 import { sendOtp, verifyOtp } from '../src/lib/auth';
 import { checkPatientExists } from '../src/lib/patients';
+import { ensureSecureReportSession } from '../src/lib/reportAuth';
 import { saveSessionPhone } from '../src/lib/session';
 import {
   colors,
@@ -206,6 +207,7 @@ export default function OtpScreen() {
             Haptics.NotificationFeedbackType.Success,
           ).catch(() => undefined);
           void saveSessionPhone(phone).catch(() => undefined);
+          void ensureSecureReportSession().catch(() => undefined);
 
           // If the patient lookup itself fails, fail open to onboarding
           // rather than stranding a verified user on this screen.

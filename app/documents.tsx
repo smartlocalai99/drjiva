@@ -1,7 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import { File } from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -9,6 +18,8 @@ import {
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
+import { DocumentReviewSheet } from '../src/components/documents/DocumentReviewSheet';
+import { ReportList } from '../src/components/documents/ReportList';
 import { PressableScale } from '../src/components/PressableScale';
 import {
   dashboardColors,
@@ -17,48 +28,97 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
+import {
+  classifyDocument,
+  type HospitalOption,
+  type ReportType,
+} from '../src/lib/documentClassifier';
+import { getDocumentPrimaryAction } from '../src/lib/documentMenu';
+import {
+  createReportPdf,
+  recognizeFirstPage,
+  scanDocuments,
+} from '../src/lib/documentScanner';
 import { getTabRoute } from '../src/lib/dashboardNav';
-import { useLanguage } from '../src/lib/i18n';
-
-type HospitalFolder = {
-  count: number;
-  id: string;
-  name: string;
-  recent: boolean;
-  tint: 'primary' | 'success' | 'warning' | 'error';
-};
-
-// No documents backend yet — this stays empty so the screen reflects
-// reality (grid/filter rendering below is ready for real data once it exists).
-const HOSPITAL_FOLDERS: HospitalFolder[] = [];
-
-const TINTS = {
-  error: { bg: dashboardColors.errorTint, fg: dashboardColors.error },
-  primary: { bg: dashboardColors.primaryTint, fg: dashboardColors.primary },
-  success: { bg: dashboardColors.successTint, fg: dashboardColors.success },
-  warning: { bg: dashboardColors.warningTint, fg: dashboardColors.warning },
-} as const;
+import { getPatientByPhone } from '../src/lib/patients';
+import {
+  createPatientReportSignedUrl,
+  fetchHospitals,
+  fetchPatientReports,
+  uploadPatientReport,
+} from '../src/lib/patientReports';
+import type { PatientReport } from '../src/lib/patientReportModel';
+import { ensureSecureReportSession } from '../src/lib/reportAuth';
 
 const FILTERS = ['All', 'Recent'] as const;
 type Filter = (typeof FILTERS)[number];
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const first = parts[0]?.[0] ?? '';
-  const second = parts[1]?.[0] ?? '';
-  return `${first}${second}`.toUpperCase();
-}
-
 export default function DocumentsScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
-
   const insets = useSafeAreaInsets();
+  const action = getDocumentPrimaryAction();
+
   const [activeTab, setActiveTab] = useState<NavTabKey>('documents');
+  const [capturedPages, setCapturedPages] = useState<string[]>([]);
+  const [detectedHospitalId, setDetectedHospitalId] = useState<string | null>(
+    null,
+  );
+  const [detectedReportType, setDetectedReportType] =
+    useState<ReportType | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('All');
+  const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [reports, setReports] = useState<PatientReport[]>([]);
+  const [reviewVisible, setReviewVisible] = useState(false);
+
+  const loadDocuments = useCallback(async () => {
+    if (!phone) {
+      setErrorMessage('Patient phone number is unavailable.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setErrorMessage(null);
+      await ensureSecureReportSession();
+      const patient = await getPatientByPhone(phone);
+      if (!patient) {
+        throw new Error('Patient profile is unavailable.');
+      }
+      const [nextHospitals, nextReports] = await Promise.all([
+        fetchHospitals(),
+        fetchPatientReports(patient.patientId),
+      ]);
+      setPatientId(patient.patientId);
+      setHospitals(nextHospitals);
+      setReports(nextReports);
+    } catch {
+      setErrorMessage('Unable to load documents. Pull down or try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [phone]);
+
+  useEffect(() => {
+    void loadDocuments();
+  }, [loadDocuments]);
+
+  const visibleReports = useMemo(() => {
+    if (filter === 'All') {
+      return reports;
+    }
+    const recentBoundary = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return reports.filter(
+      (report) => new Date(report.createdAt).getTime() >= recentBoundary,
+    );
+  }, [filter, reports]);
 
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const addButtonBottomOffset =
@@ -66,128 +126,194 @@ export default function DocumentsScreen() {
   const scrollBottomPadding =
     addButtonBottomOffset + dashboardLayout.floatingButtonHeight + 24;
 
-  const folders = useMemo(
-    () =>
-      filter === 'Recent'
-        ? HOSPITAL_FOLDERS.filter((hospital) => hospital.recent)
-        : HOSPITAL_FOLDERS,
-    [filter],
-  );
-
-  const isEmpty = folders.length === 0;
-
   const handleSelectTab = (tab: NavTabKey) => {
     if (tab === activeTab) {
       return;
     }
-
     const route = getTabRoute(tab);
     if (!route) {
       return;
     }
-
     setActiveTab(tab);
     router.replace({ params: { phone }, pathname: route });
   };
 
-  const handleAddDocument = () => {
-    Alert.alert(t('addDocument'), t('comingSoon'));
+  const handleScan = async () => {
+    if (isScanning || isSaving) {
+      return;
+    }
+    if (!patientId) {
+      Alert.alert(
+        'Patient unavailable',
+        'Reload the Documents screen before scanning.',
+      );
+      return;
+    }
+
+    setIsScanning(true);
+    try {
+      const pages = await scanDocuments();
+      if (!pages) {
+        return;
+      }
+      const ocrText = await recognizeFirstPage(pages[0]!).catch(() => '');
+      const classification = classifyDocument(ocrText, hospitals);
+      setCapturedPages(pages);
+      setDetectedHospitalId(classification.hospital?.id ?? null);
+      setDetectedReportType(classification.reportType);
+      setReviewVisible(true);
+    } catch {
+      Alert.alert(
+        'Unable to scan document',
+        'Check camera permission and try scanning again.',
+      );
+    } finally {
+      setIsScanning(false);
+    }
   };
 
-  const filterLabel = (option: Filter) => (option === 'All' ? t('all') : t('recent'));
+  const handleSave = async (metadata: {
+    hospitalId: string;
+    reportType: ReportType;
+  }) => {
+    if (!patientId || capturedPages.length === 0 || isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    let pdfUri: string | null = null;
+    try {
+      pdfUri = await createReportPdf(capturedPages);
+      const report = await uploadPatientReport({
+        hospitalId: metadata.hospitalId,
+        label: metadata.reportType,
+        pageCount: capturedPages.length,
+        patientId,
+        pdfUri,
+        reportType: metadata.reportType,
+      });
+      setReports((current) => [report, ...current]);
+      setReviewVisible(false);
+      setCapturedPages([]);
+      Alert.alert('Document saved', 'The PDF is attached to this patient.');
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.includes('20 MB')
+          ? error.message
+          : 'The PDF could not be saved. Please try again.';
+      Alert.alert('Unable to save document', message);
+    } finally {
+      if (pdfUri) {
+        const pdf = new File(pdfUri);
+        if (pdf.exists) {
+          pdf.delete();
+        }
+      }
+      setIsSaving(false);
+    }
+  };
+
+  const handleOpenReport = async (report: PatientReport) => {
+    if (!report.storagePath) {
+      Alert.alert('Unable to open', 'This older report has no storage path.');
+      return;
+    }
+    try {
+      const signedUrl = await createPatientReportSignedUrl(report.storagePath);
+      await Linking.openURL(signedUrl);
+    } catch {
+      Alert.alert('Unable to open', 'Please try opening the report again.');
+    }
+  };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.headerSide} />
-        <Text style={styles.headerTitle}>{t('documents')}</Text>
+        <Text style={styles.headerTitle}>Documents</Text>
         <View style={styles.headerSide} />
       </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          isEmpty && styles.contentEmpty,
+          visibleReports.length === 0 && styles.contentEmpty,
           { paddingBottom: scrollBottomPadding },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {isEmpty ? (
+        <View style={styles.intro}>
+          <View style={styles.introIcon}>
+            <Ionicons
+              color={dashboardColors.primary}
+              name="shield-checkmark-outline"
+              size={20}
+            />
+          </View>
+          <View style={styles.introBody}>
+            <Text style={styles.introTitle}>Private medical PDFs</Text>
+            <Text style={styles.introText}>
+              Scanning and document recognition happen on this device.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.filterRow}>
+          {FILTERS.map((option) => (
+            <PressableScale
+              key={option}
+              onPress={() => setFilter(option)}
+              pressedScale={0.95}
+              style={[
+                styles.filterChip,
+                filter === option && styles.filterChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  filter === option && styles.filterChipTextActive,
+                ]}
+              >
+                {option}
+              </Text>
+            </PressableScale>
+          ))}
+        </View>
+
+        {isLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={dashboardColors.primary} />
+          </View>
+        ) : errorMessage ? (
+          <View style={styles.center}>
+            <Ionicons
+              color={dashboardColors.error}
+              name="cloud-offline-outline"
+              size={38}
+            />
+            <Text style={styles.emptyTitle}>Documents unavailable</Text>
+            <Text style={styles.emptySubtitle}>{errorMessage}</Text>
+            <PressableScale onPress={() => void loadDocuments()} style={styles.retry}>
+              <Text style={styles.retryText}>Try again</Text>
+            </PressableScale>
+          </View>
+        ) : visibleReports.length === 0 ? (
           <EmptyDocuments />
         ) : (
-          <>
-            <Text style={styles.subtitle}>{t('documentsGroupedBy')}</Text>
-
-            <View style={styles.filterRow}>
-              {FILTERS.map((option) => (
-                <PressableScale
-                  accessibilityLabel={filterLabel(option)}
-                  key={option}
-                  onPress={() => setFilter(option)}
-                  pressedScale={0.95}
-                  style={[
-                    styles.filterChip,
-                    filter === option && styles.filterChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filter === option && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {filterLabel(option)}
-                  </Text>
-                </PressableScale>
-              ))}
-            </View>
-
-            <View style={styles.grid}>
-              {folders.map((hospital) => {
-                const tint = TINTS[hospital.tint];
-                return (
-                  <PressableScale
-                    accessibilityLabel={hospital.name}
-                    key={hospital.id}
-                    onPress={() => Alert.alert(hospital.name, 'Coming soon.')}
-                    pressedScale={0.97}
-                    style={styles.card}
-                  >
-                    <View style={[styles.tile, { backgroundColor: tint.bg }]}>
-                      <Ionicons color={tint.fg} name="folder" size={72} />
-                      <View style={[styles.logoBadge, { borderColor: tint.fg }]}>
-                        <Text style={[styles.logoBadgeText, { color: tint.fg }]}>
-                          {getInitials(hospital.name)}
-                        </Text>
-                      </View>
-                      <View style={styles.statusBadge}>
-                        <Ionicons
-                          color={dashboardColors.success}
-                          name="checkmark-circle"
-                          size={18}
-                        />
-                      </View>
-                    </View>
-                    <Text numberOfLines={2} style={styles.cardName}>
-                      {hospital.name}
-                    </Text>
-                    <Text style={styles.cardCount}>
-                      {hospital.count}{' '}
-                      {hospital.count === 1 ? 'document' : 'documents'}
-                    </Text>
-                  </PressableScale>
-                );
-              })}
-            </View>
-          </>
+          <ReportList
+            hospitals={hospitals}
+            onOpen={(report) => void handleOpenReport(report)}
+            reports={visibleReports}
+          />
         )}
       </ScrollView>
 
       <FloatingAddButton
         bottomOffset={addButtonBottomOffset}
-        icon="cloud-upload-outline"
-        label={t('addDocument')}
-        onPress={handleAddDocument}
+        icon={isScanning ? 'hourglass-outline' : action.icon}
+        label={isScanning ? 'Opening scanner…' : action.label}
+        onPress={() => void handleScan()}
       />
 
       <BottomNav
@@ -195,27 +321,40 @@ export default function DocumentsScreen() {
         bottomOffset={navBottomOffset}
         onSelectTab={handleSelectTab}
       />
+
+      <DocumentReviewSheet
+        detectedHospitalId={detectedHospitalId}
+        detectedReportType={detectedReportType}
+        hospitals={hospitals}
+        isSaving={isSaving}
+        onCancel={() => {
+          if (!isSaving) {
+            setReviewVisible(false);
+            setCapturedPages([]);
+          }
+        }}
+        onSave={(metadata) => void handleSave(metadata)}
+        pageCount={capturedPages.length}
+        visible={reviewVisible}
+      />
     </SafeAreaView>
   );
 }
 
 function EmptyDocuments() {
-  const { t } = useLanguage();
-
   return (
-    <View style={styles.emptyWrapper}>
-      <View style={styles.paperStack}>
-        <View style={[styles.paper, styles.paperBack]} />
-        <View style={[styles.paper, styles.paperMiddle]} />
-        <View style={[styles.paper, styles.paperFront]}>
-          <View style={styles.paperLine} />
-          <View style={[styles.paperLine, styles.paperLineShort]} />
-          <Ionicons color={dashboardColors.textFaint} name="add" size={26} />
-        </View>
+    <View style={styles.center}>
+      <View style={styles.emptyIcon}>
+        <Ionicons
+          color={dashboardColors.primary}
+          name="scan-outline"
+          size={42}
+        />
       </View>
-
-      <Text style={styles.emptyTitle}>{t('documentsEmptyTitle')}</Text>
-      <Text style={styles.emptySubtitle}>{t('documentsEmptySubtitle')}</Text>
+      <Text style={styles.emptyTitle}>No scanned documents</Text>
+      <Text style={styles.emptySubtitle}>
+        Scan a prescription or report and save it as one private PDF.
+      </Text>
     </View>
   );
 }
@@ -233,9 +372,7 @@ const styles = StyleSheet.create({
     paddingVertical: dashboardSpacing.sm,
   },
   headerSide: {
-    alignItems: 'center',
     height: 32,
-    justifyContent: 'center',
     width: 32,
   },
   headerTitle: {
@@ -248,10 +385,34 @@ const styles = StyleSheet.create({
   contentEmpty: {
     flexGrow: 1,
   },
-  subtitle: {
-    ...dashboardTypography.body,
-    color: dashboardColors.textMuted,
+  intro: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.card,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
     marginTop: dashboardSpacing.sm,
+    padding: dashboardSpacing.md,
+  },
+  introIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: 19,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  introBody: {
+    flex: 1,
+  },
+  introTitle: {
+    ...dashboardTypography.body,
+    color: dashboardColors.primaryDark,
+  },
+  introText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: 1,
   },
   filterRow: {
     flexDirection: 'row',
@@ -276,113 +437,43 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Inter_600SemiBold',
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: dashboardSpacing.gap,
-    marginTop: dashboardSpacing.xl,
-  },
-  card: {
-    width: '47%',
-  },
-  tile: {
+  center: {
     alignItems: 'center',
-    aspectRatio: 1,
-    borderRadius: dashboardRadii.card,
+    flex: 1,
     justifyContent: 'center',
-    width: '100%',
+    minHeight: 360,
+    paddingHorizontal: dashboardSpacing.xl,
   },
-  logoBadge: {
+  emptyIcon: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    bottom: '22%',
-    height: 40,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: 40,
-  },
-  logoBadgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-  },
-  statusBadge: {
-    backgroundColor: dashboardColors.card,
-    borderRadius: 10,
-    left: dashboardSpacing.sm,
-    padding: 1,
-    position: 'absolute',
-    top: dashboardSpacing.sm,
-  },
-  cardName: {
-    ...dashboardTypography.body,
-    color: dashboardColors.text,
-    marginTop: dashboardSpacing.sm,
-    textAlign: 'center',
-  },
-  cardCount: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  emptyWrapper: {
-    alignItems: 'center',
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  paperStack: {
-    alignItems: 'center',
-    height: 140,
-    justifyContent: 'center',
-    marginBottom: dashboardSpacing.xl,
-    width: 160,
-  },
-  paper: {
-    backgroundColor: dashboardColors.card,
-    borderRadius: 16,
-    height: 130,
-    position: 'absolute',
-    shadowColor: dashboardColors.shadow,
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    width: 100,
-  },
-  paperBack: {
-    backgroundColor: dashboardColors.track,
-    transform: [{ rotate: '-10deg' }, { translateX: -18 }],
-  },
-  paperMiddle: {
     backgroundColor: dashboardColors.primaryTint,
-    transform: [{ rotate: '8deg' }, { translateX: 14 }],
-  },
-  paperFront: {
-    alignItems: 'center',
-    gap: dashboardSpacing.sm,
+    borderRadius: 36,
+    height: 72,
     justifyContent: 'center',
-    transform: [{ rotate: '0deg' }],
-  },
-  paperLine: {
-    backgroundColor: dashboardColors.track,
-    borderRadius: 2,
-    height: 4,
-    width: 56,
-  },
-  paperLineShort: {
-    width: 36,
+    marginBottom: dashboardSpacing.gap,
+    width: 72,
   },
   emptyTitle: {
     ...dashboardTypography.title,
     color: dashboardColors.text,
+    marginTop: dashboardSpacing.md,
     textAlign: 'center',
   },
   emptySubtitle: {
     ...dashboardTypography.body,
     color: dashboardColors.textMuted,
     marginTop: dashboardSpacing.sm,
-    maxWidth: 260,
     textAlign: 'center',
+  },
+  retry: {
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.pill,
+    marginTop: dashboardSpacing.gap,
+    paddingHorizontal: dashboardSpacing.xl,
+    paddingVertical: dashboardSpacing.md,
+  },
+  retryText: {
+    ...dashboardTypography.button,
+    color: '#FFFFFF',
   },
 });
