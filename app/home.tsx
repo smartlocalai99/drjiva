@@ -15,6 +15,7 @@ import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton
 import { MedicineCard } from '../src/components/dashboard/MedicineCard';
 import {
   fetchMedicinesForDate,
+  completeDoseEvent,
   type Medicine,
 } from '../src/data/medicines';
 import {
@@ -47,6 +48,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<NavTabKey>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [patientName, setPatientName] = useState<string | undefined>();
+  const [patientId, setPatientId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!phone) {
@@ -64,6 +66,7 @@ export default function HomeScreen() {
       try {
         const patient = await getPatientByPhone(phone);
         if (!cancelled && patient) {
+          setPatientId(patient.patientId);
           setPatientName(patient.name);
           void saveCachedPatientName(phone, patient.name).catch(
             () => undefined,
@@ -82,15 +85,19 @@ export default function HomeScreen() {
   }, [phone]);
 
   const loadMedicines = useCallback(async (date: Date) => {
+    if (!patientId) {
+      setIsLoadingMedicines(false);
+      return;
+    }
     try {
-      const nextMedicines = await fetchMedicinesForDate(date);
+      const nextMedicines = await fetchMedicinesForDate(patientId, date);
       setMedicines(nextMedicines);
     } catch {
       setMedicines([]);
     } finally {
       setIsLoadingMedicines(false);
     }
-  }, []);
+  }, [patientId]);
 
   useEffect(() => {
     void loadMedicines(today);
@@ -104,14 +111,19 @@ export default function HomeScreen() {
     void loadMedicines(date);
   };
 
-  const handleToggleMedicine = (id: string) => {
-    setMedicines((current) =>
-      current.map((medicine) =>
-        medicine.id === id
-          ? { ...medicine, completed: !medicine.completed }
-          : medicine,
-      ),
-    );
+  const handleToggleMedicine = async (id: string) => {
+    const medicine = medicines.find((item) => item.id === id);
+    if (!medicine) return;
+    try {
+      await completeDoseEvent(id, !medicine.completed);
+      setMedicines((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, completed: !item.completed } : item,
+        ),
+      );
+    } catch {
+      Alert.alert(t('addMedicine'), t('tryAgain'));
+    }
   };
 
   const handleRefresh = async () => {
@@ -190,7 +202,7 @@ export default function HomeScreen() {
               index={index}
               key={medicine.id}
               medicine={medicine}
-              onToggle={() => handleToggleMedicine(medicine.id)}
+              onToggle={() => void handleToggleMedicine(medicine.id)}
             />
           ))
         )}
@@ -199,7 +211,9 @@ export default function HomeScreen() {
       <FloatingAddButton
         bottomOffset={addButtonBottomOffset}
         label={t('addMedicine')}
-        onPress={() => Alert.alert(t('addMedicine'), t('comingSoon'))}
+        onPress={() =>
+          router.push({ params: { phone }, pathname: '/add-medicine' })
+        }
       />
 
       <BottomNav

@@ -188,11 +188,16 @@ export default function MoreScreen() {
                     onPress={handleOpenProfile}
                   />
                 ) : null}
-                {item.key === 'notifications' ? (
+                {item.key === 'notificationTimings' ? (
                   <Row
-                    icon="notifications-outline"
-                    label={t('notifications')}
-                    onPress={() => comingSoon(t('notifications'))}
+                    icon="time-outline"
+                    label={t('notificationTimings')}
+                    onPress={() =>
+                      router.push({
+                        params: { phone },
+                        pathname: '/notification-timings',
+                      })
+                    }
                   />
                 ) : null}
                 {item.key === 'language' ? (
