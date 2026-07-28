@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { cancelDoseNotifications } from '../lib/medicineNotifications';
 import {
   mapDoseRows,
   selectRelevantDoseRows,
@@ -111,6 +112,12 @@ export async function completeDoseEvent(
   eventId: string,
   completed: boolean,
 ): Promise<void> {
+  const { data: event, error: eventError } = await supabase
+    .from('patient_medicine_dose_events')
+    .select('course_id, notification_id')
+    .eq('id', eventId)
+    .single();
+  if (eventError) throw eventError;
   const { error } = await supabase
     .from('patient_medicine_dose_events')
     .update({
@@ -120,4 +127,23 @@ export async function completeDoseEvent(
     })
     .eq('id', eventId);
   if (error) throw error;
+  if (completed && event.notification_id) {
+    await cancelDoseNotifications([event.notification_id]).catch(
+      () => undefined,
+    );
+  }
+  const { count, error: countError } = await supabase
+    .from('patient_medicine_dose_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('course_id', event.course_id)
+    .eq('status', 'scheduled');
+  if (countError) throw countError;
+  const { error: courseError } = await supabase
+    .from('patient_medicine_courses')
+    .update({
+      status: completed && (count ?? 0) === 0 ? 'completed' : 'active',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', event.course_id);
+  if (courseError) throw courseError;
 }

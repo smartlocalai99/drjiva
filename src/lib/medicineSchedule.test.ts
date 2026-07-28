@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generateCourseDates,
   getActiveDose,
+  replaceEventSlotTime,
   validateMedicineCourseInput,
 } from './medicineSchedule';
 
@@ -46,6 +47,18 @@ describe('medicine course validation', () => {
     expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 0.25 })).toBe(
       null,
     );
+  });
+});
+
+describe('replaceEventSlotTime', () => {
+  it('keeps the calendar date while replacing its local slot time', () => {
+    const changed = replaceEventSlotTime(
+      '2026-07-28T08:00:00+05:30',
+      '09:15',
+    );
+    const date = new Date(changed);
+    expect([date.getHours(), date.getMinutes()]).toEqual([9, 15]);
+    expect(date.getDate()).toBe(28);
   });
 });
 

@@ -113,3 +113,13 @@ export function getActiveDose<T extends { scheduledFor: string }>(
     );
   return candidates[0] ?? null;
 }
+
+export function replaceEventSlotTime(
+  scheduledFor: string,
+  time: string,
+): string {
+  const date = new Date(scheduledFor);
+  const [hour, minute] = time.split(':').map(Number);
+  date.setHours(hour!, minute!, 0, 0);
+  return date.toISOString();
+}

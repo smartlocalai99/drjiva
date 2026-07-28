@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { deletePatientReportWithAdapter } from './deletePatientReport';
+import {
+  deletePatientReportWithAdapter,
+  PatientReportDeletionError,
+} from './deletePatientReport';
 
 describe('deletePatientReportWithAdapter', () => {
   it('deletes the storage object before its database row', async () => {
@@ -39,6 +42,22 @@ describe('deletePatientReportWithAdapter', () => {
       ),
     ).rejects.toThrow('storage failed');
     expect(rowCalls).toBe(0);
+  });
+
+  it('identifies the failed deletion stage', async () => {
+    try {
+      await deletePatientReportWithAdapter(
+        {
+          removeFile: async () => null,
+          removeRow: async () => new Error('row failed'),
+        },
+        { id: 'report-1', storagePath: null },
+      );
+      throw new Error('Expected deletion to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(PatientReportDeletionError);
+      expect((error as PatientReportDeletionError).stage).toBe('database');
+    }
   });
 
   it('retries database deletion once', async () => {

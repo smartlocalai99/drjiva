@@ -61,6 +61,7 @@ import {
 } from '../src/lib/patientReportModel';
 import { ensureSecureReportSession } from '../src/lib/reportAuth';
 import { getReportDeletionMessageKey } from '../src/lib/reportDeletionCopy';
+import { PatientReportDeletionError } from '../src/lib/deletePatientReport';
 
 const FILTERS = ['All', 'Recent'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -282,9 +283,15 @@ export default function DocumentsScreen() {
     const reportName = report.reportType
       ? t(getReportTypeTranslationKey(report.reportType))
       : report.label ?? t('medicalDocument');
+    const hospitalName = report.hospitalId
+      ? hospitals.find((hospital) => hospital.id === report.hospitalId)?.name ??
+        t('hospital')
+      : t('otherHospital');
     Alert.alert(
       t('deleteDocument'),
-      `${reportName}\n\n${t(getReportDeletionMessageKey(report.storagePath))}`,
+      `${reportName}\n${hospitalName}\n\n${t(
+        getReportDeletionMessageKey(report.storagePath),
+      )}`,
       [
         { style: 'cancel', text: t('cancel') },
         {
@@ -302,10 +309,16 @@ export default function DocumentsScreen() {
                   t('documentDeletedMessage'),
                 );
               })
-              .catch(() => {
+              .catch((error: unknown) => {
+                const message =
+                  error instanceof PatientReportDeletionError
+                    ? error.stage === 'storage'
+                      ? t('unableDeleteDocumentStorage')
+                      : t('unableDeleteDocumentRecord')
+                    : t('unableDeleteDocumentMessage');
                 Alert.alert(
                   t('unableDeleteDocument'),
-                  t('unableDeleteDocumentMessage'),
+                  message,
                 );
               })
               .finally(() => setDeletingReportId(null));

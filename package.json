@@ -50,5 +50,14 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "@react-native-ml-kit/text-recognition"
+        ]
+      }
+    }
+  },
   "private": true
 }

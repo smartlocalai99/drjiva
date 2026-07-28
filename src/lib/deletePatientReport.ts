@@ -3,6 +3,16 @@ export type DeletePatientReportAdapter = {
   removeRow: (reportId: string) => Promise<Error | null>;
 };
 
+export class PatientReportDeletionError extends Error {
+  constructor(
+    public readonly stage: 'database' | 'storage',
+    cause: Error,
+  ) {
+    super(cause.message, { cause });
+    this.name = 'PatientReportDeletionError';
+  }
+}
+
 export async function deletePatientReportWithAdapter(
   adapter: DeletePatientReportAdapter,
   report: { id: string; storagePath: string | null },
@@ -10,7 +20,7 @@ export async function deletePatientReportWithAdapter(
   if (report.storagePath) {
     const storageError = await adapter.removeFile(report.storagePath);
     if (storageError) {
-      throw storageError;
+      throw new PatientReportDeletionError('storage', storageError);
     }
   }
 
@@ -20,6 +30,6 @@ export async function deletePatientReportWithAdapter(
   }
   const retryError = await adapter.removeRow(report.id);
   if (retryError) {
-    throw retryError;
+    throw new PatientReportDeletionError('database', retryError);
   }
 }

@@ -92,3 +92,7 @@ export function selectRelevantDoseRows(
     ? [...current, next]
     : current;
 }
+
+export function shouldCompleteCourse(remainingScheduledDoses: number): boolean {
+  return remainingScheduledDoses === 0;
+}

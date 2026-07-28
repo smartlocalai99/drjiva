@@ -221,3 +221,85 @@ export async function saveNotificationIds(
     if (error) throw error;
   }
 }
+
+export async function deleteMedicineCourse(courseId: string): Promise<void> {
+  const { error } = await supabase
+    .from('patient_medicine_courses')
+    .delete()
+    .eq('id', courseId);
+  if (error) throw error;
+}
+
+export type FutureDoseReminder = {
+  eventId: string;
+  medicineName: string;
+  notificationId: string | null;
+  scheduledFor: string;
+  slot: DoseSlot;
+  tablets: number;
+};
+
+export async function fetchFutureDoseReminders(
+  patientId: string,
+): Promise<FutureDoseReminder[]> {
+  const { data, error } = await supabase
+    .from('patient_medicine_dose_events')
+    .select(
+      'id, scheduled_for, slot, notification_id, patient_medicine_courses!inner(tablets_per_dose, medicines!inner(name))',
+    )
+    .eq('patient_id', patientId)
+    .eq('status', 'scheduled')
+    .gte('scheduled_for', new Date().toISOString())
+    .order('scheduled_for');
+  if (error) throw error;
+  return ((data ?? []) as unknown as Array<{
+    id: string;
+    notification_id: string | null;
+    scheduled_for: string;
+    slot: DoseSlot;
+    patient_medicine_courses:
+      | {
+          tablets_per_dose: number;
+          medicines: { name: string } | Array<{ name: string }>;
+        }
+      | Array<{
+          tablets_per_dose: number;
+          medicines: { name: string } | Array<{ name: string }>;
+        }>;
+  }>).map((row) => {
+    const course = Array.isArray(row.patient_medicine_courses)
+      ? row.patient_medicine_courses[0]!
+      : row.patient_medicine_courses;
+    const medicine = Array.isArray(course.medicines)
+      ? course.medicines[0]!
+      : course.medicines;
+    return {
+      eventId: row.id,
+      medicineName: medicine.name,
+      notificationId: row.notification_id,
+      scheduledFor: row.scheduled_for,
+      slot: row.slot,
+      tablets: Number(course.tablets_per_dose),
+    };
+  });
+}
+
+export async function updateDoseReminderSchedule(
+  updates: readonly {
+    eventId: string;
+    notificationId: string | null;
+    scheduledFor: string;
+  }[],
+): Promise<void> {
+  for (const update of updates) {
+    const { error } = await supabase
+      .from('patient_medicine_dose_events')
+      .update({
+        notification_id: update.notificationId,
+        scheduled_for: update.scheduledFor,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', update.eventId);
+    if (error) throw error;
+  }
+}

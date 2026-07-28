@@ -22,8 +22,16 @@ import {
 } from '../src/dashboardTheme';
 import {
   getNotificationSettings,
+  fetchFutureDoseReminders,
   saveNotificationSettings,
+  updateDoseReminderSchedule,
 } from '../src/lib/medicineCourses';
+import {
+  cancelDoseNotifications,
+  requestMedicineNotificationPermission,
+  scheduleDoseNotifications,
+} from '../src/lib/medicineNotifications';
+import { replaceEventSlotTime, type DoseSlot } from '../src/lib/medicineSchedule';
 import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 
@@ -40,6 +48,12 @@ export default function NotificationTimingsScreen() {
   const [night, setNight] = useState('20:00');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [original, setOriginal] = useState({
+    afternoonTime: '13:00',
+    morningTime: '08:00',
+    nightTime: '20:00',
+    timezone: 'Asia/Kolkata',
+  });
 
   useEffect(() => {
     void getPatientByPhone(phone)
@@ -50,6 +64,7 @@ export default function NotificationTimingsScreen() {
         setMorning(settings.morningTime);
         setAfternoon(settings.afternoonTime);
         setNight(settings.nightTime);
+        setOriginal(settings);
       })
       .catch(() => Alert.alert(t('patientUnavailable')))
       .finally(() => setLoading(false));
@@ -65,13 +80,94 @@ export default function NotificationTimingsScreen() {
     }
     setSaving(true);
     try {
-      await saveNotificationSettings(patientId, {
+      const nextSettings = {
         afternoonTime: afternoon,
         morningTime: morning,
         nightTime: night,
         timezone:
           Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
-      });
+      };
+      const reminders = await fetchFutureDoseReminders(patientId);
+      const newNotifications: Array<{
+        eventId: string;
+        notificationId: string;
+        scheduledFor: string;
+      }> = [];
+      let alertsEnabled = true;
+      if (reminders.length > 0) {
+        const permitted = await requestMedicineNotificationPermission();
+        if (!permitted) {
+          alertsEnabled = false;
+          Alert.alert(t('notifications'), t('phoneAlertsDisabled'));
+        } else {
+          try {
+            for (const reminder of reminders) {
+              const slotTime = {
+                afternoon,
+                morning,
+                night,
+              }[reminder.slot as DoseSlot];
+              const scheduledFor = replaceEventSlotTime(
+                reminder.scheduledFor,
+                slotTime,
+              );
+              const scheduled = await scheduleDoseNotifications(
+                [{ eventId: reminder.eventId, scheduledFor }],
+                {
+                  medicineName: reminder.medicineName,
+                  slot: t(reminder.slot),
+                  tablets: reminder.tablets,
+                },
+              );
+              if (scheduled[0]) {
+                newNotifications.push({
+                  ...scheduled[0],
+                  scheduledFor,
+                });
+              }
+            }
+          } catch (error) {
+            await cancelDoseNotifications(
+              newNotifications.map((item) => item.notificationId),
+            );
+            throw error;
+          }
+        }
+      }
+      await saveNotificationSettings(patientId, nextSettings);
+      try {
+        await updateDoseReminderSchedule(
+          reminders.map((reminder) => {
+            const scheduled = newNotifications.find(
+              (item) => item.eventId === reminder.eventId,
+            );
+            return {
+              eventId: reminder.eventId,
+              notificationId:
+                scheduled?.notificationId ??
+                (alertsEnabled ? reminder.notificationId : null),
+              scheduledFor:
+                scheduled?.scheduledFor ??
+                replaceEventSlotTime(
+                  reminder.scheduledFor,
+                  { afternoon, morning, night }[reminder.slot],
+                ),
+            };
+          }),
+        );
+      } catch (error) {
+        await saveNotificationSettings(patientId, original);
+        await cancelDoseNotifications(
+          newNotifications.map((item) => item.notificationId),
+        );
+        throw error;
+      }
+      await cancelDoseNotifications(
+        reminders.flatMap((item) =>
+          item.notificationId ? [item.notificationId] : [],
+        ),
+      );
+      setOriginal(nextSettings);
       Alert.alert(t('timingsSaved'));
     } catch {
       Alert.alert(t('unableToSaveDocument'), t('tryAgain'));

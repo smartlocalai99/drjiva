@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapDoseRows, selectRelevantDoseRows } from './medicineCourse';
+import {
+  mapDoseRows,
+  selectRelevantDoseRows,
+  shouldCompleteCourse,
+} from './medicineCourse';
 
 describe('mapDoseRows', () => {
   it('keeps stored dose values and the database medicine image', () => {
@@ -43,6 +47,13 @@ describe('mapDoseRows', () => {
         },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('shouldCompleteCourse', () => {
+  it('completes only when no scheduled doses remain', () => {
+    expect(shouldCompleteCourse(0)).toBe(true);
+    expect(shouldCompleteCourse(1)).toBe(false);
   });
 });
 

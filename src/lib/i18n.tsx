@@ -27,6 +27,7 @@ const translations = {
     courseDetails: 'Course details',
     tabletsPerDose: 'Tablets per dose',
     durationDays: 'Number of days',
+    startDate: 'Start date (YYYY-MM-DD)',
     everyDay: 'Every day',
     alternateDays: 'Alternate days',
     reviewReminder: 'Review reminder',
@@ -67,6 +68,10 @@ const translations = {
     unableDeleteDocument: 'Unable to delete document',
     unableDeleteDocumentMessage:
       'The document was kept. Please check your connection and try again.',
+    unableDeleteDocumentStorage:
+      'The private PDF could not be removed, so its record was kept.',
+    unableDeleteDocumentRecord:
+      'The PDF was removed, but its record could not be cleared. Please retry.',
     dischargeSummary: 'Discharge Summary',
     documentsUnavailable: 'Documents unavailable',
     documentsEmptySubtitle:
@@ -149,6 +154,7 @@ const translations = {
     courseDetails: 'కోర్స్ వివరాలు',
     tabletsPerDose: 'ఒక్కోసారి మాత్రలు',
     durationDays: 'రోజుల సంఖ్య',
+    startDate: 'ప్రారంభ తేదీ (YYYY-MM-DD)',
     everyDay: 'ప్రతి రోజు',
     alternateDays: 'ఒక రోజు విడిచి ఒక రోజు',
     reviewReminder: 'రిమైండర్‌ను పరిశీలించండి',
@@ -189,6 +195,10 @@ const translations = {
     unableDeleteDocument: 'పత్రాన్ని తొలగించలేకపోయాము',
     unableDeleteDocumentMessage:
       'పత్రం అలాగే ఉంచబడింది. కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.',
+    unableDeleteDocumentStorage:
+      'ప్రైవేట్ PDF తొలగించబడలేదు, కాబట్టి దాని నమోదు అలాగే ఉంచబడింది.',
+    unableDeleteDocumentRecord:
+      'PDF తొలగించబడింది, కానీ నమోదు తొలగించబడలేదు. మళ్లీ ప్రయత్నించండి.',
     dischargeSummary: 'డిశ్చార్జ్ సారాంశం',
     documentsUnavailable: 'పత్రాలు అందుబాటులో లేవు',
     documentsEmptySubtitle:

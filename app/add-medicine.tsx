@@ -26,6 +26,7 @@ import {
 import {
   createCustomHospital,
   createMedicineCourse,
+  deleteMedicineCourse,
   fetchVerifiedHospitals,
   getNotificationSettings,
   saveNotificationIds,
@@ -33,6 +34,7 @@ import {
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
 import {
+  cancelDoseNotifications,
   requestMedicineNotificationPermission,
   scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
@@ -76,6 +78,7 @@ export default function AddMedicineScreen() {
   const [medicine, setMedicine] = useState<MedicineCatalogueItem | null>(null);
   const [tablets, setTablets] = useState('1');
   const [days, setDays] = useState('7');
+  const [startDate, setStartDate] = useState(todayString());
   const [slots, setSlots] = useState<DoseSlot[]>(['morning']);
   const [pattern, setPattern] = useState<DayPattern>('daily');
   const [busy, setBusy] = useState(false);
@@ -126,11 +129,13 @@ export default function AddMedicineScreen() {
       slots,
       tabletsPerDose,
     });
-    if (validation) {
+    if (validation || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
       Alert.alert(t('courseDetails'), t('tryAgain'));
       return;
     }
     setBusy(true);
+    let createdCourseId: string | null = null;
+    const scheduledIds: string[] = [];
     try {
       const settings = await getNotificationSettings(patientId);
       const customHospital = isCustomHospital
@@ -145,7 +150,7 @@ export default function AddMedicineScreen() {
           night: settings.nightTime,
         },
         slots,
-        startDate: todayString(),
+        startDate,
       });
       const created = await createMedicineCourse({
         customHospitalId: customHospital?.id,
@@ -156,22 +161,28 @@ export default function AddMedicineScreen() {
         medicineId: medicine.id,
         patientId,
         slots,
-        startDate: todayString(),
+        startDate,
         tabletsPerDose,
       });
+      createdCourseId = created.courseId;
       const permitted = await requestMedicineNotificationPermission();
       if (permitted) {
-        const identifiers = await scheduleDoseNotifications(
-          drafts.map((event, index) => ({
-            eventId: created.eventIds[index]!,
-            scheduledFor: event.scheduledFor,
-          })),
-          {
-            medicineName: medicine.name,
-            slot: slots.map((slot) => t(slot)).join(', '),
-            tablets: tabletsPerDose,
-          },
-        );
+        const identifiers = [];
+        for (const [index, draft] of drafts.entries()) {
+          const next = await scheduleDoseNotifications(
+            [{
+              eventId: created.eventIds[index]!,
+              scheduledFor: draft.scheduledFor,
+            }],
+            {
+              medicineName: medicine.name,
+              slot: t(draft.slot),
+              tablets: tabletsPerDose,
+            },
+          );
+          identifiers.push(...next);
+          scheduledIds.push(...next.map((item) => item.notificationId));
+        }
         await saveNotificationIds(identifiers);
       } else {
         Alert.alert(t('notifications'), t('phoneAlertsDisabled'));
@@ -181,6 +192,10 @@ export default function AddMedicineScreen() {
         router.replace({ params: { phone, refresh: Date.now() }, pathname: '/home' });
       }, 1400);
     } catch {
+      await cancelDoseNotifications(scheduledIds).catch(() => undefined);
+      if (createdCourseId) {
+        await deleteMedicineCourse(createdCourseId).catch(() => undefined);
+      }
       Alert.alert(t('addMedicine'), t('tryAgain'));
     } finally {
       setBusy(false);
@@ -276,6 +291,16 @@ export default function AddMedicineScreen() {
               <Text style={styles.heading}>{t('courseDetails')}</Text>
               <LabelInput label={t('tabletsPerDose')} value={tablets} onChange={setTablets} />
               <LabelInput label={t('durationDays')} value={days} onChange={setDays} />
+              <View>
+                <Text style={styles.label}>{t('startDate')}</Text>
+                <TextInput
+                  maxLength={10}
+                  onChangeText={setStartDate}
+                  placeholder="YYYY-MM-DD"
+                  style={styles.textInput}
+                  value={startDate}
+                />
+              </View>
               <View style={styles.chips}>
                 {SLOT_KEYS.map((slot) => (
                   <Chip
