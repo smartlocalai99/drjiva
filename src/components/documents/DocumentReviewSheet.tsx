@@ -21,6 +21,7 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../../dashboardTheme';
+import { getReportTypeTranslationKey } from '../../lib/documentMenu';
 import { useLanguage } from '../../lib/i18n';
 import { PressableScale } from '../PressableScale';
 
@@ -164,7 +165,7 @@ export function DocumentReviewSheet({
                     reportType === type && styles.optionTextSelected,
                   ]}
                 >
-                  {type}
+                  {t(getReportTypeTranslationKey(type))}
                 </Text>
               </PressableScale>
             ))}

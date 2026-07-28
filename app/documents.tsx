@@ -244,7 +244,7 @@ export default function DocumentsScreen() {
     } catch (error) {
       const message =
         error instanceof Error && error.message.includes('20 MB')
-          ? error.message
+          ? t('reportTooLarge')
           : t('pdfCouldNotBeSaved');
       Alert.alert(t('unableToSaveDocument'), message);
     } finally {

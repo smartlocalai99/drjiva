@@ -8,6 +8,7 @@ import {
   dashboardTypography,
 } from '../../dashboardTheme';
 import type { HospitalOption } from '../../lib/documentClassifier';
+import { getReportTypeTranslationKey } from '../../lib/documentMenu';
 import { useLanguage } from '../../lib/i18n';
 import type { PatientReport } from '../../lib/patientReportModel';
 import { PressableScale } from '../PressableScale';
@@ -33,7 +34,9 @@ export function ReportList({
       {reports.map((report) => (
         <PressableScale
           accessibilityLabel={
-            report.reportType ?? t('medicalDocument')
+            report.reportType
+              ? t(getReportTypeTranslationKey(report.reportType))
+              : t('medicalDocument')
           }
           key={report.id}
           onPress={() => onOpen(report)}
@@ -49,7 +52,9 @@ export function ReportList({
           </View>
           <View style={styles.body}>
             <Text numberOfLines={1} style={styles.title}>
-              {report.reportType ?? report.label ?? t('medicalDocument')}
+              {report.reportType
+                ? t(getReportTypeTranslationKey(report.reportType))
+                : report.label ?? t('medicalDocument')}
             </Text>
             <Text numberOfLines={1} style={styles.hospital}>
               {report.hospitalId

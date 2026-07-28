@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { getDocumentPrimaryAction } from './documentMenu';
+import {
+  getDocumentPrimaryAction,
+  getReportTypeTranslationKey,
+} from './documentMenu';
 
 describe('getDocumentPrimaryAction', () => {
   it('uses scanning language and iconography', () => {
@@ -8,5 +11,14 @@ describe('getDocumentPrimaryAction', () => {
       icon: 'scan-outline',
       label: 'Scan Document',
     });
+  });
+});
+
+describe('getReportTypeTranslationKey', () => {
+  it('maps canonical database values to localized copy keys', () => {
+    expect(getReportTypeTranslationKey('Lab Report')).toBe('labReport');
+    expect(getReportTypeTranslationKey('OP Consultation')).toBe(
+      'opConsultation',
+    );
   });
 });
