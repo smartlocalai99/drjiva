@@ -84,6 +84,10 @@ export function mapPatientReportRow(row: PatientReportRow): PatientReport {
 export function groupPatientReportsByHospital(
   reports: PatientReport[],
   hospitals: HospitalOption[],
+  fallbackNames = {
+    hospital: 'Hospital',
+    otherHospital: 'Other hospital',
+  },
 ): PatientReportHospitalGroup[] {
   const hospitalNames = new Map(
     hospitals.map((hospital) => [hospital.id, hospital.name]),
@@ -95,8 +99,8 @@ export function groupPatientReportsByHospital(
     const group = groups.get(key) ?? {
       hospitalId: report.hospitalId,
       hospitalName: report.hospitalId
-        ? hospitalNames.get(report.hospitalId) ?? 'Hospital'
-        : 'Other hospital',
+        ? hospitalNames.get(report.hospitalId) ?? fallbackNames.hospital
+        : fallbackNames.otherHospital,
       reports: [],
     };
     group.reports.push(report);

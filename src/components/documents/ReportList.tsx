@@ -8,6 +8,7 @@ import {
   dashboardTypography,
 } from '../../dashboardTheme';
 import type { HospitalOption } from '../../lib/documentClassifier';
+import { useLanguage } from '../../lib/i18n';
 import type { PatientReport } from '../../lib/patientReportModel';
 import { PressableScale } from '../PressableScale';
 
@@ -22,6 +23,7 @@ export function ReportList({
   onOpen,
   reports,
 }: ReportListProps) {
+  const { t } = useLanguage();
   const hospitalNames = new Map(
     hospitals.map((hospital) => [hospital.id, hospital.name]),
   );
@@ -30,7 +32,9 @@ export function ReportList({
     <View style={styles.list}>
       {reports.map((report) => (
         <PressableScale
-          accessibilityLabel={`Open ${report.reportType ?? 'document'}`}
+          accessibilityLabel={
+            report.reportType ?? t('medicalDocument')
+          }
           key={report.id}
           onPress={() => onOpen(report)}
           pressedScale={0.98}
@@ -45,15 +49,16 @@ export function ReportList({
           </View>
           <View style={styles.body}>
             <Text numberOfLines={1} style={styles.title}>
-              {report.reportType ?? report.label ?? 'Medical document'}
+              {report.reportType ?? report.label ?? t('medicalDocument')}
             </Text>
             <Text numberOfLines={1} style={styles.hospital}>
               {report.hospitalId
-                ? hospitalNames.get(report.hospitalId) ?? 'Hospital'
-                : 'Hospital'}
+                ? hospitalNames.get(report.hospitalId) ?? t('hospital')
+                : t('hospital')}
             </Text>
             <Text style={styles.meta}>
-              {report.pageCount} {report.pageCount === 1 ? 'page' : 'pages'} ·{' '}
+              {report.pageCount}{' '}
+              {report.pageCount === 1 ? t('page') : t('pagePlural')} ·{' '}
               {new Date(report.createdAt).toLocaleDateString()}
             </Text>
           </View>

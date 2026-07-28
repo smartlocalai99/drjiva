@@ -89,7 +89,7 @@ export default function DocumentsScreen() {
 
   const loadDocuments = useCallback(async () => {
     if (!phone) {
-      setErrorMessage('Patient phone number is unavailable.');
+      setErrorMessage(t('patientUnavailable'));
       setIsLoading(false);
       return;
     }
@@ -109,11 +109,11 @@ export default function DocumentsScreen() {
       setHospitals(nextHospitals);
       setReports(nextReports);
     } catch {
-      setErrorMessage('Unable to load documents. Pull down or try again.');
+      setErrorMessage(t('unableLoadDocuments'));
     } finally {
       setIsLoading(false);
     }
-  }, [phone]);
+  }, [phone, t]);
 
   useEffect(() => {
     void loadDocuments();
@@ -129,8 +129,12 @@ export default function DocumentsScreen() {
     );
   }, [filter, reports]);
   const reportGroups = useMemo(
-    () => groupPatientReportsByHospital(visibleReports, hospitals),
-    [hospitals, visibleReports],
+    () =>
+      groupPatientReportsByHospital(visibleReports, hospitals, {
+        hospital: t('hospital'),
+        otherHospital: t('otherHospital'),
+      }),
+    [hospitals, t, visibleReports],
   );
   const selectedGroup =
     reportGroups.find(
@@ -162,8 +166,8 @@ export default function DocumentsScreen() {
     }
     if (!patientId) {
       Alert.alert(
-        'Patient unavailable',
-        'Reload the Documents screen before scanning.',
+        t('patientUnavailable'),
+        t('reloadBeforeScanning'),
       );
       return;
     }
@@ -173,13 +177,13 @@ export default function DocumentsScreen() {
       const cameraPermission = await requestDocumentCameraAccess();
       if (cameraPermission === 'blocked') {
         Alert.alert(
-          'Camera permission required',
-          'Allow camera access in Settings to scan medical documents.',
+          t('cameraPermissionRequired'),
+          t('cameraSettingsMessage'),
           [
-            { style: 'cancel', text: 'Not now' },
+            { style: 'cancel', text: t('notNow') },
             {
               onPress: () => void Linking.openSettings(),
-              text: 'Open Settings',
+              text: t('openSettings'),
             },
           ],
         );
@@ -187,8 +191,8 @@ export default function DocumentsScreen() {
       }
       if (cameraPermission === 'denied') {
         Alert.alert(
-          'Camera permission required',
-          'Allow camera access to scan a medical document.',
+          t('cameraPermissionRequired'),
+          t('cameraScanMessage'),
         );
         return;
       }
@@ -205,8 +209,8 @@ export default function DocumentsScreen() {
       setReviewVisible(true);
     } catch {
       Alert.alert(
-        'Unable to scan document',
-        'Check camera permission and try scanning again.',
+        t('unableToScanDocument'),
+        t('checkCameraAndTryAgain'),
       );
     } finally {
       setIsScanning(false);
@@ -236,13 +240,13 @@ export default function DocumentsScreen() {
       setReports((current) => [report, ...current]);
       setReviewVisible(false);
       setCapturedPages([]);
-      Alert.alert('Document saved', 'The PDF is attached to this patient.');
+      Alert.alert(t('documentSaved'), t('pdfAttached'));
     } catch (error) {
       const message =
         error instanceof Error && error.message.includes('20 MB')
           ? error.message
-          : 'The PDF could not be saved. Please try again.';
-      Alert.alert('Unable to save document', message);
+          : t('pdfCouldNotBeSaved');
+      Alert.alert(t('unableToSaveDocument'), message);
     } finally {
       if (pdfUri) {
         const pdf = new File(pdfUri);
@@ -256,14 +260,14 @@ export default function DocumentsScreen() {
 
   const handleOpenReport = async (report: PatientReport) => {
     if (!report.storagePath) {
-      Alert.alert('Unable to open', 'This older report has no storage path.');
+      Alert.alert(t('unableToOpen'), t('olderReportNoPath'));
       return;
     }
     try {
       const signedUrl = await createPatientReportSignedUrl(report.storagePath);
       await Linking.openURL(signedUrl);
     } catch {
-      Alert.alert('Unable to open', 'Please try opening the report again.');
+      Alert.alert(t('unableToOpen'), t('tryOpeningAgain'));
     }
   };
 
@@ -302,7 +306,7 @@ export default function DocumentsScreen() {
         {selectedGroup ? (
           <View style={styles.folderHeader}>
             <PressableScale
-              accessibilityLabel="Back to hospitals"
+              accessibilityLabel={t('backToHospitals')}
               onPress={() => setSelectedHospitalKey(null)}
               style={styles.backButton}
             >

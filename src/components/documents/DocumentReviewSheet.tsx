@@ -21,6 +21,7 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../../dashboardTheme';
+import { useLanguage } from '../../lib/i18n';
 import { PressableScale } from '../PressableScale';
 
 type DocumentReviewSheetProps = {
@@ -47,6 +48,7 @@ export function DocumentReviewSheet({
   pageCount,
   visible,
 }: DocumentReviewSheetProps) {
+  const { t } = useLanguage();
   const [hospitalId, setHospitalId] = useState<string | null>(null);
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -76,7 +78,7 @@ export function DocumentReviewSheet({
     >
       <View style={styles.backdrop}>
         <Pressable
-          accessibilityLabel="Close document review"
+          accessibilityLabel={t('cancel')}
           disabled={isSaving}
           onPress={onCancel}
           style={StyleSheet.absoluteFill}
@@ -85,9 +87,10 @@ export function DocumentReviewSheet({
           <View style={styles.handle} />
           <View style={styles.titleRow}>
             <View>
-              <Text style={styles.title}>Review scanned document</Text>
+              <Text style={styles.title}>{t('reviewScannedDocument')}</Text>
               <Text style={styles.subtitle}>
-                {pageCount} {pageCount === 1 ? 'page' : 'pages'} ready
+                {pageCount}{' '}
+                {pageCount === 1 ? t('page') : t('pagePlural')}
               </Text>
             </View>
             <View style={styles.scanBadge}>
@@ -99,7 +102,7 @@ export function DocumentReviewSheet({
             </View>
           </View>
 
-          <Text style={styles.label}>Hospital</Text>
+          <Text style={styles.label}>{t('hospital')}</Text>
           <ScrollView
             contentContainerStyle={styles.optionGrid}
             nestedScrollEnabled
@@ -140,7 +143,7 @@ export function DocumentReviewSheet({
             ))}
           </ScrollView>
 
-          <Text style={styles.label}>Report type</Text>
+          <Text style={styles.label}>{t('reportType')}</Text>
           <View style={styles.typeGrid}>
             {REPORT_TYPES.map((type) => (
               <PressableScale
@@ -169,11 +172,11 @@ export function DocumentReviewSheet({
 
           {showValidation ? (
             <Text style={styles.error}>
-              Choose both the hospital and report type.
+              {t('scannerValidation')}
             </Text>
           ) : (
             <Text style={styles.helper}>
-              We filled what could be identified on-device. Please confirm it.
+              {t('scannerReviewHelper')}
             </Text>
           )}
 
@@ -183,7 +186,7 @@ export function DocumentReviewSheet({
               onPress={onCancel}
               style={styles.cancelButton}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('cancel')}</Text>
             </PressableScale>
             <PressableScale
               disabled={isSaving}
@@ -195,7 +198,7 @@ export function DocumentReviewSheet({
               ) : (
                 <>
                   <Ionicons color="#FFFFFF" name="cloud-upload" size={18} />
-                  <Text style={styles.saveText}>Save PDF</Text>
+                  <Text style={styles.saveText}>{t('savePdf')}</Text>
                 </>
               )}
             </PressableScale>
