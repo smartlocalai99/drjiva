@@ -230,6 +230,21 @@ export async function deleteMedicineCourse(courseId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function rollbackMedicineCourse(courseId: string): Promise<void> {
+  try {
+    await deleteMedicineCourse(courseId);
+  } catch (deleteError) {
+    const { error } = await supabase
+      .from('patient_medicine_courses')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
+    if (error) throw deleteError;
+  }
+}
+
 export type FutureDoseReminder = {
   eventId: string;
   medicineName: string;
@@ -302,4 +317,31 @@ export async function updateDoseReminderSchedule(
       .eq('id', update.eventId);
     if (error) throw error;
   }
+}
+
+export async function replaceNotificationSchedule(
+  patientId: string,
+  settings: NotificationSettings,
+  updates: readonly {
+    eventId: string;
+    notificationId: string | null;
+    scheduledFor: string;
+  }[],
+): Promise<void> {
+  const { error } = await supabase.rpc(
+    'replace_patient_notification_schedule',
+    {
+      p_afternoon_time: settings.afternoonTime,
+      p_morning_time: settings.morningTime,
+      p_night_time: settings.nightTime,
+      p_patient_id: patientId,
+      p_timezone: settings.timezone,
+      p_updates: updates.map((update) => ({
+        event_id: update.eventId,
+        notification_id: update.notificationId,
+        scheduled_for: update.scheduledFor,
+      })),
+    },
+  );
+  if (error) throw error;
 }

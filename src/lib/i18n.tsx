@@ -132,6 +132,8 @@ const translations = {
     night: 'Night',
     saveTimings: 'Save timings',
     timingsSaved: 'Notification timings saved',
+    oldAlertsCleanupPending:
+      'Timings were saved. Old alerts will be cleaned up automatically.',
     invalidTimings: 'Use HH:MM and keep Morning before Afternoon before Night.',
     preferences: 'Preferences',
     recent: 'Recent',
@@ -260,6 +262,8 @@ const translations = {
     night: 'రాత్రి',
     saveTimings: 'సమయాలను సేవ్ చేయండి',
     timingsSaved: 'నోటిఫికేషన్ సమయాలు సేవ్ అయ్యాయి',
+    oldAlertsCleanupPending:
+      'సమయాలు సేవ్ అయ్యాయి. పాత అలర్ట్‌లు ఆటోమేటిక్‌గా తొలగించబడతాయి.',
     invalidTimings:
       'HH:MM ఉపయోగించి ఉదయం, మధ్యాహ్నం, రాత్రి క్రమంలో ఉంచండి.',
     preferences: 'ప్రాధాన్యతలు',

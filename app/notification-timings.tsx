@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -24,10 +25,11 @@ import {
   getNotificationSettings,
   fetchFutureDoseReminders,
   saveNotificationSettings,
-  updateDoseReminderSchedule,
+  replaceNotificationSchedule,
 } from '../src/lib/medicineCourses';
 import {
   cancelDoseNotifications,
+  queueNotificationCancellations,
   requestMedicineNotificationPermission,
   scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
@@ -48,12 +50,6 @@ export default function NotificationTimingsScreen() {
   const [night, setNight] = useState('20:00');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [original, setOriginal] = useState({
-    afternoonTime: '13:00',
-    morningTime: '08:00',
-    nightTime: '20:00',
-    timezone: 'Asia/Kolkata',
-  });
 
   useEffect(() => {
     void getPatientByPhone(phone)
@@ -64,7 +60,6 @@ export default function NotificationTimingsScreen() {
         setMorning(settings.morningTime);
         setAfternoon(settings.afternoonTime);
         setNight(settings.nightTime);
-        setOriginal(settings);
       })
       .catch(() => Alert.alert(t('patientUnavailable')))
       .finally(() => setLoading(false));
@@ -98,7 +93,13 @@ export default function NotificationTimingsScreen() {
         const permitted = await requestMedicineNotificationPermission();
         if (!permitted) {
           alertsEnabled = false;
-          Alert.alert(t('notifications'), t('phoneAlertsDisabled'));
+          Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
+            { style: 'cancel', text: t('notNow') },
+            {
+              onPress: () => void Linking.openSettings(),
+              text: t('openSettings'),
+            },
+          ]);
         } else {
           try {
             for (const reminder of reminders) {
@@ -134,40 +135,48 @@ export default function NotificationTimingsScreen() {
           }
         }
       }
-      await saveNotificationSettings(patientId, nextSettings);
-      try {
-        await updateDoseReminderSchedule(
-          reminders.map((reminder) => {
-            const scheduled = newNotifications.find(
-              (item) => item.eventId === reminder.eventId,
-            );
-            return {
-              eventId: reminder.eventId,
-              notificationId:
-                scheduled?.notificationId ??
-                (alertsEnabled ? reminder.notificationId : null),
-              scheduledFor:
-                scheduled?.scheduledFor ??
-                replaceEventSlotTime(
-                  reminder.scheduledFor,
-                  { afternoon, morning, night }[reminder.slot],
-                ),
-            };
-          }),
+      const updates = reminders.map((reminder) => {
+        const scheduled = newNotifications.find(
+          (item) => item.eventId === reminder.eventId,
         );
+        return {
+          eventId: reminder.eventId,
+          notificationId:
+            scheduled?.notificationId ??
+            (alertsEnabled ? reminder.notificationId : null),
+          scheduledFor:
+            scheduled?.scheduledFor ??
+            replaceEventSlotTime(
+              reminder.scheduledFor,
+              { afternoon, morning, night }[reminder.slot],
+            ),
+        };
+      });
+      try {
+        if (reminders.length > 0) {
+          await replaceNotificationSchedule(
+            patientId,
+            nextSettings,
+            updates,
+          );
+        } else {
+          await saveNotificationSettings(patientId, nextSettings);
+        }
       } catch (error) {
-        await saveNotificationSettings(patientId, original);
         await cancelDoseNotifications(
           newNotifications.map((item) => item.notificationId),
         );
         throw error;
       }
-      await cancelDoseNotifications(
-        reminders.flatMap((item) =>
-          item.notificationId ? [item.notificationId] : [],
-        ),
+      const oldIds = reminders.flatMap((item) =>
+        item.notificationId ? [item.notificationId] : [],
       );
-      setOriginal(nextSettings);
+      try {
+        await cancelDoseNotifications(oldIds);
+      } catch {
+        await queueNotificationCancellations(oldIds);
+        Alert.alert(t('notifications'), t('oldAlertsCleanupPending'));
+      }
       Alert.alert(t('timingsSaved'));
     } catch {
       Alert.alert(t('unableToSaveDocument'), t('tryAgain'));

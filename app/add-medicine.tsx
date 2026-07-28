@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -26,10 +27,10 @@ import {
 import {
   createCustomHospital,
   createMedicineCourse,
-  deleteMedicineCourse,
   fetchVerifiedHospitals,
   getNotificationSettings,
   saveNotificationIds,
+  rollbackMedicineCourse,
   searchMedicines,
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
@@ -185,7 +186,13 @@ export default function AddMedicineScreen() {
         }
         await saveNotificationIds(identifiers);
       } else {
-        Alert.alert(t('notifications'), t('phoneAlertsDisabled'));
+        Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
+          { style: 'cancel', text: t('notNow') },
+          {
+            onPress: () => void Linking.openSettings(),
+            text: t('openSettings'),
+          },
+        ]);
       }
       setSuccess(true);
       setTimeout(() => {
@@ -194,7 +201,7 @@ export default function AddMedicineScreen() {
     } catch {
       await cancelDoseNotifications(scheduledIds).catch(() => undefined);
       if (createdCourseId) {
-        await deleteMedicineCourse(createdCourseId).catch(() => undefined);
+        await rollbackMedicineCourse(createdCourseId).catch(() => undefined);
       }
       Alert.alert(t('addMedicine'), t('tryAgain'));
     } finally {

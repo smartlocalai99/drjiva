@@ -71,6 +71,7 @@ export function MedicineCard({ medicine, index, onToggle }: MedicineCardProps) {
           />
           <View style={styles.toggle}>
             <MedicineToggle
+              disabled={medicine.completed}
               onValueChange={onToggle}
               value={medicine.completed}
             />

@@ -10,6 +10,7 @@ import Animated, {
 import { dashboardColors, dashboardLayout } from '../../dashboardTheme';
 
 type MedicineToggleProps = {
+  disabled?: boolean;
   value: boolean;
   onValueChange: () => void;
 };
@@ -17,7 +18,11 @@ type MedicineToggleProps = {
 const KNOB_TRAVEL =
   dashboardLayout.toggleWidth - dashboardLayout.toggleKnobSize - 4;
 
-export function MedicineToggle({ value, onValueChange }: MedicineToggleProps) {
+export function MedicineToggle({
+  disabled = false,
+  value,
+  onValueChange,
+}: MedicineToggleProps) {
   const progress = useSharedValue(value ? 1 : 0);
   progress.value = withTiming(value ? 1 : 0, { duration: 220 });
 
@@ -45,6 +50,7 @@ export function MedicineToggle({ value, onValueChange }: MedicineToggleProps) {
     <Pressable
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
+      disabled={disabled}
       hitSlop={10}
       onPress={onValueChange}
     >

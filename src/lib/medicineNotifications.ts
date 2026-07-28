@@ -17,6 +17,8 @@ type NotificationAdapter = {
   ) => Promise<string>;
 };
 
+const PENDING_CANCELLATIONS_KEY = 'drjiva.pendingNotificationCancellations';
+
 export async function scheduleDoseNotificationsWithAdapter(
   adapter: NotificationAdapter,
   events: readonly NotificationEvent[],
@@ -42,6 +44,7 @@ export async function requestMedicineNotificationPermission(): Promise<boolean> 
     import('react-native'),
     import('expo-notifications'),
   ]);
+  await flushPendingNotificationCancellations().catch(() => undefined);
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('medicine-reminders', {
       importance: Notifications.AndroidImportance.HIGH,
@@ -95,4 +98,43 @@ export async function cancelDoseNotifications(
   await Promise.all(
     identifiers.map(Notifications.cancelScheduledNotificationAsync),
   );
+}
+
+export async function queueNotificationCancellations(
+  identifiers: readonly string[],
+): Promise<void> {
+  if (identifiers.length === 0) return;
+  const { default: AsyncStorage } = await import(
+    '@react-native-async-storage/async-storage'
+  );
+  const stored = await AsyncStorage.getItem(PENDING_CANCELLATIONS_KEY);
+  const previous = stored ? (JSON.parse(stored) as string[]) : [];
+  await AsyncStorage.setItem(
+    PENDING_CANCELLATIONS_KEY,
+    JSON.stringify([...new Set([...previous, ...identifiers])]),
+  );
+}
+
+export async function flushPendingNotificationCancellations(): Promise<void> {
+  const [{ default: AsyncStorage }, Notifications] = await Promise.all([
+    import('@react-native-async-storage/async-storage'),
+    import('expo-notifications'),
+  ]);
+  const stored = await AsyncStorage.getItem(PENDING_CANCELLATIONS_KEY);
+  if (!stored) return;
+  const identifiers = JSON.parse(stored) as string[];
+  const results = await Promise.allSettled(
+    identifiers.map(Notifications.cancelScheduledNotificationAsync),
+  );
+  const failed = identifiers.filter(
+    (_, index) => results[index]?.status === 'rejected',
+  );
+  if (failed.length === 0) {
+    await AsyncStorage.removeItem(PENDING_CANCELLATIONS_KEY);
+  } else {
+    await AsyncStorage.setItem(
+      PENDING_CANCELLATIONS_KEY,
+      JSON.stringify(failed),
+    );
+  }
 }
