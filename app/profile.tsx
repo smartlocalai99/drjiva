@@ -116,49 +116,56 @@ export default function ProfileScreen() {
   const isNameValid = trimmedName.length >= 2;
 
   const selectProfilePhoto = async (source: 'camera' | 'gallery') => {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission needed',
+    try {
+      const permission =
         source === 'camera'
-          ? 'Allow camera access to take a profile photo.'
-          : 'Allow photo access to choose a profile photo.',
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          'Permission needed',
+          source === 'camera'
+            ? 'Allow camera access to take a profile photo.'
+            : 'Allow photo access to choose a profile photo.',
+        );
+        return;
+      }
+
+      const options: ImagePicker.ImagePickerOptions = {
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ['images'],
+        quality: 0.85,
+      };
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync(options)
+          : await ImagePicker.launchImageLibraryAsync(options);
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset) {
+        return;
+      }
+
+      const validationMessage = validateProfilePhoto(asset);
+      if (validationMessage) {
+        Alert.alert('Photo not supported', validationMessage);
+        return;
+      }
+
+      setPendingPhoto(asset);
+      setSavedAt(undefined);
+    } catch {
+      Alert.alert(
+        'Unable to open photos',
+        'Please try again or choose the other photo source.',
       );
-      return;
     }
-
-    const options: ImagePicker.ImagePickerOptions = {
-      allowsEditing: true,
-      aspect: [1, 1],
-      mediaTypes: ['images'],
-      quality: 0.85,
-    };
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-
-    if (result.canceled) {
-      return;
-    }
-
-    const asset = result.assets[0];
-    if (!asset) {
-      return;
-    }
-
-    const validationMessage = validateProfilePhoto(asset);
-    if (validationMessage) {
-      Alert.alert('Photo not supported', validationMessage);
-      return;
-    }
-
-    setPendingPhoto(asset);
-    setSavedAt(undefined);
   };
 
   const showPhotoOptions = () => {
