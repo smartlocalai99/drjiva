@@ -11,6 +11,34 @@ function toMobile(phone: string): string {
   return mobile;
 }
 
+export type OtpScreenRoute = {
+  params: { phone: string };
+  pathname: '/otp';
+};
+
+export function getOtpScreenRoute(phone: string): OtpScreenRoute {
+  return {
+    params: { phone: toMobile(phone) },
+    pathname: '/otp',
+  };
+}
+
+export function navigateToOtpOnce(
+  phone: string,
+  navigationStarted: { current: boolean },
+  push: (route: OtpScreenRoute) => void,
+): boolean {
+  const route = getOtpScreenRoute(phone);
+
+  if (navigationStarted.current) {
+    return false;
+  }
+
+  navigationStarted.current = true;
+  push(route);
+  return true;
+}
+
 export async function sendOtp(
   phone: string,
 ): Promise<{ ok: true }> {

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   useCallback,
   useEffect,
@@ -16,7 +16,7 @@ import {
 } from '../src/components/PhoneInput';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { copy } from '../src/copy';
-import { sendOtp } from '../src/lib/auth';
+import { navigateToOtpOnce } from '../src/lib/auth';
 import { checkPatientExists } from '../src/lib/patients';
 import { getSessionPhone } from '../src/lib/session';
 import { colors, spacing, typography } from '../src/theme';
@@ -24,11 +24,9 @@ import { colors, spacing, typography } from '../src/theme';
 export default function LoginScreen() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [sendError, setSendError] = useState<string | undefined>();
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const isMountedRef = useRef(true);
-  const isSendingRef = useRef(false);
+  const otpNavigationStartedRef = useRef(false);
   const isValid = isValidIndianPhone(phone);
 
   useEffect(() => {
@@ -69,54 +67,41 @@ export default function LoginScreen() {
     })();
   }, [router]);
 
+  useFocusEffect(
+    useCallback(() => {
+      otpNavigationStartedRef.current = false;
+    }, []),
+  );
+
   const handlePhoneChange = (nextPhone: string) => {
-    setSendError(undefined);
     setPhone(nextPhone);
   };
 
-  const submitPhone = useCallback(async (submittedPhone: string) => {
-    if (
-      !isValidIndianPhone(submittedPhone) ||
-      isSendingRef.current
-    ) {
+  const submitPhone = useCallback((submittedPhone: string) => {
+    if (!isValidIndianPhone(submittedPhone)) {
       return;
     }
 
-    isSendingRef.current = true;
-    setIsSending(true);
-    setSendError(undefined);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-      () => undefined,
+    navigateToOtpOnce(
+      submittedPhone,
+      otpNavigationStartedRef,
+      (route) => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+          () => undefined,
+        );
+        router.push(route);
+      },
     );
-
-    try {
-      await sendOtp(submittedPhone);
-      if (isMountedRef.current) {
-        router.push({
-          pathname: '/otp',
-          params: { phone: submittedPhone },
-        });
-      }
-    } catch {
-      if (isMountedRef.current) {
-        setSendError(copy.sendCodeError);
-      }
-    } finally {
-      isSendingRef.current = false;
-      if (isMountedRef.current) {
-        setIsSending(false);
-      }
-    }
   }, [router]);
 
   useEffect(() => {
     if (isValid) {
-      void submitPhone(phone);
+      submitPhone(phone);
     }
   }, [isValid, phone, submitPhone]);
 
   const handleContinue = () => {
-    void submitPhone(phone);
+    submitPhone(phone);
   };
 
   if (isCheckingSession) {
@@ -131,17 +116,14 @@ export default function LoginScreen() {
 
       <View style={styles.form}>
         <PhoneInput
-          disabled={isSending}
-          errorMessage={sendError}
           onChangeText={handlePhoneChange}
           testID="phone-input"
           value={phone}
         />
         <PrimaryButton
           accessibilityLabel={copy.continue}
-          disabled={!isValid || isSending}
+          disabled={!isValid}
           label={copy.continue}
-          loading={isSending}
           onPress={handleContinue}
           testID="continue-button"
         />

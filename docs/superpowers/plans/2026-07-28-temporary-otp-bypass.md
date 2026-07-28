@@ -2,16 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Accept `1234` as the temporary OTP while leaving the surrounding login flow unchanged.
+**Goal:** Route directly to OTP entry and accept `1234` as the temporary OTP.
 
-**Architecture:** Replace the external OTP send and verify calls at the existing `src/lib/auth.ts` boundary with deterministic local results. Existing screens continue consuming the same asynchronous function signatures.
+**Architecture:** The login screen routes synchronously to `/otp` after local phone validation. Resend and verification use deterministic local results at the existing `src/lib/auth.ts` boundary.
 
 **Tech Stack:** Expo SDK 57, React Native 0.86, TypeScript 6, Vitest 4
 
 ## Global Constraints
 
 - Read the exact Expo SDK 57 documentation before code changes.
-- Do not change screens, navigation, Supabase Edge Functions, dependencies, or patient/session behavior.
+- Do not change OTP-screen navigation, Supabase Edge Functions, dependencies, or patient/session behavior.
 - The temporary bypass applies to every build.
 
 ---
@@ -20,19 +20,46 @@
 
 **Files:**
 - Create: `src/lib/auth.test.ts`
+- Modify: `app/index.tsx`
 - Modify: `src/lib/auth.ts`
 
 **Interfaces:**
-- Consumes: `sendOtp(phone: string): Promise<{ ok: true }>` and `verifyOtp(phone: string, code: string): Promise<{ ok: boolean }>`
-- Produces: The same function signatures with provider-independent temporary behavior.
+- Consumes: Expo Router's `useFocusEffect` and `router.push`.
+- Produces: `getOtpScreenRoute(phone)`, single-flight `navigateToOtpOnce(...)`, provider-independent `sendOtp(...)`, and `verifyOtp(...)`.
 
 - [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { sendOtp, verifyOtp } from './auth';
+import {
+  getOtpScreenRoute,
+  navigateToOtpOnce,
+  sendOtp,
+  verifyOtp,
+} from './auth';
 
 describe('temporary OTP bypass', () => {
+  it('builds the direct OTP route', () => {
+    expect(getOtpScreenRoute('9876543210')).toEqual({
+      params: { phone: '9876543210' },
+      pathname: '/otp',
+    });
+  });
+
+  it('prevents duplicate navigation until focus resets the guard', () => {
+    const guard = { current: false };
+    const routes: ReturnType<typeof getOtpScreenRoute>[] = [];
+    const push = (route: ReturnType<typeof getOtpScreenRoute>) => {
+      routes.push(route);
+    };
+
+    expect(navigateToOtpOnce('9876543210', guard, push)).toBe(true);
+    expect(navigateToOtpOnce('9876543210', guard, push)).toBe(false);
+    guard.current = false;
+    expect(navigateToOtpOnce('9876543210', guard, push)).toBe(true);
+    expect(routes).toHaveLength(2);
+  });
+
   it('allows login to proceed without sending an external OTP', async () => {
     await expect(sendOtp('9876543210')).resolves.toEqual({ ok: true });
   });
@@ -55,19 +82,20 @@ describe('temporary OTP bypass', () => {
 
 Run: `npm test -- src/lib/auth.test.ts`
 
-Expected: FAIL because the current implementation requires Supabase environment configuration or calls the external provider instead of returning the temporary local results.
+Expected: FAIL because the direct route, navigation guard, and temporary provider-independent behavior do not exist yet.
 
 - [x] **Step 3: Implement the minimal bypass**
 
-Remove the Supabase dependency from `src/lib/auth.ts`, retain phone validation,
-make `sendOtp` return `{ ok: true }`, and make `verifyOtp` return whether the
-submitted code is exactly `1234`.
+Remove the initial `sendOtp` call and send/loading/error state from
+`app/index.tsx`. Navigate synchronously with a single-flight ref that resets
+through Expo Router's `useFocusEffect`. Keep resend provider-independent,
+retain phone validation, and verify only `1234`.
 
 - [x] **Step 4: Verify GREEN and regression safety**
 
 Run: `npm test -- src/lib/auth.test.ts`
 
-Expected: 3 tests pass.
+Expected: 5 tests pass.
 
 Run: `npm test`
 
@@ -80,6 +108,6 @@ Expected: TypeScript exits successfully.
 - [x] **Step 5: Commit**
 
 ```bash
-git add src/lib/auth.ts src/lib/auth.test.ts docs/superpowers
+git add app/index.tsx src/lib/auth.ts src/lib/auth.test.ts docs/superpowers
 git commit -m "fix: add temporary OTP bypass"
 ```
