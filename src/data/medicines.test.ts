@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapDoseRows } from './medicineCourse';
+import { mapDoseRows, selectRelevantDoseRows } from './medicineCourse';
 
 describe('mapDoseRows', () => {
   it('keeps stored dose values and the database medicine image', () => {
@@ -43,5 +43,39 @@ describe('mapDoseRows', () => {
         },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('selectRelevantDoseRows', () => {
+  it('drops a morning dose after the afternoon window begins', () => {
+    const rows = [
+      {
+        completed: false,
+        eventId: 'morning',
+        hospitalName: 'Hospital',
+        imageUrl: 'https://db.test/m.jpg',
+        medicineName: 'Medicine',
+        scheduledFor: '2026-07-28T08:00:00+05:30',
+        slot: 'morning',
+        tabletsPerDose: 1,
+      },
+      {
+        completed: false,
+        eventId: 'night',
+        hospitalName: 'Hospital',
+        imageUrl: 'https://db.test/m.jpg',
+        medicineName: 'Medicine',
+        scheduledFor: '2026-07-28T20:00:00+05:30',
+        slot: 'night',
+        tabletsPerDose: 1,
+      },
+    ];
+    expect(
+      selectRelevantDoseRows(
+        rows,
+        new Date('2026-07-28T18:00:00+05:30'),
+        { afternoon: '13:00', morning: '08:00', night: '20:00' },
+      ).map((row) => row.eventId),
+    ).toEqual(['night']);
   });
 });

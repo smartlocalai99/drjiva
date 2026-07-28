@@ -59,3 +59,36 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
       timing: titleCase(row.slot),
     }));
 }
+
+export function selectRelevantDoseRows(
+  rows: readonly DoseRow[],
+  now: Date,
+  times: Record<'morning' | 'afternoon' | 'night', string>,
+): DoseRow[] {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const toMinutes = (value: string) => {
+    const [hour, minute] = value.split(':').map(Number);
+    return hour! * 60 + minute!;
+  };
+  const currentSlot =
+    minutes >= toMinutes(times.night)
+      ? 'night'
+      : minutes >= toMinutes(times.afternoon)
+        ? 'afternoon'
+        : minutes >= toMinutes(times.morning)
+          ? 'morning'
+          : null;
+  const current = currentSlot
+    ? rows.filter(
+        (row) =>
+          row.slot === currentSlot &&
+          new Date(row.scheduledFor).getTime() <= now.getTime(),
+      )
+    : [];
+  const next = rows.find(
+    (row) => new Date(row.scheduledFor).getTime() > now.getTime(),
+  );
+  return next && !current.some((row) => row.eventId === next.eventId)
+    ? [...current, next]
+    : current;
+}

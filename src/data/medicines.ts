@@ -1,5 +1,10 @@
 import { supabase } from '../lib/supabase';
-import { mapDoseRows, type DoseRow, type Medicine } from './medicineCourse';
+import {
+  mapDoseRows,
+  selectRelevantDoseRows,
+  type DoseRow,
+  type Medicine,
+} from './medicineCourse';
 
 export {
   getHospitalInitials,
@@ -51,16 +56,23 @@ export async function fetchMedicinesForDate(
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-  const { data, error } = await supabase
-    .from('patient_medicine_dose_events')
-    .select(
-      'id, scheduled_for, slot, status, patient_medicine_courses!inner(tablets_per_dose, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
-    )
-    .eq('patient_id', patientId)
-    .gte('scheduled_for', start.toISOString())
-    .lt('scheduled_for', end.toISOString())
-    .neq('status', 'cancelled')
-    .order('scheduled_for');
+  const [{ data, error }, settingsResult] = await Promise.all([
+    supabase
+      .from('patient_medicine_dose_events')
+      .select(
+        'id, scheduled_for, slot, status, patient_medicine_courses!inner(tablets_per_dose, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
+      )
+      .eq('patient_id', patientId)
+      .gte('scheduled_for', start.toISOString())
+      .lt('scheduled_for', end.toISOString())
+      .neq('status', 'cancelled')
+      .order('scheduled_for'),
+    supabase
+      .from('patient_notification_settings')
+      .select('morning_time, afternoon_time, night_time')
+      .eq('patient_id', patientId)
+      .maybeSingle(),
+  ]);
   if (error) throw error;
 
   const rows = ((data ?? []) as unknown as RawDose[]).flatMap((event) => {
@@ -85,16 +97,14 @@ export async function fetchMedicinesForDate(
 
   const isToday = start.toDateString() === now.toDateString();
   if (!isToday) return mapDoseRows(rows);
-  const past = rows.filter(
-    (row) => new Date(row.scheduledFor).getTime() <= now.getTime(),
+  const settings = settingsResult.data;
+  return mapDoseRows(
+    selectRelevantDoseRows(rows, now, {
+      afternoon: String(settings?.afternoon_time ?? '13:00').slice(0, 5),
+      morning: String(settings?.morning_time ?? '08:00').slice(0, 5),
+      night: String(settings?.night_time ?? '20:00').slice(0, 5),
+    }),
   );
-  const future = rows.filter(
-    (row) => new Date(row.scheduledFor).getTime() > now.getTime(),
-  );
-  return mapDoseRows([
-    ...(past.length ? [past[past.length - 1]!] : []),
-    ...(future.length ? [future[0]!] : []),
-  ]);
 }
 
 export async function completeDoseEvent(

@@ -3,7 +3,7 @@
     "name": "DrJiva",
     "slug": "drjiva-app",
     "scheme": "drjiva",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,6 +17,9 @@
     },
     "android": {
       "package": "com.drjiva.patient",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ],
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
@@ -45,6 +48,12 @@
         }
       ],
       "expo-font",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "medicine-reminders"
+        }
+      ],
       [
         "react-native-document-scanner-plugin",
         {
