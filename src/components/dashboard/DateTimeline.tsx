@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { dashboardColors, dashboardLayout } from '../../dashboardTheme';
+import { getDateMarker } from '../../lib/dateMarker';
 import { addDays, dateKey, formatWeekdayShort, isSameDay } from '../../lib/dates';
 
 const STREAK_GRADIENT = ['#FFA53D', '#EF4444'] as const;
@@ -169,15 +170,17 @@ type DateSlotProps = {
 };
 
 function DateSlot({ date, isSelected, isToday, onPress }: DateSlotProps) {
-  const scale = useSharedValue(isSelected ? 1 : 0.86);
+  const marker = getDateMarker(isToday, isSelected);
+  const isEmphasized = marker !== 'plain';
+  const scale = useSharedValue(isEmphasized ? 1 : 0.86);
 
   useEffect(() => {
-    scale.value = withSpring(isSelected ? 1 : 0.86, {
-      damping: isSelected ? 14 : 16,
+    scale.value = withSpring(isEmphasized ? 1 : 0.86, {
+      damping: isEmphasized ? 14 : 16,
       mass: 0.6,
       stiffness: 220,
     });
-  }, [isSelected, scale]);
+  }, [isEmphasized, scale]);
 
   const circleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -200,11 +203,11 @@ function DateSlot({ date, isSelected, isToday, onPress }: DateSlotProps) {
       <Animated.View
         style={[
           styles.circle,
-          isSelected ? styles.circleSelected : styles.circleUnselected,
+          isEmphasized ? styles.circleSelected : styles.circleUnselected,
           circleStyle,
         ]}
       >
-        {isSelected ? (
+        {marker === 'selected-gradient' ? (
           <LinearGradient
             colors={STREAK_GRADIENT}
             end={{ x: 1, y: 1 }}
@@ -212,22 +215,25 @@ function DateSlot({ date, isSelected, isToday, onPress }: DateSlotProps) {
             style={styles.circleGradient}
           />
         ) : null}
+        {marker === 'today-streak' ? (
+          <Image
+            contentFit="contain"
+            source={streakIconSource}
+            style={styles.streakMarker}
+          />
+        ) : null}
         <Text
           style={[
             styles.dateNumber,
-            isSelected ? styles.dateNumberSelected : styles.dateNumberUnselected,
+            isEmphasized
+              ? styles.dateNumberSelected
+              : styles.dateNumberUnselected,
+            marker === 'today-streak' && styles.dateNumberOnStreak,
           ]}
         >
           {date.getDate()}
         </Text>
-        {isSelected ? <View style={styles.dot} /> : null}
-        {isToday ? (
-          <Image
-            contentFit="contain"
-            source={streakIconSource}
-            style={styles.streakIcon}
-          />
-        ) : null}
+        {marker === 'selected-gradient' ? <View style={styles.dot} /> : null}
       </Animated.View>
     </Pressable>
   );
@@ -294,6 +300,12 @@ const styles = StyleSheet.create({
   dateNumberSelected: {
     color: '#FFFFFF',
   },
+  dateNumberOnStreak: {
+    textShadowColor: '#9A3412',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 2,
+    zIndex: 1,
+  },
   dateNumberUnselected: {
     color: dashboardColors.textFaint,
     opacity: 0.7,
@@ -309,22 +321,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 6,
   },
-  streakIcon: {
-    bottom: -8,
-    height: 24,
+  streakMarker: {
+    height: dashboardLayout.dateCircleSize + 8,
     position: 'absolute',
-    right: -8,
-    width: 24,
-    ...Platform.select({
-      android: {
-        elevation: 3,
-      },
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { height: 1, width: 0 },
-        shadowOpacity: 0.25,
-        shadowRadius: 2,
-      },
-    }),
+    width: dashboardLayout.dateCircleSize + 8,
   },
 });
