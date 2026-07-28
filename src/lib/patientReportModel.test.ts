@@ -5,6 +5,7 @@ import {
   buildReportStoragePath,
   groupPatientReportsByHospital,
   mapPatientReportRow,
+  removePatientReport,
 } from './patientReportModel';
 
 describe('buildReportStoragePath', () => {
@@ -103,5 +104,19 @@ describe('groupPatientReportsByHospital', () => {
         ],
       },
     ]);
+  });
+});
+
+describe('removePatientReport', () => {
+  it('removes only the selected report', () => {
+    const reports = [
+      { id: 'report-a' },
+      { id: 'report-b' },
+    ] as unknown as Parameters<typeof removePatientReport>[0];
+
+    expect(removePatientReport(reports, 'report-a')).toEqual([
+      expect.objectContaining({ id: 'report-b' }),
+    ]);
+    expect(removePatientReport(reports, 'unknown')).toEqual(reports);
   });
 });

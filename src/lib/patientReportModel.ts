@@ -81,6 +81,13 @@ export function mapPatientReportRow(row: PatientReportRow): PatientReport {
   };
 }
 
+export function removePatientReport(
+  reports: PatientReport[],
+  reportId: string,
+): PatientReport[] {
+  return reports.filter((report) => report.id !== reportId);
+}
+
 export function groupPatientReportsByHospital(
   reports: PatientReport[],
   hospitals: HospitalOption[],

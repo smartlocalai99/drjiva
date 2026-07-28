@@ -34,7 +34,10 @@ import {
   type HospitalOption,
   type ReportType,
 } from '../src/lib/documentClassifier';
-import { getDocumentPrimaryAction } from '../src/lib/documentMenu';
+import {
+  getDocumentPrimaryAction,
+  getReportTypeTranslationKey,
+} from '../src/lib/documentMenu';
 import {
   createReportPdf,
   recognizeFirstPage,
@@ -46,15 +49,18 @@ import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
   createPatientReportSignedUrl,
+  deletePatientReport,
   fetchHospitals,
   fetchPatientReports,
   uploadPatientReport,
 } from '../src/lib/patientReports';
 import {
   groupPatientReportsByHospital,
+  removePatientReport,
   type PatientReport,
 } from '../src/lib/patientReportModel';
 import { ensureSecureReportSession } from '../src/lib/reportAuth';
+import { getReportDeletionMessageKey } from '../src/lib/reportDeletionCopy';
 
 const FILTERS = ['All', 'Recent'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -75,6 +81,7 @@ export default function DocumentsScreen() {
   );
   const [detectedReportType, setDetectedReportType] =
     useState<ReportType | null>(null);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('All');
   const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
@@ -271,6 +278,43 @@ export default function DocumentsScreen() {
     }
   };
 
+  const handleDeleteReport = (report: PatientReport) => {
+    const reportName = report.reportType
+      ? t(getReportTypeTranslationKey(report.reportType))
+      : report.label ?? t('medicalDocument');
+    Alert.alert(
+      t('deleteDocument'),
+      `${reportName}\n\n${t(getReportDeletionMessageKey(report.storagePath))}`,
+      [
+        { style: 'cancel', text: t('cancel') },
+        {
+          style: 'destructive',
+          text: t('delete'),
+          onPress: () => {
+            setDeletingReportId(report.id);
+            void deletePatientReport(report)
+              .then(() => {
+                setReports((current) =>
+                  removePatientReport(current, report.id),
+                );
+                Alert.alert(
+                  t('documentDeleted'),
+                  t('documentDeletedMessage'),
+                );
+              })
+              .catch(() => {
+                Alert.alert(
+                  t('unableDeleteDocument'),
+                  t('unableDeleteDocumentMessage'),
+                );
+              })
+              .finally(() => setDeletingReportId(null));
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
@@ -376,7 +420,9 @@ export default function DocumentsScreen() {
           <EmptyDocuments />
         ) : selectedGroup ? (
           <ReportList
+            deletingReportId={deletingReportId}
             hospitals={hospitals}
+            onDelete={handleDeleteReport}
             onOpen={(report) => void handleOpenReport(report)}
             reports={selectedGroup.reports}
           />

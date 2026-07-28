@@ -11,6 +11,7 @@ import {
   type PatientReport,
   type PatientReportRow,
 } from './patientReportModel';
+import { deletePatientReportWithAdapter } from './deletePatientReport';
 import { ensureSecureReportSession } from './reportAuth';
 import { supabase } from './supabase';
 
@@ -126,4 +127,28 @@ export async function createPatientReportSignedUrl(
   }
 
   return data.signedUrl;
+}
+
+export async function deletePatientReport(
+  report: Pick<PatientReport, 'id' | 'storagePath'>,
+): Promise<void> {
+  await ensureSecureReportSession();
+  await deletePatientReportWithAdapter(
+    {
+      removeFile: async (storagePath) => {
+        const { error } = await supabase.storage
+          .from('patient-reports')
+          .remove([storagePath]);
+        return error;
+      },
+      removeRow: async (reportId) => {
+        const { error } = await supabase
+          .from('patient_reports')
+          .delete()
+          .eq('id', reportId);
+        return error;
+      },
+    },
+    report,
+  );
 }

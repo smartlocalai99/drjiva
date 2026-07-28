@@ -39,6 +39,18 @@ const translations = {
     document: 'document',
     documentPlural: 'documents',
     documentSaved: 'Document saved',
+    delete: 'Delete',
+    deleteDocument: 'Delete document?',
+    deleteDocumentMessage:
+      'This permanently deletes the PDF and cannot be undone.',
+    deleteLegacyDocumentMessage:
+      'This older entry has no stored PDF path. Only its record will be permanently deleted.',
+    deletingDocument: 'Deleting document…',
+    documentDeleted: 'Document deleted',
+    documentDeletedMessage: 'The PDF and its record were permanently deleted.',
+    unableDeleteDocument: 'Unable to delete document',
+    unableDeleteDocumentMessage:
+      'The document was kept. Please check your connection and try again.',
     dischargeSummary: 'Discharge Summary',
     documentsUnavailable: 'Documents unavailable',
     documentsEmptySubtitle:
@@ -124,6 +136,18 @@ const translations = {
     document: 'పత్రం',
     documentPlural: 'పత్రాలు',
     documentSaved: 'పత్రం సేవ్ అయింది',
+    delete: 'తొలగించండి',
+    deleteDocument: 'పత్రాన్ని తొలగించాలా?',
+    deleteDocumentMessage:
+      'ఇది PDFను శాశ్వతంగా తొలగిస్తుంది. తిరిగి పొందడం సాధ్యం కాదు.',
+    deleteLegacyDocumentMessage:
+      'ఈ పాత నమోదుకు PDF మార్గం లేదు. నమోదు మాత్రమే శాశ్వతంగా తొలగించబడుతుంది.',
+    deletingDocument: 'పత్రాన్ని తొలగిస్తోంది…',
+    documentDeleted: 'పత్రం తొలగించబడింది',
+    documentDeletedMessage: 'PDF మరియు దాని నమోదు శాశ్వతంగా తొలగించబడ్డాయి.',
+    unableDeleteDocument: 'పత్రాన్ని తొలగించలేకపోయాము',
+    unableDeleteDocumentMessage:
+      'పత్రం అలాగే ఉంచబడింది. కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.',
     dischargeSummary: 'డిశ్చార్జ్ సారాంశం',
     documentsUnavailable: 'పత్రాలు అందుబాటులో లేవు',
     documentsEmptySubtitle:
