@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     backgroundColor: dashboardColors.successTint,
   },
   imageFrame: {
-    height: 148,
+    height: 200,
     position: 'relative',
     width: '100%',
   },
