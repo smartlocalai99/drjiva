@@ -30,14 +30,14 @@ describe('medicine course validation', () => {
     );
   });
 
-  it('accepts only bounded quarter tablets and course duration', () => {
-    expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 0.3 })).toBe(
+  it('accepts only bounded whole tablets and course duration', () => {
+    expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 0.5 })).toBe(
       'invalidTabletQuantity',
     );
     expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 0 })).toBe(
       'invalidTabletQuantity',
     );
-    expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 10.25 })).toBe(
+    expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 11 })).toBe(
       'invalidTabletQuantity',
     );
     expect(validateMedicineCourseInput({ ...validInput, durationDays: 0 })).toBe(
@@ -46,25 +46,25 @@ describe('medicine course validation', () => {
     expect(validateMedicineCourseInput({ ...validInput, durationDays: 366 })).toBe(
       'invalidCourseDuration',
     );
-    expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 0.25 })).toBe(
+    expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 10 })).toBe(
       null,
     );
   });
 });
 
 describe('adjustTabletCount', () => {
-  it('steps by a quarter tablet in either direction', () => {
-    expect(adjustTabletCount('1', 1)).toBe('1.25');
-    expect(adjustTabletCount('1', -1)).toBe('0.75');
+  it('steps by one whole tablet in either direction', () => {
+    expect(adjustTabletCount('1', 1)).toBe('2');
+    expect(adjustTabletCount('2', -1)).toBe('1');
   });
 
   it('clamps to the minimum and maximum bounds', () => {
-    expect(adjustTabletCount('0.25', -1)).toBe('0.25');
+    expect(adjustTabletCount('1', -1)).toBe('1');
     expect(adjustTabletCount('10', 1)).toBe('10');
   });
 
   it('falls back to a base of 1 for unparsable input', () => {
-    expect(adjustTabletCount('', 1)).toBe('1.25');
+    expect(adjustTabletCount('', 1)).toBe('2');
   });
 });
 

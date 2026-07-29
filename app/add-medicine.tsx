@@ -41,6 +41,7 @@ import {
   saveNotificationIds,
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
+import { getHospitalInitials } from '../src/data/medicineCourse';
 import { DOSE_SLOT_THEME } from '../src/lib/doseSlotTheme';
 import {
   cancelDoseNotifications,
@@ -54,10 +55,7 @@ import {
   type DayPattern,
   type DoseSlot,
 } from '../src/lib/medicineSchedule';
-import {
-  areSelectedSlotTimesOrdered,
-  formatTime12Hour,
-} from '../src/lib/medicineTime';
+import { areSelectedSlotTimesOrdered } from '../src/lib/medicineTime';
 import {
   filterMedicineCatalogue,
   getNewCatalogueEntryName,
@@ -595,67 +593,69 @@ export default function AddMedicineScreen() {
                 return (
                   <View key={medicine.id} style={styles.medicineDetailsCard}>
                     <MedicineImage item={medicine} style={styles.detailsImage} />
-                    <View style={styles.medicineNameRow}>
-                      <Text numberOfLines={2} style={styles.detailsName}>
-                        {medicine.name}
+                    <View style={styles.medicineDetailsBody}>
+                      <View style={styles.medicineNameRow}>
+                        <Text numberOfLines={2} style={styles.detailsName}>
+                          {medicine.name}
+                        </Text>
+                        <TabletStepper
+                          onChange={(value) =>
+                            updateMedicineDetails(medicine.id, (current) => ({
+                              ...current,
+                              tablets: value,
+                            }))
+                          }
+                          value={details.tablets}
+                        />
+                      </View>
+                      <Text style={styles.stepperCaption}>
+                        {t('tabletsPerDose')}
                       </Text>
-                      <TabletStepper
-                        onChange={(value) =>
-                          updateMedicineDetails(medicine.id, (current) => ({
-                            ...current,
-                            tablets: value,
-                          }))
-                        }
-                        value={details.tablets}
-                      />
-                    </View>
-                    <Text style={styles.stepperCaption}>
-                      {t('tabletsPerDose')}
-                    </Text>
-                    <Text style={styles.sectionLabel}>
-                      When should this medicine be taken?
-                    </Text>
-                    <View style={styles.chips}>
-                      {SLOT_KEYS.map((slot) => (
-                        <Chip
-                          active={details.slots.includes(slot)}
-                          fill
+                      <Text style={styles.sectionLabel}>
+                        When should this medicine be taken?
+                      </Text>
+                      <View style={styles.chips}>
+                        {SLOT_KEYS.map((slot) => (
+                          <Chip
+                            active={details.slots.includes(slot)}
+                            fill
+                            key={slot}
+                            label={t(slot)}
+                            onPress={() =>
+                              updateMedicineDetails(
+                                medicine.id,
+                                (current) => ({
+                                  ...current,
+                                  slots: SLOT_KEYS.filter((item) =>
+                                    item === slot
+                                      ? !current.slots.includes(slot)
+                                      : current.slots.includes(item),
+                                  ),
+                                }),
+                              )
+                            }
+                            slot={slot}
+                          />
+                        ))}
+                      </View>
+                      {details.slots.map((slot) => (
+                        <SlotTimeEditor
                           key={slot}
                           label={t(slot)}
-                          onPress={() =>
-                            updateMedicineDetails(
-                              medicine.id,
-                              (current) => ({
-                                ...current,
-                                slots: SLOT_KEYS.filter((item) =>
-                                  item === slot
-                                    ? !current.slots.includes(slot)
-                                    : current.slots.includes(item),
-                                ),
-                              }),
-                            )
+                          onChange={(value) =>
+                            updateMedicineDetails(medicine.id, (current) => ({
+                              ...current,
+                              slotTimes: {
+                                ...current.slotTimes,
+                                [slot]: value,
+                              },
+                            }))
                           }
                           slot={slot}
+                          value={details.slotTimes[slot]}
                         />
                       ))}
                     </View>
-                    {details.slots.map((slot) => (
-                      <SlotTimeEditor
-                        key={slot}
-                        label={t(slot)}
-                        onChange={(value) =>
-                          updateMedicineDetails(medicine.id, (current) => ({
-                            ...current,
-                            slotTimes: {
-                              ...current.slotTimes,
-                              [slot]: value,
-                            },
-                          }))
-                        }
-                        slot={slot}
-                        value={details.slotTimes[slot]}
-                      />
-                    ))}
                   </View>
                 );
               })}
@@ -694,22 +694,56 @@ export default function AddMedicineScreen() {
                         item={medicine}
                         style={styles.reviewImage}
                       />
-                      <View style={styles.reviewCopy}>
+                      <View style={styles.reviewBody}>
                         <Text numberOfLines={2} style={styles.reviewName}>
                           {medicine.name}
                         </Text>
-                        <Text style={styles.reviewMeta}>
-                          {details.tablets} tablet
-                          {Number(details.tablets) === 1 ? '' : 's'} ·{' '}
-                          {details.slots
-                            .map(
-                              (slot) =>
-                                `${t(slot)} ${formatTime12Hour(
-                                  details.slotTimes[slot],
-                                )}`,
-                            )
-                            .join(', ')}
-                        </Text>
+                        <View style={styles.reviewDetailRow}>
+                          <View style={styles.reviewDetailCell}>
+                            <Ionicons
+                              color={dashboardColors.textMuted}
+                              name="time-outline"
+                              size={14}
+                            />
+                            <Text
+                              numberOfLines={1}
+                              style={styles.reviewDetailText}
+                            >
+                              {details.slots.map((slot) => t(slot)).join(', ')}
+                            </Text>
+                          </View>
+
+                          <View style={styles.reviewHospitalCell}>
+                            <View style={styles.reviewHospitalLogo}>
+                              <Text style={styles.reviewHospitalLogoText}>
+                                {getHospitalInitials(hospitalName)}
+                              </Text>
+                            </View>
+                            <Text
+                              numberOfLines={1}
+                              style={styles.reviewHospitalName}
+                            >
+                              {hospitalName}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={[
+                              styles.reviewDetailCell,
+                              styles.reviewDetailRight,
+                            ]}
+                          >
+                            <Ionicons
+                              color={dashboardColors.primary}
+                              name="medical-outline"
+                              size={14}
+                            />
+                            <Text style={styles.reviewDoseText}>
+                              {details.tablets} tablet
+                              {Number(details.tablets) === 1 ? '' : 's'}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
                   );
@@ -1170,12 +1204,14 @@ const styles = StyleSheet.create({
     borderColor: dashboardColors.track,
     borderRadius: dashboardRadii.card,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  medicineDetailsBody: {
     gap: dashboardSpacing.md,
     padding: dashboardSpacing.md,
   },
   detailsImage: {
-    borderRadius: dashboardRadii.card,
-    height: 168,
+    height: 200,
     width: '100%',
   },
   medicineNameRow: {
@@ -1250,26 +1286,76 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   reviewMedicine: {
-    alignItems: 'center',
     backgroundColor: dashboardColors.card,
     borderColor: dashboardColors.track,
     borderRadius: 16,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: dashboardSpacing.md,
     overflow: 'hidden',
-    padding: dashboardSpacing.sm,
   },
-  reviewImage: { borderRadius: 12, height: 72, width: 82 },
-  reviewCopy: { flex: 1 },
+  reviewImage: { height: 140, width: '100%' },
+  reviewBody: {
+    gap: 3,
+    padding: dashboardSpacing.md,
+  },
   reviewName: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
+    fontSize: 16,
   },
-  reviewMeta: {
+  reviewDetailRow: {
+    alignItems: 'center',
+    borderTopColor: dashboardColors.track,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    marginTop: 6,
+    minHeight: 44,
+    paddingTop: 8,
+  },
+  reviewDetailCell: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  reviewDetailRight: {
+    justifyContent: 'flex-end',
+  },
+  reviewDetailText: {
     ...dashboardTypography.caption,
     color: dashboardColors.textMuted,
-    marginTop: 4,
+    flexShrink: 1,
+  },
+  reviewHospitalCell: {
+    alignItems: 'center',
+    flex: 0.9,
+    paddingHorizontal: 4,
+  },
+  reviewHospitalLogo: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderColor: dashboardColors.primary,
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  reviewHospitalLogoText: {
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+  },
+  reviewHospitalName: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    fontSize: 9,
+    marginTop: 2,
+    maxWidth: 92,
+  },
+  reviewDoseText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primaryDark,
+    fontFamily: 'Inter_700Bold',
   },
   continueFooter: {
     backgroundColor: dashboardColors.bg,

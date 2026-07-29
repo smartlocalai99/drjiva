@@ -20,9 +20,9 @@ const DEFAULT_SLOT_TIMES: Record<DoseSlot, string> = {
   night: '20:00',
 };
 
-export const MIN_TABLETS_PER_DOSE = 0.25;
+export const MIN_TABLETS_PER_DOSE = 1;
 export const MAX_TABLETS_PER_DOSE = 10;
-export const TABLET_STEP = 0.25;
+export const TABLET_STEP = 1;
 
 export function adjustTabletCount(value: string, steps: number): string {
   const current = Number.parseFloat(value);
@@ -31,7 +31,7 @@ export function adjustTabletCount(value: string, steps: number): string {
     MAX_TABLETS_PER_DOSE,
     Math.max(MIN_TABLETS_PER_DOSE, base + steps * TABLET_STEP),
   );
-  return (Math.round(next * 4) / 4).toString();
+  return (Math.round(next / TABLET_STEP) * TABLET_STEP).toString();
 }
 
 function parseCalendarDate(value: string): Date {
