@@ -28,7 +28,8 @@ export type AddressLocationAdapter = {
 export type AddressLocationResult =
   | { fields: AddressLocationFields; status: 'resolved' }
   | { status: 'permission-denied' }
-  | { status: 'unavailable' };
+  | { status: 'unavailable' }
+  | { status: 'unsupported' };
 
 export function mapGeocodedAddressToFields(
   address: GeocodedAddress,

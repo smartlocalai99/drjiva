@@ -160,6 +160,13 @@ export default function AddressEditorScreen() {
         );
         return;
       }
+      if (result.status === 'unsupported') {
+        Alert.alert(
+          'Update needed',
+          'This feature needs the latest app update. Please fill your address in manually for now.',
+        );
+        return;
+      }
 
       setDraft((current) => ({ ...current, ...result.fields }));
       setErrors((current) => ({
