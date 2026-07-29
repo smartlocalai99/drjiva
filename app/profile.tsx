@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MedicineToggle } from '../src/components/dashboard/MedicineToggle';
+import { AgePicker } from '../src/components/profile/AgePicker';
 import { PressableScale } from '../src/components/PressableScale';
 import { VerifiedBadge } from '../src/components/VerifiedBadge';
 import {
@@ -75,6 +76,7 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [isAgePickerVisible, setIsAgePickerVisible] = useState(false);
 
   useEffect(() => {
     if (!phone) {
@@ -318,18 +320,26 @@ export default function ProfileScreen() {
               <Divider />
 
               <Field label="Age">
-                <TextInput
-                  keyboardType="number-pad"
-                  maxLength={3}
-                  onChangeText={(value) => {
-                    setAge(value.replace(/\D/g, ''));
-                    setSavedAt(undefined);
-                  }}
-                  placeholder="Add your age"
-                  placeholderTextColor={dashboardColors.textFaint}
-                  style={styles.input}
-                  value={age}
-                />
+                <Pressable
+                  accessibilityLabel="Select age"
+                  accessibilityRole="button"
+                  onPress={() => setIsAgePickerVisible(true)}
+                  style={styles.ageRow}
+                >
+                  <Text
+                    style={[
+                      styles.input,
+                      !age && { color: dashboardColors.textFaint },
+                    ]}
+                  >
+                    {age || 'Add your age'}
+                  </Text>
+                  <Ionicons
+                    color={dashboardColors.textFaint}
+                    name="chevron-down"
+                    size={18}
+                  />
+                </Pressable>
               </Field>
 
               <Divider />
@@ -475,6 +485,17 @@ export default function ProfileScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       )}
+
+      <AgePicker
+        onClose={() => setIsAgePickerVisible(false)}
+        onSelect={(selectedAge) => {
+          setAge(String(selectedAge));
+          setSavedAt(undefined);
+          setIsAgePickerVisible(false);
+        }}
+        value={parsedAge}
+        visible={isAgePickerVisible}
+      />
     </SafeAreaView>
   );
 }
@@ -609,6 +630,11 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     fontSize: 16,
     padding: 0,
+  },
+  ageRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   addressInput: {
     minHeight: 48,
