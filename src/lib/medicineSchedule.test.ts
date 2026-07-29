@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  adjustTabletCount,
   expandDoseEvents,
   generateCourseDates,
   getActiveDose,
@@ -48,6 +49,22 @@ describe('medicine course validation', () => {
     expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 0.25 })).toBe(
       null,
     );
+  });
+});
+
+describe('adjustTabletCount', () => {
+  it('steps by a quarter tablet in either direction', () => {
+    expect(adjustTabletCount('1', 1)).toBe('1.25');
+    expect(adjustTabletCount('1', -1)).toBe('0.75');
+  });
+
+  it('clamps to the minimum and maximum bounds', () => {
+    expect(adjustTabletCount('0.25', -1)).toBe('0.25');
+    expect(adjustTabletCount('10', 1)).toBe('10');
+  });
+
+  it('falls back to a base of 1 for unparsable input', () => {
+    expect(adjustTabletCount('', 1)).toBe('1.25');
   });
 });
 

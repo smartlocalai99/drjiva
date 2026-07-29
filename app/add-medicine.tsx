@@ -48,6 +48,7 @@ import {
   scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
 import {
+  adjustTabletCount,
   expandDoseEvents,
   validateMedicineCourseInput,
   type DayPattern,
@@ -593,25 +594,24 @@ export default function AddMedicineScreen() {
                 };
                 return (
                   <View key={medicine.id} style={styles.medicineDetailsCard}>
-                    <View style={styles.medicineDetailsHeader}>
-                      <MedicineImage
-                        item={medicine}
-                        style={styles.detailsThumb}
-                      />
+                    <MedicineImage item={medicine} style={styles.detailsImage} />
+                    <View style={styles.medicineNameRow}>
                       <Text numberOfLines={2} style={styles.detailsName}>
                         {medicine.name}
                       </Text>
+                      <TabletStepper
+                        onChange={(value) =>
+                          updateMedicineDetails(medicine.id, (current) => ({
+                            ...current,
+                            tablets: value,
+                          }))
+                        }
+                        value={details.tablets}
+                      />
                     </View>
-                    <LabelInput
-                      label={t('tabletsPerDose')}
-                      onChange={(value) =>
-                        updateMedicineDetails(medicine.id, (current) => ({
-                          ...current,
-                          tablets: value,
-                        }))
-                      }
-                      value={details.tablets}
-                    />
+                    <Text style={styles.stepperCaption}>
+                      {t('tabletsPerDose')}
+                    </Text>
                     <Text style={styles.sectionLabel}>
                       When should this medicine be taken?
                     </Text>
@@ -619,10 +619,9 @@ export default function AddMedicineScreen() {
                       {SLOT_KEYS.map((slot) => (
                         <Chip
                           active={details.slots.includes(slot)}
+                          fill
                           key={slot}
-                          label={`${t(slot)} · ${formatTime12Hour(
-                            details.slotTimes[slot],
-                          )}`}
+                          label={t(slot)}
                           onPress={() =>
                             updateMedicineDetails(
                               medicine.id,
@@ -904,11 +903,13 @@ function SelectedMedicineStrip({
 
 function Chip({
   active,
+  fill,
   label,
   onPress,
   slot,
 }: {
   active: boolean;
+  fill?: boolean;
   label: string;
   onPress: () => void;
   slot?: DoseSlot;
@@ -920,6 +921,7 @@ function Chip({
       onPress={onPress}
       style={[
         styles.chip,
+        fill && styles.chipFill,
         active && styles.chipActive,
         theme && {
           backgroundColor: active ? theme.tint : dashboardColors.card,
@@ -940,6 +942,34 @@ function Chip({
         {label}
       </Text>
     </PressableScale>
+  );
+}
+
+function TabletStepper({
+  onChange,
+  value,
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <View style={styles.stepper}>
+      <PressableScale
+        accessibilityLabel="Fewer tablets per dose"
+        onPress={() => onChange(adjustTabletCount(value, -1))}
+        style={styles.stepperButton}
+      >
+        <Ionicons color={dashboardColors.primary} name="remove" size={16} />
+      </PressableScale>
+      <Text style={styles.stepperValue}>{value || '1'}</Text>
+      <PressableScale
+        accessibilityLabel="More tablets per dose"
+        onPress={() => onChange(adjustTabletCount(value, 1))}
+        style={styles.stepperButton}
+      >
+        <Ionicons color={dashboardColors.primary} name="add" size={16} />
+      </PressableScale>
+    </View>
   );
 }
 
@@ -1143,22 +1173,55 @@ const styles = StyleSheet.create({
     gap: dashboardSpacing.md,
     padding: dashboardSpacing.md,
   },
-  medicineDetailsHeader: {
+  detailsImage: {
+    borderRadius: dashboardRadii.card,
+    height: 168,
+    width: '100%',
+  },
+  medicineNameRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: dashboardSpacing.md,
-  },
-  detailsThumb: {
-    borderRadius: 12,
-    height: 58,
-    width: 68,
+    justifyContent: 'space-between',
   },
   detailsName: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
     flex: 1,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stepper: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  stepperButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: 14,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  stepperValue: {
+    ...dashboardTypography.button,
+    color: dashboardColors.primaryDark,
+    minWidth: 22,
+    textAlign: 'center',
+  },
+  stepperCaption: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    textAlign: 'right',
+  },
+  chips: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
   chip: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
@@ -1169,6 +1232,10 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  chipFill: {
+    flex: 1,
+    justifyContent: 'center',
   },
   chipActive: {
     backgroundColor: dashboardColors.primaryTint,

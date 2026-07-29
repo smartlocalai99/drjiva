@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -56,6 +57,7 @@ export default function MoreScreen() {
   const [activeTab, setActiveTab] = useState<NavTabKey>('more');
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!phone) {
@@ -78,6 +80,7 @@ export default function MoreScreen() {
         const patient = await getPatientByPhone(phone);
         if (!cancelled && patient) {
           setName(patient.name);
+          setAvatarUrl(patient.avatarUrl);
           void saveCachedPatientName(phone, patient.name).catch(
             () => undefined,
           );
@@ -166,9 +169,17 @@ export default function MoreScreen() {
         >
           <View style={styles.avatarCard}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarInitials}>
-                {getInitials(name || '?')}
-              </Text>
+              {avatarUrl ? (
+                <Image
+                  contentFit="cover"
+                  source={{ uri: avatarUrl }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarInitials}>
+                  {getInitials(name || '?')}
+                </Text>
+              )}
             </View>
             <Text style={styles.avatarName}>{name || 'Your name'}</Text>
             <View style={styles.phoneRow}>
@@ -346,7 +357,12 @@ const styles = StyleSheet.create({
     height: 80,
     justifyContent: 'center',
     marginBottom: dashboardSpacing.sm,
+    overflow: 'hidden',
     width: 80,
+  },
+  avatarImage: {
+    height: '100%',
+    width: '100%',
   },
   avatarInitials: {
     color: '#FFFFFF',

@@ -20,6 +20,20 @@ const DEFAULT_SLOT_TIMES: Record<DoseSlot, string> = {
   night: '20:00',
 };
 
+export const MIN_TABLETS_PER_DOSE = 0.25;
+export const MAX_TABLETS_PER_DOSE = 10;
+export const TABLET_STEP = 0.25;
+
+export function adjustTabletCount(value: string, steps: number): string {
+  const current = Number.parseFloat(value);
+  const base = Number.isFinite(current) ? current : 1;
+  const next = Math.min(
+    MAX_TABLETS_PER_DOSE,
+    Math.max(MIN_TABLETS_PER_DOSE, base + steps * TABLET_STEP),
+  );
+  return (Math.round(next * 4) / 4).toString();
+}
+
 function parseCalendarDate(value: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year!, month! - 1, day!);
@@ -39,9 +53,9 @@ export function validateMedicineCourseInput(
   if (!input.medicineId.trim()) return 'missingMedicine';
   if (input.slots.length === 0) return 'missingSlot';
   if (
-    input.tabletsPerDose < 0.25 ||
-    input.tabletsPerDose > 10 ||
-    !Number.isInteger(input.tabletsPerDose * 4)
+    input.tabletsPerDose < MIN_TABLETS_PER_DOSE ||
+    input.tabletsPerDose > MAX_TABLETS_PER_DOSE ||
+    !Number.isInteger(input.tabletsPerDose / TABLET_STEP)
   ) {
     return 'invalidTabletQuantity';
   }
