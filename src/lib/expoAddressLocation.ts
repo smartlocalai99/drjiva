@@ -3,6 +3,7 @@ import {
   type AddressLocationAdapter,
   type AddressLocationResult,
 } from './addressLocation';
+import { isNativeModuleAvailable } from './nativeModuleAvailability';
 
 // Required lazily (not at module scope) so that simply importing this file
 // doesn't crash the app when the native expo-location module hasn't been
@@ -10,8 +11,13 @@ import {
 // following a native dependency add, before the next native rebuild).
 // expo-router eagerly loads every route file to build its route table, so a
 // top-level `import` here would take down the whole app, not just this
-// screen.
+// screen. The availability check has to happen before ever calling
+// require('expo-location') — see nativeModuleAvailability.ts for why a bare
+// try/catch around the require isn't enough on its own.
 function loadNativeLocationModule(): typeof import('expo-location') | null {
+  if (!isNativeModuleAvailable('ExpoLocation')) {
+    return null;
+  }
   try {
     return require('expo-location') as typeof import('expo-location');
   } catch {

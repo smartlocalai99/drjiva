@@ -1,10 +1,16 @@
 import { File, Paths } from 'expo-file-system';
 
+import { isNativeModuleAvailable } from './nativeModuleAvailability';
+
 // Loaded lazily (not at module scope) so importing this file can't crash
 // app boot when the native module hasn't been compiled into the installed
-// binary yet — see expoAddressLocation.ts for the same pattern and why it
-// matters with expo-router's eager route loading.
+// binary yet — see expoAddressLocation.ts for the same pattern, and
+// nativeModuleAvailability.ts for why the availability check has to happen
+// before ever calling require('expo-x'), not just around it.
 function loadWebBrowser(): typeof import('expo-web-browser') | null {
+  if (!isNativeModuleAvailable('ExpoWebBrowser')) {
+    return null;
+  }
   try {
     return require('expo-web-browser') as typeof import('expo-web-browser');
   } catch {
@@ -13,6 +19,9 @@ function loadWebBrowser(): typeof import('expo-web-browser') | null {
 }
 
 function loadSharing(): typeof import('expo-sharing') | null {
+  if (!isNativeModuleAvailable('ExpoSharing')) {
+    return null;
+  }
   try {
     return require('expo-sharing') as typeof import('expo-sharing');
   } catch {

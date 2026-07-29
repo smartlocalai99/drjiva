@@ -1,10 +1,15 @@
 import { compressPageIfNeeded } from './documentImageCompression';
+import { isNativeModuleAvailable } from './nativeModuleAvailability';
 
 // Loaded lazily (not at module scope) so importing this file can't crash
 // app boot when the native module hasn't been compiled into the installed
-// binary yet — see expoAddressLocation.ts for the same pattern and why it
-// matters with expo-router's eager route loading.
+// binary yet — see nativeModuleAvailability.ts for why the availability
+// check has to happen before ever calling require('expo-image-manipulator'),
+// not just around it.
 function loadImageManipulatorModule(): typeof import('expo-image-manipulator') | null {
+  if (!isNativeModuleAvailable('ExpoImageManipulator')) {
+    return null;
+  }
   try {
     return require('expo-image-manipulator') as typeof import('expo-image-manipulator');
   } catch {
