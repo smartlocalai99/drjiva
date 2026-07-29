@@ -1292,7 +1292,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  reviewImage: { height: 140, width: '100%' },
+  reviewImage: { height: 220, width: '100%' },
   reviewBody: {
     gap: 3,
     padding: dashboardSpacing.md,

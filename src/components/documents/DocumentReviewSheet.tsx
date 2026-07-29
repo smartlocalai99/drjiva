@@ -33,6 +33,7 @@ import { PressableScale } from '../PressableScale';
 type DocumentReviewSheetProps = {
   detectedHospitalId: string | null;
   detectedReportType: ReportType | null;
+  extractedText: string;
   hospitals: HospitalOption[];
   isSaving: boolean;
   onAddHospital: (name: string) => Promise<HospitalOption | null>;
@@ -48,6 +49,7 @@ type DocumentReviewSheetProps = {
 export function DocumentReviewSheet({
   detectedHospitalId,
   detectedReportType,
+  extractedText,
   hospitals,
   isSaving,
   onAddHospital,
@@ -116,6 +118,7 @@ export function DocumentReviewSheet({
         />
         <View style={styles.sheet}>
           <View style={styles.handle} />
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.sheetScroll}>
           <View style={styles.titleRow}>
             <View>
               <Text style={styles.title}>{t('reviewScannedDocument')}</Text>
@@ -132,6 +135,25 @@ export function DocumentReviewSheet({
               />
             </View>
           </View>
+
+          {extractedText ? (
+            <View style={styles.extractedCard}>
+              <View style={styles.extractedHeader}>
+                <Ionicons
+                  color={dashboardColors.textMuted}
+                  name="text-outline"
+                  size={14}
+                />
+                <Text style={styles.extractedLabel}>Extracted text</Text>
+              </View>
+              <ScrollView
+                nestedScrollEnabled
+                style={styles.extractedScroll}
+              >
+                <Text style={styles.extractedText}>{extractedText}</Text>
+              </ScrollView>
+            </View>
+          ) : null}
 
           <Text style={styles.label}>{t('hospital')}</Text>
           <View style={styles.searchBox}>
@@ -248,6 +270,7 @@ export function DocumentReviewSheet({
               {t('scannerReviewHelper')}
             </Text>
           )}
+          </ScrollView>
 
           <View style={styles.actions}>
             <PressableScale
@@ -293,6 +316,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: dashboardSpacing.pagePadding,
     paddingTop: 10,
   },
+  sheetScroll: {
+    flexShrink: 1,
+  },
   handle: {
     alignSelf: 'center',
     backgroundColor: dashboardColors.track,
@@ -328,6 +354,32 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     marginBottom: dashboardSpacing.sm,
     marginTop: dashboardSpacing.gap,
+  },
+  extractedCard: {
+    backgroundColor: dashboardColors.bg,
+    borderRadius: dashboardRadii.card,
+    marginTop: dashboardSpacing.gap,
+    padding: dashboardSpacing.md,
+  },
+  extractedHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  extractedLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontFamily: 'Inter_600SemiBold',
+    textTransform: 'uppercase',
+  },
+  extractedScroll: {
+    maxHeight: 90,
+  },
+  extractedText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    lineHeight: 17,
   },
   searchBox: {
     alignItems: 'center',

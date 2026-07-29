@@ -35,6 +35,7 @@ import {
   type HospitalOption,
   type ReportType,
 } from '../src/lib/documentClassifier';
+import { compressScannedPage } from '../src/lib/expoImageCompressor';
 import {
   getDocumentPrimaryAction,
   getReportTypeTranslationKey,
@@ -89,6 +90,7 @@ export default function DocumentsScreen() {
     useState<ReportType | null>(null);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [extractedText, setExtractedText] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
   const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -233,7 +235,11 @@ export default function DocumentsScreen() {
       }
       const ocrText = await recognizeFirstPage(pages[0]!).catch(() => '');
       const classification = classifyDocument(ocrText, hospitals);
-      setCapturedPages(pages);
+      const compressedPages = await Promise.all(
+        pages.map((page) => compressScannedPage(page).catch(() => page)),
+      );
+      setCapturedPages(compressedPages);
+      setExtractedText(ocrText.trim());
       setDetectedHospitalId(classification.hospital?.id ?? null);
       setDetectedReportType(classification.reportType);
       setReviewVisible(true);
@@ -270,6 +276,7 @@ export default function DocumentsScreen() {
       setReports((current) => [report, ...current]);
       setReviewVisible(false);
       setCapturedPages([]);
+      setExtractedText('');
       Alert.alert(t('documentSaved'), t('pdfAttached'));
     } catch (error) {
       const message =
@@ -491,6 +498,7 @@ export default function DocumentsScreen() {
       <DocumentReviewSheet
         detectedHospitalId={detectedHospitalId}
         detectedReportType={detectedReportType}
+        extractedText={extractedText}
         hospitals={hospitals}
         isSaving={isSaving}
         onAddHospital={handleAddHospital}
@@ -498,6 +506,7 @@ export default function DocumentsScreen() {
           if (!isSaving) {
             setReviewVisible(false);
             setCapturedPages([]);
+            setExtractedText('');
           }
         }}
         onSave={(metadata) => void handleSave(metadata)}
