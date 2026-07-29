@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { DOSE_SLOT_THEME } from './doseSlotTheme';
 import type { DoseSlot } from './medicineSchedule';
 import { formatScheduledTime12Hour } from './medicineTime';
@@ -45,10 +47,7 @@ export async function scheduleDoseNotificationsWithAdapter(
 }
 
 export async function requestMedicineNotificationPermission(): Promise<boolean> {
-  const [{ Platform }, Notifications] = await Promise.all([
-    import('react-native'),
-    import('expo-notifications'),
-  ]);
+  const Notifications = await import('expo-notifications');
   await flushPendingNotificationCancellations().catch(() => undefined);
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('medicine-reminders', {

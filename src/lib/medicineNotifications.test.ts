@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// medicineNotifications.ts statically imports Platform from react-native.
+// react-native's real source isn't parseable outside Metro's transform, so
+// it's mocked here rather than letting Vitest try to load it directly.
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 import { scheduleDoseNotificationsWithAdapter } from './medicineNotifications';
 
