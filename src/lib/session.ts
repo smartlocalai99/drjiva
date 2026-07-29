@@ -2,10 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SESSION_PHONE_KEY = 'drjiva.session.phone';
 const PATIENT_NAME_KEY_PREFIX = 'drjiva.patient-name.v1';
+const PATIENT_AVATAR_KEY_PREFIX = 'drjiva.patient-avatar.v1';
 
 function getPatientNameKey(phone: string): string {
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
   return `${PATIENT_NAME_KEY_PREFIX}.${normalizedPhone}`;
+}
+
+function getPatientAvatarKey(phone: string): string {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  return `${PATIENT_AVATAR_KEY_PREFIX}.${normalizedPhone}`;
 }
 
 export async function saveSessionPhone(phone: string): Promise<void> {
@@ -22,6 +28,7 @@ export async function clearSessionPhone(): Promise<void> {
 
   if (phone) {
     removals.push(clearCachedPatientName(phone));
+    removals.push(clearCachedAvatarUrl(phone));
   }
 
   await Promise.all(removals);
@@ -48,4 +55,26 @@ export async function saveCachedPatientName(
 
 export async function clearCachedPatientName(phone: string): Promise<void> {
   await AsyncStorage.removeItem(getPatientNameKey(phone));
+}
+
+export async function getCachedAvatarUrl(
+  phone: string,
+): Promise<string | null> {
+  return AsyncStorage.getItem(getPatientAvatarKey(phone));
+}
+
+export async function saveCachedAvatarUrl(
+  phone: string,
+  avatarUrl: string | null,
+): Promise<void> {
+  if (!avatarUrl) {
+    await clearCachedAvatarUrl(phone);
+    return;
+  }
+
+  await AsyncStorage.setItem(getPatientAvatarKey(phone), avatarUrl);
+}
+
+export async function clearCachedAvatarUrl(phone: string): Promise<void> {
+  await AsyncStorage.removeItem(getPatientAvatarKey(phone));
 }

@@ -11,9 +11,12 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
+  clearCachedAvatarUrl,
   clearCachedPatientName,
   clearSessionPhone,
+  getCachedAvatarUrl,
   getCachedPatientName,
+  saveCachedAvatarUrl,
   saveCachedPatientName,
 } from './session';
 
@@ -68,6 +71,51 @@ describe('patient name cache', () => {
     );
     expect(asyncStorage.removeItem).toHaveBeenCalledWith(
       'drjiva.patient-name.v1.9876543210',
+    );
+    expect(asyncStorage.removeItem).toHaveBeenCalledWith(
+      'drjiva.patient-avatar.v1.9876543210',
+    );
+  });
+});
+
+describe('patient avatar cache', () => {
+  beforeEach(() => {
+    asyncStorage.getItem.mockReset();
+    asyncStorage.removeItem.mockReset();
+    asyncStorage.setItem.mockReset();
+  });
+
+  it('stores the avatar url under a phone-scoped key', async () => {
+    await saveCachedAvatarUrl('98765 43210', 'https://example.test/a.jpg');
+
+    expect(asyncStorage.setItem).toHaveBeenCalledWith(
+      'drjiva.patient-avatar.v1.9876543210',
+      'https://example.test/a.jpg',
+    );
+  });
+
+  it('removes the cached avatar instead of persisting a null value', async () => {
+    await saveCachedAvatarUrl('9876543210', null);
+
+    expect(asyncStorage.removeItem).toHaveBeenCalledWith(
+      'drjiva.patient-avatar.v1.9876543210',
+    );
+    expect(asyncStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('reads and explicitly clears the phone-scoped avatar', async () => {
+    asyncStorage.getItem.mockResolvedValueOnce('https://example.test/a.jpg');
+
+    await expect(getCachedAvatarUrl('9876543210')).resolves.toBe(
+      'https://example.test/a.jpg',
+    );
+    await clearCachedAvatarUrl('9876543210');
+
+    expect(asyncStorage.getItem).toHaveBeenCalledWith(
+      'drjiva.patient-avatar.v1.9876543210',
+    );
+    expect(asyncStorage.removeItem).toHaveBeenCalledWith(
+      'drjiva.patient-avatar.v1.9876543210',
     );
   });
 });

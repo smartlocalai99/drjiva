@@ -25,6 +25,7 @@ type NotificationAdapter = {
 };
 
 const PENDING_CANCELLATIONS_KEY = 'drjiva.pendingNotificationCancellations';
+const NOTIFICATION_NUDGE_SHOWN_KEY = 'drjiva.notificationSettingsNudgeShown';
 
 export async function scheduleDoseNotificationsWithAdapter(
   adapter: NotificationAdapter,
@@ -60,6 +61,24 @@ export async function requestMedicineNotificationPermission(): Promise<boolean> 
   if (current.granted) return true;
   const requested = await Notifications.requestPermissionsAsync();
   return requested.granted;
+}
+
+// The system permission dialog only ever appears once per install; after
+// that, requestPermissionsAsync() just silently returns the existing
+// (denied) status. Without this, every reminder created while notifications
+// stay off would re-show our own "enable notifications" nudge alert.
+export async function hasShownNotificationSettingsNudge(): Promise<boolean> {
+  const { default: AsyncStorage } = await import(
+    '@react-native-async-storage/async-storage'
+  );
+  return (await AsyncStorage.getItem(NOTIFICATION_NUDGE_SHOWN_KEY)) === 'true';
+}
+
+export async function markNotificationSettingsNudgeShown(): Promise<void> {
+  const { default: AsyncStorage } = await import(
+    '@react-native-async-storage/async-storage'
+  );
+  await AsyncStorage.setItem(NOTIFICATION_NUDGE_SHOWN_KEY, 'true');
 }
 
 export async function scheduleDoseNotifications(

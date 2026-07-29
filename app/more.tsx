@@ -33,7 +33,9 @@ import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 import {
   clearSessionPhone,
+  getCachedAvatarUrl,
   getCachedPatientName,
+  saveCachedAvatarUrl,
   saveCachedPatientName,
 } from '../src/lib/session';
 
@@ -68,10 +70,16 @@ export default function MoreScreen() {
     let cancelled = false;
 
     const loadPatient = async () => {
-      const cachedName = await getCachedPatientName(phone).catch(() => null);
+      const [cachedName, cachedAvatarUrl] = await Promise.all([
+        getCachedPatientName(phone).catch(() => null),
+        getCachedAvatarUrl(phone).catch(() => null),
+      ]);
       if (!cancelled) {
         if (cachedName) {
           setName(cachedName);
+        }
+        if (cachedAvatarUrl) {
+          setAvatarUrl(cachedAvatarUrl);
         }
         setIsLoading(false);
       }
@@ -82,6 +90,9 @@ export default function MoreScreen() {
           setName(patient.name);
           setAvatarUrl(patient.avatarUrl);
           void saveCachedPatientName(phone, patient.name).catch(
+            () => undefined,
+          );
+          void saveCachedAvatarUrl(phone, patient.avatarUrl).catch(
             () => undefined,
           );
         }

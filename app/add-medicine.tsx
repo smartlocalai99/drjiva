@@ -45,6 +45,8 @@ import { HospitalLogo } from '../src/components/HospitalLogo';
 import { DOSE_SLOT_THEME } from '../src/lib/doseSlotTheme';
 import {
   cancelDoseNotifications,
+  hasShownNotificationSettingsNudge,
+  markNotificationSettingsNudgeShown,
   requestMedicineNotificationPermission,
   scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
@@ -317,13 +319,19 @@ export default function AddMedicineScreen() {
       }
 
       if (!permitted || notificationWarning) {
-        Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
-          { style: 'cancel', text: t('notNow') },
-          {
-            onPress: () => void Linking.openSettings(),
-            text: t('openSettings'),
-          },
-        ]);
+        const alreadyNudged = await hasShownNotificationSettingsNudge().catch(
+          () => true,
+        );
+        if (!alreadyNudged) {
+          Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
+            { style: 'cancel', text: t('notNow') },
+            {
+              onPress: () => void Linking.openSettings(),
+              text: t('openSettings'),
+            },
+          ]);
+          void markNotificationSettingsNudgeShown().catch(() => undefined);
+        }
       }
       setSuccess(true);
       setTimeout(() => {
