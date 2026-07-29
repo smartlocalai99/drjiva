@@ -140,6 +140,11 @@ const translations = {
     invalidTimings: 'Keep Morning before Afternoon before Night.',
     preferences: 'Preferences',
     recent: 'Recent',
+    reminders: 'Reminders',
+    noReminders: 'No reminders yet',
+    noRemindersSubtitle:
+      'Medicines you add will show up here so you can manage them anytime.',
+    unableLoadReminders: 'Unable to load reminders. Please try again.',
     searchMedicine: 'Search medicine',
     shop: 'Shop',
     shopSubtitle: 'What medicine are you looking for?',
@@ -274,6 +279,12 @@ const translations = {
       'ఉదయం, మధ్యాహ్నం, రాత్రి సమయాలను అదే క్రమంలో ఉంచండి.',
     preferences: 'ప్రాధాన్యతలు',
     recent: 'ఇటీవలివి',
+    reminders: 'రిమైండర్‌లు',
+    noReminders: 'ఇంకా రిమైండర్‌లు లేవు',
+    noRemindersSubtitle:
+      'మీరు జోడించే మందులు ఇక్కడ కనిపిస్తాయి, ఎప్పుడైనా నిర్వహించవచ్చు.',
+    unableLoadReminders:
+      'రిమైండర్‌లను లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.',
     searchMedicine: 'మందు వెతకండి',
     shop: 'షాప్',
     shopSubtitle: 'మీరు ఏ మందు కోసం చూస్తున్నారు?',

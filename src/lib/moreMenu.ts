@@ -1,10 +1,11 @@
 export type AccountMenuItem = {
-  key: 'profile' | 'savedAddresses' | 'notificationTimings' | 'language';
+  key: 'profile' | 'savedAddresses' | 'reminders' | 'notificationTimings' | 'language';
 };
 
 const ACCOUNT_MENU_ITEMS: readonly AccountMenuItem[] = [
   { key: 'profile' },
   { key: 'savedAddresses' },
+  { key: 'reminders' },
   { key: 'notificationTimings' },
   { key: 'language' },
 ];

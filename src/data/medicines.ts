@@ -5,6 +5,8 @@ import {
   cancelDoseNotifications,
   queueNotificationCancellations,
 } from '../lib/medicineNotifications';
+import { ensureSecureReportSession } from '../lib/reportAuth';
+import type { DoseSlot } from '../lib/medicineSchedule';
 import {
   mapDoseRows,
   selectRelevantDoseRows,
@@ -114,6 +116,66 @@ export async function fetchMedicinesForDate(
       night: String(settings?.night_time ?? '20:00').slice(0, 5),
     }),
   );
+}
+
+export type MedicineReminder = {
+  courseId: string;
+  durationDays: number;
+  hospitalName: string;
+  imageUrl: string;
+  medicineName: string;
+  slots: DoseSlot[];
+  startDate: string;
+  tabletsPerDose: number;
+};
+
+type RawCourse = {
+  duration_days: number;
+  hospitals: { name: string } | Array<{ name: string }> | null;
+  id: string;
+  medicines:
+    | { image_url: string | null; name: string }
+    | Array<{ image_url: string | null; name: string }>;
+  patient_custom_hospitals: { name: string } | Array<{ name: string }> | null;
+  patient_medicine_course_slots: Array<{ slot: string }>;
+  start_date: string;
+  tablets_per_dose: number;
+};
+
+export async function fetchActiveMedicineReminders(
+  patientId: string,
+): Promise<MedicineReminder[]> {
+  await ensureSecureReportSession();
+  const { data, error } = await supabase
+    .from('patient_medicine_courses')
+    .select(
+      'id, tablets_per_dose, start_date, duration_days, hospitals(name), patient_custom_hospitals(name), medicines!inner(name, image_url), patient_medicine_course_slots(slot)',
+    )
+    .eq('patient_id', patientId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as RawCourse[]).flatMap((row) => {
+    const medicine = one(row.medicines);
+    if (!medicine?.image_url) return [];
+    const hospitalName =
+      one(row.hospitals)?.name ?? one(row.patient_custom_hospitals)?.name ?? '';
+    return [
+      {
+        courseId: row.id,
+        durationDays: row.duration_days,
+        hospitalName,
+        imageUrl: medicine.image_url,
+        medicineName: medicine.name,
+        slots: row.patient_medicine_course_slots.map(
+          (item) => item.slot as DoseSlot,
+        ),
+        startDate: row.start_date,
+        tabletsPerDose: Number(row.tablets_per_dose),
+      } satisfies MedicineReminder,
+    ];
+  });
 }
 
 export async function deleteMedicineReminder(courseId: string): Promise<void> {

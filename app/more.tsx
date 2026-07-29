@@ -223,6 +223,18 @@ export default function MoreScreen() {
                     }
                   />
                 ) : null}
+                {item.key === 'reminders' ? (
+                  <Row
+                    icon="alarm-outline"
+                    label={t('reminders')}
+                    onPress={() =>
+                      router.push({
+                        params: { phone },
+                        pathname: '/reminders',
+                      })
+                    }
+                  />
+                ) : null}
                 {item.key === 'language' ? (
                   <Row
                     icon="language-outline"
