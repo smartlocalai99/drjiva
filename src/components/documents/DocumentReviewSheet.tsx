@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -23,6 +24,10 @@ import {
 } from '../../dashboardTheme';
 import { getReportTypeTranslationKey } from '../../lib/documentMenu';
 import { useLanguage } from '../../lib/i18n';
+import {
+  filterMedicineCatalogue,
+  getNewCatalogueEntryName,
+} from '../../lib/medicineSearch';
 import { PressableScale } from '../PressableScale';
 
 type DocumentReviewSheetProps = {
@@ -30,6 +35,7 @@ type DocumentReviewSheetProps = {
   detectedReportType: ReportType | null;
   hospitals: HospitalOption[];
   isSaving: boolean;
+  onAddHospital: (name: string) => Promise<HospitalOption | null>;
   onCancel: () => void;
   onSave: (input: {
     hospitalId: string;
@@ -44,6 +50,7 @@ export function DocumentReviewSheet({
   detectedReportType,
   hospitals,
   isSaving,
+  onAddHospital,
   onCancel,
   onSave,
   pageCount,
@@ -51,6 +58,8 @@ export function DocumentReviewSheet({
 }: DocumentReviewSheetProps) {
   const { t } = useLanguage();
   const [hospitalId, setHospitalId] = useState<string | null>(null);
+  const [hospitalQuery, setHospitalQuery] = useState('');
+  const [isAddingHospital, setIsAddingHospital] = useState(false);
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [showValidation, setShowValidation] = useState(false);
 
@@ -58,9 +67,30 @@ export function DocumentReviewSheet({
     if (visible) {
       setHospitalId(detectedHospitalId);
       setReportType(detectedReportType);
+      setHospitalQuery('');
       setShowValidation(false);
     }
   }, [detectedHospitalId, detectedReportType, visible]);
+
+  const hospitalResults = filterMedicineCatalogue(hospitals, hospitalQuery, 100);
+  const newHospitalName = getNewCatalogueEntryName(hospitals, hospitalQuery);
+
+  const handleAddHospital = async () => {
+    if (!newHospitalName || isAddingHospital) {
+      return;
+    }
+    setIsAddingHospital(true);
+    try {
+      const hospital = await onAddHospital(newHospitalName);
+      if (hospital) {
+        setHospitalId(hospital.id);
+        setHospitalQuery('');
+        setShowValidation(false);
+      }
+    } finally {
+      setIsAddingHospital(false);
+    }
+  };
 
   const handleSave = () => {
     if (!hospitalId || !reportType) {
@@ -104,12 +134,26 @@ export function DocumentReviewSheet({
           </View>
 
           <Text style={styles.label}>{t('hospital')}</Text>
+          <View style={styles.searchBox}>
+            <Ionicons color={dashboardColors.textFaint} name="search" size={16} />
+            <TextInput
+              accessibilityLabel="Search or add a hospital"
+              onChangeText={(value) => {
+                setHospitalQuery(value);
+                setShowValidation(false);
+              }}
+              placeholder="Search or add a hospital"
+              placeholderTextColor={dashboardColors.textFaint}
+              style={styles.searchInput}
+              value={hospitalQuery}
+            />
+          </View>
           <ScrollView
             contentContainerStyle={styles.optionGrid}
             nestedScrollEnabled
             style={styles.hospitalList}
           >
-            {hospitals.map((hospital) => (
+            {hospitalResults.map((hospital) => (
               <PressableScale
                 key={hospital.id}
                 onPress={() => {
@@ -142,6 +186,30 @@ export function DocumentReviewSheet({
                 </Text>
               </PressableScale>
             ))}
+            {newHospitalName ? (
+              <PressableScale
+                disabled={isAddingHospital}
+                onPress={() => void handleAddHospital()}
+                pressedScale={0.98}
+                style={styles.option}
+              >
+                {isAddingHospital ? (
+                  <ActivityIndicator color={dashboardColors.primary} size="small" />
+                ) : (
+                  <Ionicons
+                    color={dashboardColors.primary}
+                    name="add-circle-outline"
+                    size={16}
+                  />
+                )}
+                <Text numberOfLines={1} style={styles.optionText}>
+                  Add “{newHospitalName}”
+                </Text>
+              </PressableScale>
+            ) : null}
+            {hospitalResults.length === 0 && !newHospitalName ? (
+              <Text style={styles.emptyHospitals}>No hospitals found</Text>
+            ) : null}
           </ScrollView>
 
           <Text style={styles.label}>{t('reportType')}</Text>
@@ -261,7 +329,30 @@ const styles = StyleSheet.create({
     marginBottom: dashboardSpacing.sm,
     marginTop: dashboardSpacing.gap,
   },
+  searchBox: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.bg,
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    paddingHorizontal: dashboardSpacing.md,
+    paddingVertical: 10,
+  },
+  searchInput: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
+  },
+  emptyHospitals: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    paddingVertical: dashboardSpacing.sm,
+    textAlign: 'center',
+  },
   hospitalList: {
+    marginTop: dashboardSpacing.sm,
     maxHeight: 145,
   },
   optionGrid: {

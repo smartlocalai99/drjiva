@@ -29,6 +29,7 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
+import { openDocumentInApp, shareDocument } from '../src/lib/documentActions';
 import {
   classifyDocument,
   type HospitalOption,
@@ -46,6 +47,10 @@ import {
 } from '../src/lib/documentScanner';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
+import {
+  createCustomHospital,
+  fetchPatientCustomHospitals,
+} from '../src/lib/medicineCourses';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
   createPatientReportSignedUrl,
@@ -109,12 +114,14 @@ export default function DocumentsScreen() {
       if (!patient) {
         throw new Error('Patient profile is unavailable.');
       }
-      const [nextHospitals, nextReports] = await Promise.all([
-        fetchHospitals(),
-        fetchPatientReports(patient.patientId),
-      ]);
+      const [verifiedHospitals, customHospitals, nextReports] =
+        await Promise.all([
+          fetchHospitals(),
+          fetchPatientCustomHospitals(patient.patientId).catch(() => []),
+          fetchPatientReports(patient.patientId),
+        ]);
       setPatientId(patient.patientId);
-      setHospitals(nextHospitals);
+      setHospitals([...verifiedHospitals, ...customHospitals]);
       setReports(nextReports);
     } catch {
       setErrorMessage(t('unableLoadDocuments'));
@@ -166,6 +173,21 @@ export default function DocumentsScreen() {
     }
     setActiveTab(tab);
     router.replace({ params: { phone }, pathname: route });
+  };
+
+  const handleAddHospital = async (
+    name: string,
+  ): Promise<HospitalOption | null> => {
+    if (!patientId) {
+      return null;
+    }
+    try {
+      const hospital = await createCustomHospital(patientId, name);
+      setHospitals((current) => [...current, hospital]);
+      return hospital;
+    } catch {
+      return null;
+    }
   };
 
   const handleScan = async () => {
@@ -273,7 +295,26 @@ export default function DocumentsScreen() {
     }
     try {
       const signedUrl = await createPatientReportSignedUrl(report.storagePath);
-      await Linking.openURL(signedUrl);
+      const opened = await openDocumentInApp(signedUrl);
+      if (!opened) {
+        await Linking.openURL(signedUrl);
+      }
+    } catch {
+      Alert.alert(t('unableToOpen'), t('tryOpeningAgain'));
+    }
+  };
+
+  const handleShareReport = async (report: PatientReport) => {
+    if (!report.storagePath) {
+      Alert.alert(t('unableToOpen'), t('olderReportNoPath'));
+      return;
+    }
+    try {
+      const signedUrl = await createPatientReportSignedUrl(report.storagePath);
+      const shared = await shareDocument(signedUrl);
+      if (!shared) {
+        Alert.alert(t('unableToOpen'), t('tryOpeningAgain'));
+      }
     } catch {
       Alert.alert(t('unableToOpen'), t('tryOpeningAgain'));
     }
@@ -421,6 +462,7 @@ export default function DocumentsScreen() {
             hospitals={hospitals}
             onDelete={handleDeleteReport}
             onOpen={(report) => void handleOpenReport(report)}
+            onShare={(report) => void handleShareReport(report)}
             reports={selectedGroup.reports}
           />
         ) : (
@@ -451,6 +493,7 @@ export default function DocumentsScreen() {
         detectedReportType={detectedReportType}
         hospitals={hospitals}
         isSaving={isSaving}
+        onAddHospital={handleAddHospital}
         onCancel={() => {
           if (!isSaving) {
             setReviewVisible(false);

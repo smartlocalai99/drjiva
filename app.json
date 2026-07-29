@@ -70,7 +70,9 @@
         {
           "locationWhenInUsePermission": "Allow DrJiva to use your current location to fill in your delivery address."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},

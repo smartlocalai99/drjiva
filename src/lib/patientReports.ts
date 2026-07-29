@@ -152,11 +152,23 @@ export async function deletePatientReport(
         return error;
       },
       removeRow: async (reportId) => {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('patient_reports')
           .delete()
-          .eq('id', reportId);
-        return error;
+          .eq('id', reportId)
+          .select('id');
+        if (error) {
+          return error;
+        }
+        // RLS lets a delete "succeed" with zero rows affected instead of
+        // erroring when the current session no longer owns the row (e.g. a
+        // stale session from before login persistence was fixed). Treat
+        // that silent no-op as a real failure so the row doesn't reappear
+        // after the UI already showed it as deleted.
+        if (!data || data.length === 0) {
+          return new Error('The document record could not be deleted.');
+        }
+        return null;
       },
     },
     report,

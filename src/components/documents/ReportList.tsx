@@ -18,6 +18,7 @@ type ReportListProps = {
   deletingReportId: string | null;
   onDelete: (report: PatientReport) => void;
   onOpen: (report: PatientReport) => void;
+  onShare: (report: PatientReport) => void;
   reports: PatientReport[];
 };
 
@@ -26,6 +27,7 @@ export function ReportList({
   deletingReportId,
   onDelete,
   onOpen,
+  onShare,
   reports,
 }: ReportListProps) {
   const { t } = useLanguage();
@@ -73,23 +75,38 @@ export function ReportList({
               </Text>
             </View>
           </PressableScale>
-          <PressableScale
-            accessibilityLabel={t('delete')}
-            disabled={deletingReportId !== null}
-            onPress={() => onDelete(report)}
-            pressedScale={0.9}
-            style={styles.deleteButton}
-          >
-            {deletingReportId === report.id ? (
-              <ActivityIndicator color={dashboardColors.error} size="small" />
-            ) : (
+          <View style={styles.actions}>
+            <PressableScale
+              accessibilityLabel="Share"
+              disabled={deletingReportId === report.id}
+              onPress={() => onShare(report)}
+              pressedScale={0.9}
+              style={styles.shareButton}
+            >
               <Ionicons
-                color={dashboardColors.error}
-                name="trash-outline"
-                size={18}
+                color={dashboardColors.primary}
+                name="share-outline"
+                size={16}
               />
-            )}
-          </PressableScale>
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel={t('delete')}
+              disabled={deletingReportId !== null}
+              onPress={() => onDelete(report)}
+              pressedScale={0.9}
+              style={styles.deleteButton}
+            >
+              {deletingReportId === report.id ? (
+                <ActivityIndicator color={dashboardColors.error} size="small" />
+              ) : (
+                <Ionicons
+                  color={dashboardColors.error}
+                  name="trash-outline"
+                  size={18}
+                />
+              )}
+            </PressableScale>
+          </View>
         </View>
       ))}
     </View>
@@ -118,7 +135,22 @@ const styles = StyleSheet.create({
     gap: dashboardSpacing.md,
     minHeight: 82,
     padding: dashboardSpacing.md,
-    paddingRight: 52,
+    paddingRight: 92,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    position: 'absolute',
+    right: dashboardSpacing.md,
+    top: dashboardSpacing.md,
+  },
+  shareButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
   },
   deleteButton: {
     alignItems: 'center',
@@ -126,9 +158,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     height: 32,
     justifyContent: 'center',
-    position: 'absolute',
-    right: dashboardSpacing.md,
-    top: dashboardSpacing.md,
     width: 32,
   },
   icon: {
