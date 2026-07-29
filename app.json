@@ -64,6 +64,12 @@
         {
           "cameraPermission": "Allow DrJiva to scan medical reports."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow DrJiva to use your current location to fill in your delivery address."
+        }
       ]
     ],
     "extra": {

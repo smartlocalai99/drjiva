@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -32,6 +33,7 @@ import {
   type AddressLabel,
   type SavedAddress,
 } from '../src/lib/addresses';
+import { fetchCurrentLocationAddress } from '../src/lib/expoAddressLocation';
 
 const LABELS: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -77,6 +79,7 @@ export default function AddressEditorScreen() {
   const [errors, setErrors] = useState<AddressErrors>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,6 +131,51 @@ export default function AddressEditorScreen() {
     setDraft((current) => ({ ...current, [key]: value }));
     if (errors[key]) {
       setErrors((current) => ({ ...current, [key]: undefined }));
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    if (isLocating) {
+      return;
+    }
+
+    setIsLocating(true);
+    try {
+      const result = await fetchCurrentLocationAddress();
+      if (result.status === 'permission-denied') {
+        Alert.alert(
+          'Location permission needed',
+          'Allow location access in Settings to fill your address automatically.',
+          [
+            { style: 'cancel', text: 'Not now' },
+            { onPress: () => void Linking.openSettings(), text: 'Open Settings' },
+          ],
+        );
+        return;
+      }
+      if (result.status === 'unavailable') {
+        Alert.alert(
+          'Unable to detect address',
+          'We could not match your current location to an address. Please fill it in manually.',
+        );
+        return;
+      }
+
+      setDraft((current) => ({ ...current, ...result.fields }));
+      setErrors((current) => ({
+        ...current,
+        area: undefined,
+        city: undefined,
+        pinCode: undefined,
+        state: undefined,
+      }));
+    } catch {
+      Alert.alert(
+        'Unable to detect address',
+        'Please check your location settings and try again.',
+      );
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -258,6 +306,26 @@ export default function AddressEditorScreen() {
             </View>
 
             <Text style={styles.sectionTitle}>Address details</Text>
+            <PressableScale
+              accessibilityLabel="Use current location"
+              disabled={isLocating}
+              onPress={() => void handleUseCurrentLocation()}
+              pressedScale={0.98}
+              style={styles.locateRow}
+            >
+              {isLocating ? (
+                <ActivityIndicator color={dashboardColors.primary} size="small" />
+              ) : (
+                <Ionicons
+                  color={dashboardColors.primary}
+                  name="locate"
+                  size={18}
+                />
+              )}
+              <Text style={styles.locateText}>
+                {isLocating ? 'Detecting your location…' : 'Use current location'}
+              </Text>
+            </PressableScale>
             <View style={styles.formCard}>
               <AddressField
                 autoCapitalize="words"
@@ -453,6 +521,21 @@ const styles = StyleSheet.create({
     backgroundColor: dashboardColors.card,
     borderRadius: dashboardRadii.card,
     paddingHorizontal: dashboardSpacing.gap,
+  },
+  locateRow: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.card,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    marginBottom: dashboardSpacing.gap,
+    paddingHorizontal: dashboardSpacing.gap,
+    paddingVertical: dashboardSpacing.md,
+  },
+  locateText: {
+    ...dashboardTypography.body,
+    color: dashboardColors.primaryDark,
+    fontFamily: 'Inter_600SemiBold',
   },
   field: {
     paddingVertical: dashboardSpacing.md,
