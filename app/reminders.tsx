@@ -5,7 +5,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,12 +16,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Calendar, type DateData } from 'react-native-calendars';
 
-import { DateTimeline } from '../src/components/dashboard/DateTimeline';
 import { getHospitalInitials } from '../src/data/medicineCourse';
 import {
   deleteMedicineReminder,
   fetchMedicinesForDate,
+  fetchReminderDatesInRange,
   type Medicine,
 } from '../src/data/medicines';
 import {
@@ -31,6 +32,7 @@ import {
   dashboardTypography,
 } from '../src/dashboardTheme';
 import { useLanguage } from '../src/lib/i18n';
+import { formatDateOnly } from '../src/lib/medicineCalendar';
 import { getPatientByPhone } from '../src/lib/patients';
 
 export default function RemindersScreen() {
@@ -40,7 +42,10 @@ export default function RemindersScreen() {
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
 
+  const [patientId, setPatientId] = useState<string>();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const [markedDateSet, setMarkedDateSet] = useState<Set<string>>(new Set());
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -54,6 +59,7 @@ export default function RemindersScreen() {
         if (!patient) {
           throw new Error('Patient unavailable');
         }
+        setPatientId(patient.patientId);
         setMedicines(
           await fetchMedicinesForDate(patient.patientId, date, new Date(), {
             showAll: true,
@@ -75,9 +81,56 @@ export default function RemindersScreen() {
     }, [reload, selectedDate]),
   );
 
-  const handleSelectDate = (date: Date) => {
-    setSelectedDate(date);
+  useEffect(() => {
+    if (!patientId) {
+      return;
+    }
+    let cancelled = false;
+    const monthStart = new Date(
+      visibleMonth.getFullYear(),
+      visibleMonth.getMonth(),
+      1,
+    );
+    const monthEnd = new Date(
+      visibleMonth.getFullYear(),
+      visibleMonth.getMonth() + 1,
+      1,
+    );
+    void fetchReminderDatesInRange(patientId, monthStart, monthEnd)
+      .then((dates) => {
+        if (!cancelled) {
+          setMarkedDateSet(dates);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId, visibleMonth]);
+
+  const handleSelectDate = (day: DateData) => {
+    setSelectedDate(new Date(day.year, day.month - 1, day.day));
   };
+
+  const handleVisibleMonthChange = (month: DateData) => {
+    setVisibleMonth(new Date(month.year, month.month - 1, 1));
+  };
+
+  const markedDates = Object.fromEntries([
+    ...[...markedDateSet].map((date) => [
+      date,
+      { dotColor: dashboardColors.primary, marked: true },
+    ]),
+    [
+      formatDateOnly(selectedDate),
+      {
+        dotColor: '#FFFFFF',
+        marked: markedDateSet.has(formatDateOnly(selectedDate)),
+        selected: true,
+        selectedColor: dashboardColors.primary,
+      },
+    ],
+  ]);
 
   const confirmDelete = (medicine: Medicine) => {
     Alert.alert(t('deleteReminder'), t('deleteReminderMessage'), [
@@ -120,8 +173,29 @@ export default function RemindersScreen() {
         <View style={styles.headerSide} />
       </View>
 
-      <View style={styles.timelineWrap}>
-        <DateTimeline onSelectDate={handleSelectDate} selectedDate={selectedDate} />
+      <View style={styles.calendarWrap}>
+        <Calendar
+          current={formatDateOnly(visibleMonth)}
+          enableSwipeMonths
+          markedDates={markedDates}
+          onDayPress={handleSelectDate}
+          onMonthChange={handleVisibleMonthChange}
+          style={styles.calendar}
+          theme={{
+            arrowColor: dashboardColors.primary,
+            calendarBackground: dashboardColors.card,
+            dayTextColor: dashboardColors.text,
+            monthTextColor: dashboardColors.text,
+            selectedDayBackgroundColor: dashboardColors.primary,
+            selectedDayTextColor: '#FFFFFF',
+            textDayFontFamily: 'Inter_500Medium',
+            textDayHeaderFontFamily: 'Inter_600SemiBold',
+            textDisabledColor: dashboardColors.textFaint,
+            textMonthFontFamily: 'Inter_700Bold',
+            textSectionTitleColor: dashboardColors.textMuted,
+            todayTextColor: dashboardColors.primary,
+          }}
+        />
       </View>
 
       {isLoading ? (
@@ -275,9 +349,15 @@ const styles = StyleSheet.create({
     ...dashboardTypography.title,
     color: dashboardColors.text,
   },
-  timelineWrap: {
+  calendarWrap: {
     paddingBottom: dashboardSpacing.sm,
     paddingHorizontal: dashboardSpacing.pagePadding,
+  },
+  calendar: {
+    borderColor: dashboardColors.track,
+    borderRadius: dashboardRadii.card,
+    borderWidth: 1,
+    paddingBottom: 6,
   },
   centered: {
     alignItems: 'center',

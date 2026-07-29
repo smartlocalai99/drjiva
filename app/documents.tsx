@@ -89,6 +89,7 @@ export default function DocumentsScreen() {
   const [detectedReportType, setDetectedReportType] =
     useState<ReportType | null>(null);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+  const [openingReportId, setOpeningReportId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
@@ -300,6 +301,7 @@ export default function DocumentsScreen() {
       Alert.alert(t('unableToOpen'), t('olderReportNoPath'));
       return;
     }
+    setOpeningReportId(report.id);
     try {
       const signedUrl = await createPatientReportSignedUrl(report.storagePath);
       const opened = await openDocumentInApp(signedUrl);
@@ -308,6 +310,8 @@ export default function DocumentsScreen() {
       }
     } catch {
       Alert.alert(t('unableToOpen'), t('tryOpeningAgain'));
+    } finally {
+      setOpeningReportId(null);
     }
   };
 
@@ -470,6 +474,7 @@ export default function DocumentsScreen() {
             onDelete={handleDeleteReport}
             onOpen={(report) => void handleOpenReport(report)}
             onShare={(report) => void handleShareReport(report)}
+            openingReportId={openingReportId}
             reports={selectedGroup.reports}
           />
         ) : (

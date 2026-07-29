@@ -19,9 +19,14 @@ const REPORT_COLUMNS =
   'id, patient_id, hospital_id, label, report_type, page_count, storage_path, created_at';
 const MAX_REPORT_BYTES = 20 * 1024 * 1024;
 const HOSPITALS_CACHE_TTL_MS = 5 * 60 * 1000;
+const SIGNED_URL_TTL_SECONDS = 10 * 60;
+// Cached for less than the URL's real validity so a reopen never hands out
+// one that's about to expire mid-view.
+const SIGNED_URL_CACHE_TTL_MS = 8 * 60 * 1000;
 
 let hospitalsCache: { expiresAt: number; hospitals: HospitalOption[] } | null =
   null;
+const signedUrlCache = new Map<string, { expiresAt: number; url: string }>();
 
 function createDocumentId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
@@ -128,14 +133,23 @@ export async function uploadPatientReport(input: {
 export async function createPatientReportSignedUrl(
   storagePath: string,
 ): Promise<string> {
+  const cached = signedUrlCache.get(storagePath);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
+
   const { data, error } = await supabase.storage
     .from('patient-reports')
-    .createSignedUrl(storagePath, 10 * 60);
+    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
     throw error ?? new Error('Unable to open this report.');
   }
 
+  signedUrlCache.set(storagePath, {
+    expiresAt: Date.now() + SIGNED_URL_CACHE_TTL_MS,
+    url: data.signedUrl,
+  });
   return data.signedUrl;
 }
 
@@ -173,4 +187,7 @@ export async function deletePatientReport(
     },
     report,
   );
+  if (report.storagePath) {
+    signedUrlCache.delete(report.storagePath);
+  }
 }

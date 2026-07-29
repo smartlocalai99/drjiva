@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { deleteMedicineReminderWithAdapter } from '../lib/deleteMedicineReminder';
+import { formatDateOnly } from '../lib/medicineCalendar';
 import { deleteMedicineCourse } from '../lib/medicineCourses';
 import {
   cancelDoseNotifications,
@@ -116,6 +117,28 @@ export async function fetchMedicinesForDate(
       morning: String(settings?.morning_time ?? '08:00').slice(0, 5),
       night: String(settings?.night_time ?? '20:00').slice(0, 5),
     }),
+  );
+}
+
+export async function fetchReminderDatesInRange(
+  patientId: string,
+  start: Date,
+  end: Date,
+): Promise<Set<string>> {
+  await ensureSecureReportSession();
+  const { data, error } = await supabase
+    .from('patient_medicine_dose_events')
+    .select('scheduled_for')
+    .eq('patient_id', patientId)
+    .gte('scheduled_for', start.toISOString())
+    .lt('scheduled_for', end.toISOString())
+    .neq('status', 'cancelled');
+  if (error) throw error;
+
+  return new Set(
+    ((data ?? []) as Array<{ scheduled_for: string }>).map((row) =>
+      formatDateOnly(new Date(row.scheduled_for)),
+    ),
   );
 }
 
