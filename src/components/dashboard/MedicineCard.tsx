@@ -22,14 +22,12 @@ import { DOSE_SLOT_THEME } from '../../lib/doseSlotTheme';
 import { DoctorAvatar } from '../DoctorAvatar';
 import { HospitalLogo } from '../HospitalLogo';
 import { PressableScale } from '../PressableScale';
-import { MedicineToggle } from './MedicineToggle';
 
 type MedicineCardProps = {
   deleting: boolean;
   medicine: Medicine;
   index: number;
   onDelete: () => void;
-  onToggle: () => void;
 };
 
 export function MedicineCard({
@@ -37,7 +35,6 @@ export function MedicineCard({
   medicine,
   index,
   onDelete,
-  onToggle,
 }: MedicineCardProps) {
   const scale = useSharedValue(1);
   const wasCompleted = useRef(medicine.completed);
@@ -62,12 +59,7 @@ export function MedicineCard({
       entering={FadeInDown.delay(index * 60).duration(320)}
       style={bounceStyle}
     >
-      <View
-        style={[
-          styles.card,
-          medicine.completed && styles.cardCompleted,
-        ]}
-      >
+      <View style={styles.card}>
         <View style={styles.imageFrame}>
           <Image
             accessibilityLabel={`${medicine.name} medicine`}
@@ -76,13 +68,6 @@ export function MedicineCard({
             style={styles.image}
             transition={180}
           />
-          <View style={styles.toggle}>
-            <MedicineToggle
-              disabled={medicine.completed}
-              onValueChange={onToggle}
-              value={medicine.completed}
-            />
-          </View>
           <PressableScale
             accessibilityLabel={`Delete ${medicine.name} reminder`}
             disabled={deleting}
@@ -108,53 +93,35 @@ export function MedicineCard({
           ) : null}
         </View>
 
-        <View style={styles.body}>
-          <Text numberOfLines={1} style={styles.name}>
-            {medicine.name}
-          </Text>
-          <View
-            style={[styles.slotBadge, { backgroundColor: slotTheme.tint }]}
-          >
-            <Ionicons
-              color={slotTheme.accent}
-              name={slotTheme.icon}
-              size={13}
-            />
+        <View style={[styles.body, { backgroundColor: slotTheme.tint }]}>
+          <View style={styles.nameRow}>
+            <Text numberOfLines={1} style={styles.name}>
+              {medicine.name}
+            </Text>
+            <View style={styles.doseChip}>
+              <Ionicons color={slotTheme.accent} name="medical" size={13} />
+              <Text style={[styles.doseChipText, { color: slotTheme.accent }]}>
+                {medicine.tabletCount}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.slotBadge}>
+            <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={13} />
             <Text style={[styles.meta, { color: slotTheme.accent }]}>
               {medicine.timing} · {medicine.nextReminderTime}
             </Text>
           </View>
 
-          <View style={styles.detailRow}>
-            <View style={[styles.detailCell, styles.detailLeft]}>
-              <Ionicons
-                color={dashboardColors.primary}
-                name="medical-outline"
-                size={15}
-              />
-              <Text numberOfLines={1} style={styles.detailText}>
-                {medicine.tabletCount}
-              </Text>
-            </View>
-
-            <View style={styles.hospitalCell}>
-              <HospitalLogo size={28} />
-              <Text numberOfLines={1} style={styles.hospitalName}>
+          <View style={styles.peopleRow}>
+            <View style={styles.hospitalGroup}>
+              <HospitalLogo size={44} />
+              <Text numberOfLines={2} style={styles.hospitalName}>
                 {medicine.hospitalName}
               </Text>
             </View>
-
-            <View style={[styles.detailCell, styles.detailRight]}>
-              <DoctorAvatar size={16} />
-              <Text numberOfLines={1} style={styles.doctor}>
-                {medicine.doctorName}
-              </Text>
-            </View>
+            <DoctorAvatar size={48} />
           </View>
-
-          <Text style={[styles.reminder, { color: slotTheme.accent }]}>
-            Next dose {medicine.nextReminderTime}
-          </Text>
         </View>
       </View>
     </Animated.View>
@@ -172,9 +139,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 16,
   },
-  cardCompleted: {
-    backgroundColor: dashboardColors.successTint,
-  },
   imageFrame: {
     height: 200,
     position: 'relative',
@@ -183,15 +147,6 @@ const styles = StyleSheet.create({
   image: {
     height: '100%',
     width: '100%',
-  },
-  toggle: {
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: dashboardRadii.pill,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    position: 'absolute',
-    right: dashboardSpacing.sm,
-    top: dashboardSpacing.sm,
   },
   deleteButton: {
     alignItems: 'center',
@@ -205,14 +160,21 @@ const styles = StyleSheet.create({
     width: 36,
   },
   body: {
-    gap: 3,
+    gap: 8,
     paddingHorizontal: dashboardSpacing.md,
-    paddingVertical: 11,
+    paddingVertical: 12,
+  },
+  nameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    justifyContent: 'space-between',
   },
   name: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    fontSize: 17,
+    flex: 1,
+    fontSize: 18,
   },
   badge: {
     alignItems: 'center',
@@ -231,6 +193,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
   },
+  doseChip: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  doseChipText: {
+    ...dashboardTypography.caption,
+    fontFamily: 'Inter_700Bold',
+  },
   meta: {
     ...dashboardTypography.caption,
     fontFamily: 'Inter_700Bold',
@@ -238,61 +213,33 @@ const styles = StyleSheet.create({
   slotBadge: {
     alignItems: 'center',
     alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
     gap: 4,
-    marginTop: 2,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  detailRow: {
+  peopleRow: {
     alignItems: 'center',
-    borderTopColor: dashboardColors.track,
+    borderTopColor: 'rgba(255,255,255,0.7)',
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    marginTop: 5,
-    minHeight: 48,
-    paddingTop: 7,
+    justifyContent: 'space-between',
+    marginTop: 2,
+    paddingTop: 10,
   },
-  detailCell: {
+  hospitalGroup: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: 4,
-  },
-  detailLeft: {
-    justifyContent: 'flex-start',
-  },
-  detailRight: {
-    justifyContent: 'flex-end',
-  },
-  detailText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.text,
-    flexShrink: 1,
-  },
-  hospitalCell: {
-    alignItems: 'center',
-    flex: 0.9,
-    paddingHorizontal: 4,
+    gap: dashboardSpacing.sm,
+    paddingRight: dashboardSpacing.sm,
   },
   hospitalName: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
-    fontSize: 9,
-    marginTop: 2,
-    maxWidth: 92,
-  },
-  doctor: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
     flexShrink: 1,
-    fontSize: 10,
-  },
-  reminder: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 14,
   },
 });

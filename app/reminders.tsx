@@ -24,6 +24,7 @@ import {
   fetchReminderDatesInRange,
   type Medicine,
 } from '../src/data/medicines';
+import { DoctorAvatar } from '../src/components/DoctorAvatar';
 import { HospitalLogo } from '../src/components/HospitalLogo';
 import {
   dashboardColors,
@@ -31,6 +32,7 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
+import { DOSE_SLOT_THEME } from '../src/lib/doseSlotTheme';
 import { useLanguage } from '../src/lib/i18n';
 import { formatDateOnly } from '../src/lib/medicineCalendar';
 import { getPatientByPhone } from '../src/lib/patients';
@@ -257,6 +259,8 @@ function ReminderCard({
   medicine: Medicine;
   onDelete: () => void;
 }) {
+  const slotTheme = DOSE_SLOT_THEME[medicine.slot];
+
   return (
     <View style={styles.card}>
       <Image
@@ -279,44 +283,41 @@ function ReminderCard({
           <Ionicons color={dashboardColors.error} name="trash-outline" size={16} />
         )}
       </Pressable>
+      {medicine.completed ? (
+        <View style={styles.completedBadge}>
+          <Ionicons color="#FFFFFF" name="checkmark" size={11} />
+          <Text style={styles.completedBadgeText}>Taken</Text>
+        </View>
+      ) : null}
 
-      <View style={styles.cardBody}>
-        <Text numberOfLines={2} style={styles.cardName}>
-          {medicine.name}
-        </Text>
-        <Text style={styles.cardDuration}>
-          {medicine.timing} · {medicine.nextReminderTime}
-        </Text>
-
-        <View style={styles.detailRow}>
-          <View style={styles.detailCell}>
-            <Ionicons
-              color={dashboardColors.textMuted}
-              name="medical-outline"
-              size={14}
-            />
-            <Text numberOfLines={1} style={styles.detailText}>
+      <View style={[styles.cardBody, { backgroundColor: slotTheme.tint }]}>
+        <View style={styles.nameRow}>
+          <Text numberOfLines={1} style={styles.cardName}>
+            {medicine.name}
+          </Text>
+          <View style={styles.doseChip}>
+            <Ionicons color={slotTheme.accent} name="medical" size={13} />
+            <Text style={[styles.doseChipText, { color: slotTheme.accent }]}>
               {medicine.tabletCount}
             </Text>
           </View>
+        </View>
 
-          <View style={styles.hospitalCell}>
-            <HospitalLogo size={28} />
-            <Text numberOfLines={1} style={styles.hospitalName}>
+        <View style={styles.slotBadge}>
+          <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={13} />
+          <Text style={[styles.cardDuration, { color: slotTheme.accent }]}>
+            {medicine.timing} · {medicine.nextReminderTime}
+          </Text>
+        </View>
+
+        <View style={styles.peopleRow}>
+          <View style={styles.hospitalGroup}>
+            <HospitalLogo size={44} />
+            <Text numberOfLines={2} style={styles.hospitalName}>
               {medicine.hospitalName}
             </Text>
           </View>
-
-          <View style={[styles.detailCell, styles.detailRight]}>
-            <Ionicons
-              color={dashboardColors.primary}
-              name={medicine.completed ? 'checkmark-circle' : 'time-outline'}
-              size={14}
-            />
-            <Text style={styles.doseText}>
-              {medicine.completed ? 'Taken' : 'Scheduled'}
-            </Text>
-          </View>
+          <DoctorAvatar size={48} />
         </View>
       </View>
     </View>
@@ -421,57 +422,86 @@ const styles = StyleSheet.create({
     top: dashboardSpacing.md,
     width: 32,
   },
-  cardBody: {
+  completedBadge: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.success,
+    borderRadius: dashboardRadii.pill,
+    bottom: dashboardSpacing.sm,
+    flexDirection: 'row',
     gap: 3,
+    left: dashboardSpacing.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    position: 'absolute',
+  },
+  completedBadgeText: {
+    ...dashboardTypography.caption,
+    color: '#FFFFFF',
+    fontSize: 11,
+  },
+  cardBody: {
+    gap: 8,
     padding: dashboardSpacing.md,
+  },
+  nameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    justifyContent: 'space-between',
   },
   cardName: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    fontSize: 16,
+    flex: 1,
+    fontSize: 17,
+  },
+  doseChip: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  doseChipText: {
+    ...dashboardTypography.caption,
+    fontFamily: 'Inter_700Bold',
   },
   cardDuration: {
     ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
+    fontFamily: 'Inter_700Bold',
   },
-  detailRow: {
+  slotBadge: {
     alignItems: 'center',
-    borderTopColor: dashboardColors.track,
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  peopleRow: {
+    alignItems: 'center',
+    borderTopColor: 'rgba(255,255,255,0.7)',
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    marginTop: 6,
-    minHeight: 44,
-    paddingTop: 8,
+    justifyContent: 'space-between',
+    marginTop: 2,
+    paddingTop: 10,
   },
-  detailCell: {
+  hospitalGroup: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    gap: 4,
-  },
-  detailRight: {
-    justifyContent: 'flex-end',
-  },
-  detailText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    flexShrink: 1,
-  },
-  hospitalCell: {
-    alignItems: 'center',
-    flex: 0.9,
-    paddingHorizontal: 4,
+    gap: dashboardSpacing.sm,
+    paddingRight: dashboardSpacing.sm,
   },
   hospitalName: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
-    fontSize: 9,
-    marginTop: 2,
-    maxWidth: 92,
-  },
-  doseText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primaryDark,
-    fontFamily: 'Inter_700Bold',
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+    flexShrink: 1,
+    fontSize: 14,
   },
 });

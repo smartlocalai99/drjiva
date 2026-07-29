@@ -14,7 +14,6 @@ import { EmptyMedicines } from '../src/components/dashboard/EmptyMedicines';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
 import { MedicineCard } from '../src/components/dashboard/MedicineCard';
 import {
-  completeDoseEvent,
   deleteMedicineReminder,
   fetchMedicinesForDate,
   type Medicine,
@@ -125,21 +124,6 @@ export default function HomeScreen() {
     setSelectedDate(date);
   };
 
-  const handleToggleMedicine = async (id: string) => {
-    const medicine = medicines.find((item) => item.id === id);
-    if (!medicine) return;
-    try {
-      await completeDoseEvent(id, !medicine.completed);
-      setMedicines((current) =>
-        current.map((item) =>
-          item.id === id ? { ...item, completed: !item.completed } : item,
-        ),
-      );
-    } catch {
-      Alert.alert(t('addMedicine'), t('tryAgain'));
-    }
-  };
-
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadMedicines(selectedDate);
@@ -246,7 +230,6 @@ export default function HomeScreen() {
               medicine={medicine}
               deleting={deletingCourseId === medicine.courseId}
               onDelete={() => handleDeleteMedicine(medicine)}
-              onToggle={() => void handleToggleMedicine(medicine.id)}
             />
           ))
         )}
