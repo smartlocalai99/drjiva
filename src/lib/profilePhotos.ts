@@ -1,5 +1,6 @@
 import type * as ImagePicker from 'expo-image-picker';
 
+import { ensureSecureReportSession } from './reportAuth';
 import { supabase } from './supabase';
 
 export const PROFILE_PHOTO_BUCKET = 'profile-pictures';
@@ -48,6 +49,8 @@ export async function uploadProfilePhoto(
   if (validationMessage) {
     throw new Error(validationMessage);
   }
+
+  await ensureSecureReportSession();
 
   const mimeType = asset.mimeType as 'image/jpeg' | 'image/png';
   const path = buildProfilePhotoPath(patientId, mimeType);

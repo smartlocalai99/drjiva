@@ -230,7 +230,8 @@ export default function ProfileScreen() {
       setAvatarUrl(patient.avatarUrl ?? nextAvatarUrl);
       setPendingPhoto(null);
       setSavedAt(Date.now());
-    } catch {
+    } catch (error) {
+      console.error('Unable to save profile changes', error);
       setErrorMessage('Unable to save your changes. Please try again.');
     } finally {
       setIsSaving(false);
