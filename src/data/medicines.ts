@@ -61,6 +61,7 @@ export async function fetchMedicinesForDate(
   patientId: string,
   date: Date,
   now = new Date(),
+  options: { showAll?: boolean } = {},
 ): Promise<Medicine[]> {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
@@ -107,7 +108,7 @@ export async function fetchMedicinesForDate(
   });
 
   const isToday = start.toDateString() === now.toDateString();
-  if (!isToday) return mapDoseRows(rows);
+  if (!isToday || options.showAll) return mapDoseRows(rows);
   const settings = settingsResult.data;
   return mapDoseRows(
     selectRelevantDoseRows(rows, now, {

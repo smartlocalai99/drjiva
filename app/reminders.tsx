@@ -17,11 +17,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DateTimeline } from '../src/components/dashboard/DateTimeline';
 import { getHospitalInitials } from '../src/data/medicineCourse';
 import {
   deleteMedicineReminder,
-  fetchActiveMedicineReminders,
-  type MedicineReminder,
+  fetchMedicinesForDate,
+  type Medicine,
 } from '../src/data/medicines';
 import {
   dashboardColors,
@@ -29,7 +30,6 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
-import { formatDateOnly, getCourseEndDate } from '../src/lib/medicineCalendar';
 import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 
@@ -40,43 +40,55 @@ export default function RemindersScreen() {
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
 
-  const [reminders, setReminders] = useState<MedicineReminder[]>([]);
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [deletingCourseId, setDeletingCourseId] = useState<string>();
 
-  const reload = useCallback(async () => {
-    setErrorMessage(undefined);
-    try {
-      const patient = await getPatientByPhone(phone);
-      if (!patient) {
-        throw new Error('Patient unavailable');
+  const reload = useCallback(
+    async (date: Date) => {
+      setErrorMessage(undefined);
+      try {
+        const patient = await getPatientByPhone(phone);
+        if (!patient) {
+          throw new Error('Patient unavailable');
+        }
+        setMedicines(
+          await fetchMedicinesForDate(patient.patientId, date, new Date(), {
+            showAll: true,
+          }),
+        );
+      } catch {
+        setErrorMessage(t('unableLoadReminders'));
+      } finally {
+        setIsLoading(false);
       }
-      setReminders(await fetchActiveMedicineReminders(patient.patientId));
-    } catch {
-      setErrorMessage(t('unableLoadReminders'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [phone, t]);
+    },
+    [phone, t],
+  );
 
   useFocusEffect(
     useCallback(() => {
       setIsLoading(true);
-      void reload();
-    }, [reload]),
+      void reload(selectedDate);
+    }, [reload, selectedDate]),
   );
 
-  const confirmDelete = (reminder: MedicineReminder) => {
+  const handleSelectDate = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const confirmDelete = (medicine: Medicine) => {
     Alert.alert(t('deleteReminder'), t('deleteReminderMessage'), [
       { style: 'cancel', text: t('cancel') },
       {
         onPress: () => {
-          setDeletingCourseId(reminder.courseId);
-          void deleteMedicineReminder(reminder.courseId)
+          setDeletingCourseId(medicine.courseId);
+          void deleteMedicineReminder(medicine.courseId)
             .then(() => {
-              setReminders((current) =>
-                current.filter((item) => item.courseId !== reminder.courseId),
+              setMedicines((current) =>
+                current.filter((item) => item.courseId !== medicine.courseId),
               );
             })
             .catch(() =>
@@ -108,6 +120,10 @@ export default function RemindersScreen() {
         <View style={styles.headerSide} />
       </View>
 
+      <View style={styles.timelineWrap}>
+        <DateTimeline onSelectDate={handleSelectDate} selectedDate={selectedDate} />
+      </View>
+
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={dashboardColors.primary} />
@@ -120,11 +136,14 @@ export default function RemindersScreen() {
             size={38}
           />
           <Text style={styles.emptyTitle}>{errorMessage}</Text>
-          <Pressable onPress={() => void reload()} style={styles.retry}>
+          <Pressable
+            onPress={() => void reload(selectedDate)}
+            style={styles.retry}
+          >
             <Text style={styles.retryText}>{t('tryAgain')}</Text>
           </Pressable>
         </View>
-      ) : reminders.length === 0 ? (
+      ) : medicines.length === 0 ? (
         <View style={styles.centered}>
           <View style={styles.emptyIcon}>
             <Ionicons
@@ -133,7 +152,7 @@ export default function RemindersScreen() {
               size={40}
             />
           </View>
-          <Text style={styles.emptyTitle}>{t('noReminders')}</Text>
+          <Text style={styles.emptyTitle}>{t('noRemindersForDate')}</Text>
           <Text style={styles.emptySubtitle}>{t('noRemindersSubtitle')}</Text>
         </View>
       ) : (
@@ -141,12 +160,12 @@ export default function RemindersScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {reminders.map((reminder) => (
+          {medicines.map((medicine) => (
             <ReminderCard
-              deleting={deletingCourseId === reminder.courseId}
-              key={reminder.courseId}
-              onDelete={() => confirmDelete(reminder)}
-              reminder={reminder}
+              deleting={deletingCourseId === medicine.courseId}
+              key={medicine.id}
+              medicine={medicine}
+              onDelete={() => confirmDelete(medicine)}
             />
           ))}
         </ScrollView>
@@ -157,31 +176,24 @@ export default function RemindersScreen() {
 
 function ReminderCard({
   deleting,
+  medicine,
   onDelete,
-  reminder,
 }: {
   deleting: boolean;
+  medicine: Medicine;
   onDelete: () => void;
-  reminder: MedicineReminder;
 }) {
-  const { t } = useLanguage();
-  const endDate = getCourseEndDate(
-    reminder.startDate,
-    reminder.durationDays,
-  );
-  const isOngoing = formatDateOnly(new Date()) <= endDate;
-
   return (
     <View style={styles.card}>
       <Image
-        accessibilityLabel={reminder.medicineName}
+        accessibilityLabel={medicine.name}
         contentFit="cover"
-        source={{ uri: reminder.imageUrl }}
+        source={{ uri: medicine.imageUrl }}
         style={styles.cardImage}
         transition={120}
       />
       <Pressable
-        accessibilityLabel={`Delete ${reminder.medicineName} reminder`}
+        accessibilityLabel={`Delete ${medicine.name} reminder`}
         disabled={deleting}
         hitSlop={8}
         onPress={onDelete}
@@ -196,46 +208,43 @@ function ReminderCard({
 
       <View style={styles.cardBody}>
         <Text numberOfLines={2} style={styles.cardName}>
-          {reminder.medicineName}
+          {medicine.name}
         </Text>
         <Text style={styles.cardDuration}>
-          {isOngoing ? 'Ongoing' : 'Completed'} · {reminder.durationDays} day
-          {reminder.durationDays === 1 ? '' : 's'} from{' '}
-          {new Date(reminder.startDate).toLocaleDateString()}
+          {medicine.timing} · {medicine.nextReminderTime}
         </Text>
 
         <View style={styles.detailRow}>
           <View style={styles.detailCell}>
             <Ionicons
               color={dashboardColors.textMuted}
-              name="time-outline"
+              name="medical-outline"
               size={14}
             />
             <Text numberOfLines={1} style={styles.detailText}>
-              {reminder.slots.map((slot) => t(slot)).join(', ')}
+              {medicine.tabletCount}
             </Text>
           </View>
 
           <View style={styles.hospitalCell}>
             <View style={styles.hospitalLogo}>
               <Text style={styles.hospitalLogoText}>
-                {getHospitalInitials(reminder.hospitalName)}
+                {getHospitalInitials(medicine.hospitalName)}
               </Text>
             </View>
             <Text numberOfLines={1} style={styles.hospitalName}>
-              {reminder.hospitalName}
+              {medicine.hospitalName}
             </Text>
           </View>
 
           <View style={[styles.detailCell, styles.detailRight]}>
             <Ionicons
               color={dashboardColors.primary}
-              name="medical-outline"
+              name={medicine.completed ? 'checkmark-circle' : 'time-outline'}
               size={14}
             />
             <Text style={styles.doseText}>
-              {reminder.tabletsPerDose} tablet
-              {reminder.tabletsPerDose === 1 ? '' : 's'}
+              {medicine.completed ? 'Taken' : 'Scheduled'}
             </Text>
           </View>
         </View>
@@ -266,6 +275,10 @@ const styles = StyleSheet.create({
     ...dashboardTypography.title,
     color: dashboardColors.text,
   },
+  timelineWrap: {
+    paddingBottom: dashboardSpacing.sm,
+    paddingHorizontal: dashboardSpacing.pagePadding,
+  },
   centered: {
     alignItems: 'center',
     flex: 1,
@@ -276,7 +289,7 @@ const styles = StyleSheet.create({
     gap: dashboardSpacing.md,
     paddingBottom: dashboardSpacing.xxl,
     paddingHorizontal: dashboardSpacing.pagePadding,
-    paddingTop: dashboardSpacing.gap,
+    paddingTop: dashboardSpacing.sm,
   },
   emptyIcon: {
     alignItems: 'center',

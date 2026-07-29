@@ -142,6 +142,7 @@ const translations = {
     recent: 'Recent',
     reminders: 'Reminders',
     noReminders: 'No reminders yet',
+    noRemindersForDate: 'Nothing scheduled for this date',
     noRemindersSubtitle:
       'Medicines you add will show up here so you can manage them anytime.',
     unableLoadReminders: 'Unable to load reminders. Please try again.',
@@ -281,6 +282,7 @@ const translations = {
     recent: 'ఇటీవలివి',
     reminders: 'రిమైండర్‌లు',
     noReminders: 'ఇంకా రిమైండర్‌లు లేవు',
+    noRemindersForDate: 'ఈ తేదీకి ఏమీ షెడ్యూల్ చేయలేదు',
     noRemindersSubtitle:
       'మీరు జోడించే మందులు ఇక్కడ కనిపిస్తాయి, ఎప్పుడైనా నిర్వహించవచ్చు.',
     unableLoadReminders:
