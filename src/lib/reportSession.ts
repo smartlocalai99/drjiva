@@ -16,10 +16,10 @@ const inFlightSessions = new WeakMap<
 async function establishReportSession(
   auth: ReportAuthAdapter,
 ): Promise<string> {
+  // A fresh install has no persisted session yet, so `getUser` legitimately
+  // errors (e.g. Supabase's "Auth session missing!") rather than returning a
+  // clean null. Only a signInAnonymously failure should be treated as fatal.
   const current = await auth.getUser();
-  if (current.error) {
-    throw current.error;
-  }
   if (current.userId) {
     return current.userId;
   }

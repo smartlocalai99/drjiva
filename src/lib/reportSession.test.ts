@@ -7,13 +7,14 @@ import {
 
 function createAdapter(options: {
   currentUserId?: string;
+  getUserError?: Error;
   signedInUserId?: string;
 }): ReportAuthAdapter & { anonymousSignIns: number } {
   return {
     anonymousSignIns: 0,
     async getUser() {
       return {
-        error: null,
+        error: options.getUserError ?? null,
         userId: options.currentUserId ?? null,
       };
     },
@@ -59,6 +60,34 @@ describe('ensureReportSession', () => {
 
     await expect(ensureReportSession(adapter)).rejects.toThrow(
       'Unable to create a secure report session.',
+    );
+  });
+
+  it('falls back to anonymous sign-in when getUser errors on a fresh install', async () => {
+    // A fresh install has no persisted session, so Supabase's getUser()
+    // legitimately errors (e.g. "Auth session missing!") instead of
+    // returning a clean null userId. This must not be treated as fatal.
+    const adapter = createAdapter({
+      getUserError: new Error('Auth session missing!'),
+      signedInUserId: 'anonymous-user',
+    });
+
+    await expect(ensureReportSession(adapter)).resolves.toBe('anonymous-user');
+    expect(adapter.anonymousSignIns).toBe(1);
+  });
+
+  it('still fails when anonymous sign-in itself errors', async () => {
+    const adapter: ReportAuthAdapter = {
+      async getUser() {
+        return { error: new Error('Auth session missing!'), userId: null };
+      },
+      async signInAnonymously() {
+        return { error: new Error('network unreachable'), userId: null };
+      },
+    };
+
+    await expect(ensureReportSession(adapter)).rejects.toThrow(
+      'network unreachable',
     );
   });
 });
