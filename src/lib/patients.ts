@@ -151,7 +151,7 @@ export async function createPatient(
 }
 
 export type PatientProfileUpdate = {
-  address: string | null;
+  address?: string | null;
   age: number | null;
   avatar_url?: string | null;
   gender: 'female' | 'male' | 'other' | null;

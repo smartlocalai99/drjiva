@@ -83,4 +83,21 @@ describe('patient profile photos', () => {
       name: 'Asha Rao',
     });
   });
+
+  it('leaves the stored address untouched when the field is omitted', async () => {
+    await updatePatientProfile('9876543210', {
+      age: 34,
+      avatar_url: null,
+      gender: 'female',
+      name: 'Asha Rao',
+    });
+
+    expect(updatePayload).toEqual({
+      age: 34,
+      avatar_url: null,
+      gender: 'female',
+      name: 'Asha Rao',
+    });
+    expect(updatePayload).not.toHaveProperty('address');
+  });
 });

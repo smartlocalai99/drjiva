@@ -68,7 +68,6 @@ export default function ProfileScreen() {
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
-  const [address, setAddress] = useState('');
   const [gender, setGender] = useState<
     'female' | 'male' | 'other' | null
   >(null);
@@ -99,7 +98,6 @@ export default function ProfileScreen() {
         }
         setName(patient.name);
         setAge(patient.age != null ? String(patient.age) : '');
-        setAddress(patient.address ?? '');
         setGender(
           patient.gender === 'female' ||
             patient.gender === 'male' ||
@@ -223,7 +221,6 @@ export default function ProfileScreen() {
       }
 
       const patient = await updatePatientProfile(phone, {
-        address: address.trim() || null,
         age: parsedAge,
         avatar_url: nextAvatarUrl,
         gender,
@@ -340,22 +337,6 @@ export default function ProfileScreen() {
                     size={18}
                   />
                 </Pressable>
-              </Field>
-
-              <Divider />
-
-              <Field label="Address">
-                <TextInput
-                  multiline
-                  onChangeText={(value) => {
-                    setAddress(value);
-                    setSavedAt(undefined);
-                  }}
-                  placeholder="Add your address"
-                  placeholderTextColor={dashboardColors.textFaint}
-                  style={[styles.input, styles.addressInput]}
-                  value={address}
-                />
               </Field>
 
               <Divider />
@@ -635,10 +616,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  addressInput: {
-    minHeight: 48,
-    textAlignVertical: 'top',
   },
   genderRow: {
     flexDirection: 'row',
