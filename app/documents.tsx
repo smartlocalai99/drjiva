@@ -236,10 +236,7 @@ export default function DocumentsScreen() {
       }
       const ocrText = await recognizeFirstPage(pages[0]!).catch(() => '');
       const classification = classifyDocument(ocrText, hospitals);
-      const compressedPages = await Promise.all(
-        pages.map((page) => compressScannedPage(page).catch(() => page)),
-      );
-      setCapturedPages(compressedPages);
+      setCapturedPages(pages);
       setExtractedText(ocrText.trim());
       setDetectedHospitalId(classification.hospital?.id ?? null);
       setDetectedReportType(classification.reportType);
@@ -265,7 +262,10 @@ export default function DocumentsScreen() {
     setIsSaving(true);
     let pdfUri: string | null = null;
     try {
-      pdfUri = await createReportPdf(capturedPages);
+      const compressedPages = await Promise.all(
+        capturedPages.map((page) => compressScannedPage(page).catch(() => page)),
+      );
+      pdfUri = await createReportPdf(compressedPages);
       const report = await uploadPatientReport({
         hospitalId: metadata.hospitalId,
         label: metadata.reportType,
