@@ -12,6 +12,7 @@ const inFlightSessions = new WeakMap<
   ReportAuthAdapter,
   Promise<string>
 >();
+const resolvedSessions = new WeakMap<ReportAuthAdapter, string>();
 
 async function establishReportSession(
   auth: ReportAuthAdapter,
@@ -38,6 +39,11 @@ async function establishReportSession(
 export function ensureReportSession(
   auth: ReportAuthAdapter,
 ): Promise<string> {
+  const resolved = resolvedSessions.get(auth);
+  if (resolved) {
+    return Promise.resolve(resolved);
+  }
+
   const existing = inFlightSessions.get(auth);
   if (existing) {
     return existing;
@@ -50,6 +56,9 @@ export function ensureReportSession(
       inFlightSessions.delete(auth);
     }
   };
-  void pending.then(clear, clear);
+  void pending.then((userId) => {
+    resolvedSessions.set(auth, userId);
+    clear();
+  }, clear);
   return pending;
 }

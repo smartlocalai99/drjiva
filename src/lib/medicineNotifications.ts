@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { DOSE_SLOT_THEME } from './doseSlotTheme';
@@ -26,6 +27,50 @@ type NotificationAdapter = {
 
 const PENDING_CANCELLATIONS_KEY = 'drjiva.pendingNotificationCancellations';
 const NOTIFICATION_NUDGE_SHOWN_KEY = 'drjiva.notificationSettingsNudgeShown';
+const DEFAULT_REMINDER_CHANNEL = 'medicine-reminders';
+
+function getMedicineReminderSoundConfig(): {
+  channelId: string;
+  sound: 'default' | string;
+} {
+  const channelId =
+    Constants.expoConfig?.extra?.medicineReminderChannel;
+  const sound = Constants.expoConfig?.extra?.medicineReminderSound;
+  return {
+    channelId:
+      typeof channelId === 'string' && channelId
+        ? channelId
+        : DEFAULT_REMINDER_CHANNEL,
+    sound: typeof sound === 'string' && sound ? sound : 'default',
+  };
+}
+
+async function ensureMedicineReminderChannel(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+  const Notifications = await import('expo-notifications');
+  const { channelId, sound } = getMedicineReminderSoundConfig();
+  await Notifications.setNotificationChannelAsync(channelId, {
+    audioAttributes: {
+      contentType: Notifications.AndroidAudioContentType.SPEECH,
+      flags: {
+        enforceAudibility: true,
+        requestHardwareAudioVideoSynchronization: false,
+      },
+      usage: Notifications.AndroidAudioUsage.ALARM,
+    },
+    description: 'Spoken alerts for scheduled medicine doses',
+    enableLights: true,
+    enableVibrate: true,
+    importance: Notifications.AndroidImportance.MAX,
+    lightColor: '#2563EB',
+    name: 'Medicine reminders',
+    showBadge: true,
+    sound,
+    vibrationPattern: [0, 500, 200, 500, 200, 750],
+  });
+}
 
 export async function scheduleDoseNotificationsWithAdapter(
   adapter: NotificationAdapter,
@@ -50,13 +95,7 @@ export async function scheduleDoseNotificationsWithAdapter(
 export async function requestMedicineNotificationPermission(): Promise<boolean> {
   const Notifications = await import('expo-notifications');
   await flushPendingNotificationCancellations().catch(() => undefined);
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('medicine-reminders', {
-      importance: Notifications.AndroidImportance.HIGH,
-      name: 'Medicine reminders',
-      vibrationPattern: [0, 250, 150, 250],
-    });
-  }
+  await ensureMedicineReminderChannel();
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
   const requested = await Notifications.requestPermissionsAsync();
@@ -86,6 +125,8 @@ export async function scheduleDoseNotifications(
   content: NotificationContent,
 ): Promise<Array<{ eventId: string; notificationId: string }>> {
   const Notifications = await import('expo-notifications');
+  await ensureMedicineReminderChannel();
+  const { channelId, sound } = getMedicineReminderSoundConfig();
   const futureEvents = events.filter(
     (event) => new Date(event.scheduledFor).getTime() > Date.now(),
   );
@@ -102,11 +143,13 @@ export async function scheduleDoseNotifications(
             )}`,
             color: DOSE_SLOT_THEME[notificationContent.slotKey].accent,
             data: { eventId: event.eventId, route: '/home' },
-            sound: 'default',
+            interruptionLevel: 'timeSensitive',
+            badge: 1,
+            sound,
             title: `Time for ${notificationContent.medicineName}`,
           },
           trigger: {
-            channelId: 'medicine-reminders',
+            channelId,
             date: new Date(event.scheduledFor),
             type: Notifications.SchedulableTriggerInputTypes.DATE,
           },

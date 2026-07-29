@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Linking,
-  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,7 +22,7 @@ import {
 } from '../src/dashboardTheme';
 import {
   getNotificationSettings,
-  fetchFutureDoseReminders,
+  fetchScheduledDoseRemindersFromToday,
   saveNotificationSettings,
   replaceNotificationSchedule,
 } from '../src/lib/medicineCourses';
@@ -131,17 +130,16 @@ export default function NotificationTimingsScreen() {
         timezone:
           Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
       };
-      const reminders = await fetchFutureDoseReminders(patientId);
+      const reminders =
+        await fetchScheduledDoseRemindersFromToday(patientId);
       const newNotifications: Array<{
         eventId: string;
         notificationId: string;
         scheduledFor: string;
       }> = [];
-      let alertsEnabled = true;
       if (reminders.length > 0) {
         const permitted = await requestMedicineNotificationPermission();
         if (!permitted) {
-          alertsEnabled = false;
           Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
             { style: 'cancel', text: t('notNow') },
             {
@@ -191,9 +189,7 @@ export default function NotificationTimingsScreen() {
         );
         return {
           eventId: reminder.eventId,
-          notificationId:
-            scheduled?.notificationId ??
-            (alertsEnabled ? reminder.notificationId : null),
+          notificationId: scheduled?.notificationId ?? null,
           scheduledFor:
             scheduled?.scheduledFor ??
             replaceEventSlotTime(
@@ -227,7 +223,7 @@ export default function NotificationTimingsScreen() {
         await queueNotificationCancellations(oldIds);
         Alert.alert(t('notifications'), t('oldAlertsCleanupPending'));
       }
-      Alert.alert(t('timingsSaved'));
+      Alert.alert(t('timingsSaved'), t('timingsSynced'));
     } catch {
       Alert.alert(t('unableToSaveDocument'), t('tryAgain'));
     } finally {
@@ -247,29 +243,53 @@ export default function NotificationTimingsScreen() {
       {loading ? (
         <ActivityIndicator color={dashboardColors.primary} style={styles.loader} />
       ) : (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.content}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.help}>{t('notificationTimingsHelp')}</Text>
+          <View style={styles.intro}>
+            <View style={styles.introIcon}>
+              <Ionicons
+                color={dashboardColors.primary}
+                name="notifications-outline"
+                size={24}
+              />
+            </View>
+            <View style={styles.introCopy}>
+              <Text style={styles.introTitle}>{t('chooseReminderTimes')}</Text>
+              <Text style={styles.help}>{t('notificationTimingsHelp')}</Text>
+            </View>
+          </View>
           <SlotTimeEditor
+            hint={t('tapToChooseTime')}
             label={t('morning')}
             onChange={setMorning}
             slot="morning"
             value={morning}
           />
           <SlotTimeEditor
+            hint={t('tapToChooseTime')}
             label={t('afternoon')}
             onChange={setAfternoon}
             slot="afternoon"
             value={afternoon}
           />
           <SlotTimeEditor
+            hint={t('tapToChooseTime')}
             label={t('night')}
             onChange={setNight}
             slot="night"
             value={night}
           />
+          <View style={styles.syncNote}>
+            <Ionicons
+              color={dashboardColors.success}
+              name="sync-circle"
+              size={22}
+            />
+            <Text style={styles.syncText}>{t('timingsSynced')}</Text>
+          </View>
           <PressableScale
             disabled={saving}
             onPress={() => void save()}
@@ -281,7 +301,7 @@ export default function NotificationTimingsScreen() {
               <Text style={styles.saveText}>{t('saveTimings')}</Text>
             )}
           </PressableScale>
-        </KeyboardAvoidingView>
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -303,17 +323,55 @@ const styles = StyleSheet.create({
   },
   title: { ...dashboardTypography.title, color: dashboardColors.text },
   loader: { marginTop: 80 },
-  content: { gap: dashboardSpacing.md, padding: dashboardSpacing.pagePadding },
+  content: {
+    gap: dashboardSpacing.md,
+    padding: dashboardSpacing.pagePadding,
+    paddingBottom: dashboardSpacing.xxl,
+  },
+  intro: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.card,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    padding: dashboardSpacing.md,
+  },
+  introIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  introCopy: { flex: 1, gap: 3 },
+  introTitle: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+  },
   help: {
     ...dashboardTypography.body,
     color: dashboardColors.textMuted,
-    marginBottom: dashboardSpacing.sm,
+    fontSize: 13,
+  },
+  syncNote: {
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderRadius: dashboardRadii.card,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    padding: dashboardSpacing.md,
+  },
+  syncText: {
+    ...dashboardTypography.body,
+    color: '#047857',
+    flex: 1,
+    fontSize: 13,
   },
   save: {
     alignItems: 'center',
     backgroundColor: dashboardColors.primary,
     borderRadius: dashboardRadii.button,
-    marginTop: dashboardSpacing.md,
     padding: 16,
   },
   saveText: { ...dashboardTypography.button, color: '#fff' },

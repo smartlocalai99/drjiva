@@ -4,6 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 // react-native's real source isn't parseable outside Metro's transform, so
 // it's mocked here rather than letting Vitest try to load it directly.
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('expo-constants', () => ({
+  default: {
+    expoConfig: {
+      extra: {
+        medicineReminderChannel: 'medicine-reminders',
+        medicineReminderSound: false,
+      },
+    },
+  },
+}));
 
 import { scheduleDoseNotificationsWithAdapter } from './medicineNotifications';
 

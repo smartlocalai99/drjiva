@@ -1,11 +1,10 @@
-import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
-import { PermissionsAndroid, Platform } from 'react-native';
-import DocumentScanner, {
-  ResponseType,
-  ScanDocumentResponseStatus,
-} from 'react-native-document-scanner-plugin';
+import {
+  PermissionsAndroid,
+  Platform,
+  TurboModuleRegistry,
+} from 'react-native';
 
 import {
   buildReportPdfHtml,
@@ -19,6 +18,23 @@ import {
 
 const nativeScanner: DocumentScannerAdapter = {
   async scanDocument(options) {
+    if (
+      Platform.OS === 'web' ||
+      TurboModuleRegistry.get('DocumentScanner') === null
+    ) {
+      throw new Error(
+        'Document scanning requires the DrJiva development or production build.',
+      );
+    }
+
+    // These two document packages are custom native modules and are not
+    // included in Expo Go or web. Loading the scanner only when Scan is
+    // pressed keeps the rest of the app usable in those environments.
+    const {
+      default: DocumentScanner,
+      ResponseType,
+      ScanDocumentResponseStatus,
+    } = await import('react-native-document-scanner-plugin');
     const result = await DocumentScanner.scanDocument({
       croppedImageQuality: options.croppedImageQuality,
       maxNumDocuments: options.maxNumDocuments,
@@ -53,6 +69,9 @@ export function requestDocumentCameraAccess(): Promise<CameraPermissionResult> {
 }
 
 export async function recognizeFirstPage(base64Page: string): Promise<string> {
+  const { default: TextRecognition } = await import(
+    '@react-native-ml-kit/text-recognition'
+  );
   const image = new File(Paths.cache, temporaryImageName());
   image.create({ intermediates: true, overwrite: true });
   image.write(base64Page, { encoding: 'base64' });

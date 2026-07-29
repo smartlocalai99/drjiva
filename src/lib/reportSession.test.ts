@@ -55,6 +55,23 @@ describe('ensureReportSession', () => {
     expect(adapter.anonymousSignIns).toBe(1);
   });
 
+  it('reuses a resolved session without another auth request', async () => {
+    let userChecks = 0;
+    const adapter: ReportAuthAdapter = {
+      async getUser() {
+        userChecks += 1;
+        return { error: null, userId: 'existing-user' };
+      },
+      async signInAnonymously() {
+        return { error: null, userId: 'anonymous-user' };
+      },
+    };
+
+    await expect(ensureReportSession(adapter)).resolves.toBe('existing-user');
+    await expect(ensureReportSession(adapter)).resolves.toBe('existing-user');
+    expect(userChecks).toBe(1);
+  });
+
   it('rejects a sign-in response without a user id', async () => {
     const adapter = createAdapter({});
 

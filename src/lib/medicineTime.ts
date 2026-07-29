@@ -20,6 +20,22 @@ export function formatTime12Hour(value: string): string {
   return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
 }
 
+export function storedTimeToDate(value: string, base = new Date()): Date {
+  const date = new Date(base);
+  const minutes = timeToMinutes(value);
+  if (!Number.isFinite(minutes)) {
+    return date;
+  }
+  date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return date;
+}
+
+export function dateToStoredTime(value: Date): string {
+  return `${String(value.getHours()).padStart(2, '0')}:${String(
+    value.getMinutes(),
+  ).padStart(2, '0')}`;
+}
+
 export function adjustTime(value: string, amountMinutes: number): string {
   const current = timeToMinutes(value);
   if (!Number.isFinite(current)) return value;

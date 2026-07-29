@@ -1,6 +1,10 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import {
   useSafeAreaInsets,
@@ -9,12 +13,10 @@ import {
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { DailyProgress } from '../src/components/dashboard/DailyProgress';
 import { DashboardHeader } from '../src/components/dashboard/DashboardHeader';
-import { DateTimeline } from '../src/components/dashboard/DateTimeline';
 import { EmptyMedicines } from '../src/components/dashboard/EmptyMedicines';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
 import { MedicineCard } from '../src/components/dashboard/MedicineCard';
 import {
-  deleteMedicineReminder,
   fetchMedicinesForDate,
   type Medicine,
 } from '../src/data/medicines';
@@ -24,10 +26,10 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
-import { getGreeting, isSameDay } from '../src/lib/dates';
+import { getGreeting } from '../src/lib/dates';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
-import { getInitialTimelineDate } from '../src/lib/medicineCalendar';
+import { useCart } from '../src/lib/cart';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
   getCachedPatientName,
@@ -37,28 +39,21 @@ import {
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  const { totalItems } = useCart();
   const params = useLocalSearchParams<{
     phone?: string | string[];
-    selectedDate?: string | string[];
   }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
-  const selectedDateParam = Array.isArray(params.selectedDate)
-    ? params.selectedDate[0]
-    : params.selectedDate;
 
   const insets = useSafeAreaInsets();
   const today = useMemo(() => new Date(), []);
-  const [selectedDate, setSelectedDate] = useState(() =>
-    getInitialTimelineDate(selectedDateParam, today),
-  );
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [isLoadingMedicines, setIsLoadingMedicines] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTabKey>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [patientName, setPatientName] = useState<string | undefined>();
   const [patientId, setPatientId] = useState<string | null>(null);
-  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!phone) {
@@ -110,52 +105,28 @@ export default function HomeScreen() {
     }
   }, [patientId]);
 
-  useEffect(() => {
-    void loadMedicines(selectedDate);
-  }, [loadMedicines, selectedDate]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadMedicines(new Date());
+    }, [loadMedicines]),
+  );
 
   useEffect(() => {
-    setSelectedDate(getInitialTimelineDate(selectedDateParam, today));
-  }, [selectedDateParam, today]);
+    if (!phone || !patientId) {
+      return;
+    }
+    router.prefetch({
+      params: { patientId, phone },
+      pathname: '/documents',
+    });
+  }, [patientId, phone, router]);
 
   const completedCount = medicines.filter((medicine) => medicine.completed).length;
 
-  const handleSelectDate = (date: Date) => {
-    setSelectedDate(date);
-  };
-
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadMedicines(selectedDate);
+    await loadMedicines(today);
     setRefreshing(false);
-  };
-
-  const handleDeleteMedicine = (medicine: Medicine) => {
-    Alert.alert(t('deleteReminder'), t('deleteReminderMessage'), [
-      { style: 'cancel', text: t('cancel') },
-      {
-        onPress: () => {
-          setDeletingCourseId(medicine.courseId);
-          void deleteMedicineReminder(medicine.courseId)
-            .then(() => {
-              setMedicines((current) =>
-                current.filter(
-                  (item) => item.courseId !== medicine.courseId,
-                ),
-              );
-            })
-            .catch(() =>
-              Alert.alert(
-                t('unableDeleteReminder'),
-                t('unableDeleteReminderMessage'),
-              ),
-            )
-            .finally(() => setDeletingCourseId(null));
-        },
-        style: 'destructive',
-        text: t('delete'),
-      },
-    ]);
   };
 
   const handleSelectTab = (tab: NavTabKey) => {
@@ -169,7 +140,13 @@ export default function HomeScreen() {
     }
 
     setActiveTab(tab);
-    router.replace({ params: { phone }, pathname: route });
+    router.replace({
+      params: {
+        phone,
+        ...(tab === 'documents' && patientId ? { patientId } : {}),
+      },
+      pathname: route,
+    });
   };
 
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
@@ -196,21 +173,17 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DashboardHeader
+          cartItemCount={totalItems}
           greeting={getGreeting(today)}
-          hasNotifications={false}
           name={patientName}
-          onPressNotifications={() =>
-            Alert.alert('Notifications', 'No new notifications yet.')
+          onPressCart={() =>
+            router.push({ params: { phone }, pathname: '/cart' })
           }
         />
 
-        <View style={styles.timeline}>
-          <DateTimeline onSelectDate={handleSelectDate} selectedDate={selectedDate} />
-        </View>
-
         <DailyProgress
           completed={completedCount}
-          isToday={isSameDay(selectedDate, today)}
+          isToday
           total={medicines.length}
         />
 
@@ -228,8 +201,6 @@ export default function HomeScreen() {
               index={index}
               key={medicine.id}
               medicine={medicine}
-              deleting={deletingCourseId === medicine.courseId}
-              onDelete={() => handleDeleteMedicine(medicine)}
             />
           ))
         )}
@@ -262,9 +233,6 @@ const styles = StyleSheet.create({
   },
   contentEmpty: {
     flexGrow: 1,
-  },
-  timeline: {
-    marginTop: dashboardSpacing.md,
   },
   sectionTitle: {
     ...dashboardTypography.title,

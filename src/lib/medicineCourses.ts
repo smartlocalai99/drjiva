@@ -257,9 +257,11 @@ export type FutureDoseReminder = {
   tablets: number;
 };
 
-export async function fetchFutureDoseReminders(
+export async function fetchScheduledDoseRemindersFromToday(
   patientId: string,
 ): Promise<FutureDoseReminder[]> {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
   const { data, error } = await supabase
     .from('patient_medicine_dose_events')
     .select(
@@ -267,7 +269,7 @@ export async function fetchFutureDoseReminders(
     )
     .eq('patient_id', patientId)
     .eq('status', 'scheduled')
-    .gte('scheduled_for', new Date().toISOString())
+    .gte('scheduled_for', startOfToday.toISOString())
     .order('scheduled_for');
   if (error) throw error;
   return ((data ?? []) as unknown as Array<{

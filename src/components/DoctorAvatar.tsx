@@ -15,7 +15,13 @@ export function DoctorAvatar({ size = 20 }: { size?: number }) {
 
 const styles = StyleSheet.create({
   wrap: {
+    borderColor: '#FFFFFF',
+    borderWidth: 3,
     overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { height: 3, width: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
   },
   image: {
     height: '100%',

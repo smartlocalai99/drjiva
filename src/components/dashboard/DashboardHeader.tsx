@@ -10,17 +10,17 @@ import {
 import { PressableScale } from '../PressableScale';
 
 type DashboardHeaderProps = {
+  cartItemCount: number;
   greeting: string;
-  hasNotifications: boolean;
   name?: string;
-  onPressNotifications: () => void;
+  onPressCart: () => void;
 };
 
 export function DashboardHeader({
+  cartItemCount,
   greeting,
-  hasNotifications,
   name,
-  onPressNotifications,
+  onPressCart,
 }: DashboardHeaderProps) {
   return (
     <View style={styles.row}>
@@ -30,13 +30,23 @@ export function DashboardHeader({
       </View>
 
       <PressableScale
-        accessibilityLabel="Notifications"
-        onPress={onPressNotifications}
+        accessibilityLabel={
+          cartItemCount > 0
+            ? `Cart, ${cartItemCount} item${cartItemCount === 1 ? '' : 's'}`
+            : 'Cart'
+        }
+        onPress={onPressCart}
         pressedScale={0.94}
-        style={styles.bellButton}
+        style={styles.cartButton}
       >
-        <Ionicons color={dashboardColors.text} name="notifications-outline" size={22} />
-        {hasNotifications ? <View style={styles.badge} /> : null}
+        <Ionicons color={dashboardColors.text} name="cart-outline" size={23} />
+        {cartItemCount > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>
+              {cartItemCount > 99 ? '99+' : cartItemCount}
+            </Text>
+          </View>
+        ) : null}
       </PressableScale>
     </View>
   );
@@ -57,7 +67,7 @@ const styles = StyleSheet.create({
     color: dashboardColors.textMuted,
     marginTop: 2,
   },
-  bellButton: {
+  cartButton: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
     borderRadius: dashboardRadii.bellButton,
@@ -78,11 +88,21 @@ const styles = StyleSheet.create({
   },
   badge: {
     backgroundColor: dashboardColors.error,
-    borderRadius: 5,
-    height: 10,
+    borderColor: dashboardColors.card,
+    borderRadius: 9,
+    borderWidth: 2,
+    minHeight: 18,
+    minWidth: 18,
+    paddingHorizontal: 3,
     position: 'absolute',
-    right: 10,
-    top: 10,
-    width: 10,
+    right: -2,
+    top: -2,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+    lineHeight: 14,
+    textAlign: 'center',
   },
 });

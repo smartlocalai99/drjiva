@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   adjustTime,
   areSelectedSlotTimesOrdered,
+  dateToStoredTime,
   formatTime12Hour,
   isStoredTime,
+  storedTimeToDate,
 } from './medicineTime';
 
 describe('medicine time helpers', () => {
@@ -18,6 +20,16 @@ describe('medicine time helpers', () => {
   it('moves times in selectable steps', () => {
     expect(adjustTime('08:00', 15)).toBe('08:15');
     expect(adjustTime('00:00', -15)).toBe('23:45');
+  });
+
+  it('round-trips native picker dates to stored reminder times', () => {
+    const date = storedTimeToDate('19:35', new Date(2026, 6, 29, 8, 0));
+    expect([date.getHours(), date.getMinutes(), date.getSeconds()]).toEqual([
+      19,
+      35,
+      0,
+    ]);
+    expect(dateToStoredTime(date)).toBe('19:35');
   });
 
   it('validates only the selected periods in their natural order', () => {

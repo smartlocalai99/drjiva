@@ -126,8 +126,12 @@ const translations = {
     noMedicinesToday: 'No medicines scheduled today',
     notifications: 'Notifications',
     notificationTimings: 'Notification Timings',
+    chooseReminderTimes: 'Choose your reminder times',
     notificationTimingsHelp:
-      'Choose separate AM/PM times for Morning, Afternoon, and Night.',
+      'Choose the exact time for each part of your day.',
+    tapToChooseTime: 'Tap the time to change',
+    timingsSynced:
+      'Notification alerts and medicine cards will use these same times.',
     unableLoadNotificationTimings:
       'Unable to load notification timings',
     morning: 'Morning',
@@ -265,8 +269,12 @@ const translations = {
     noMedicinesToday: 'ఈరోజు మందులు షెడ్యూల్ చేయలేదు',
     notifications: 'నోటిఫికేషన్‌లు',
     notificationTimings: 'నోటిఫికేషన్ సమయాలు',
+    chooseReminderTimes: 'మీ రిమైండర్ సమయాలను ఎంచుకోండి',
     notificationTimingsHelp:
-      'ఉదయం, మధ్యాహ్నం, రాత్రికి వేర్వేరు AM/PM సమయాలను ఎంచుకోండి.',
+      'రోజులో ప్రతి భాగానికి ఖచ్చితమైన సమయాన్ని ఎంచుకోండి.',
+    tapToChooseTime: 'సమయాన్ని మార్చడానికి నొక్కండి',
+    timingsSynced:
+      'నోటిఫికేషన్ అలర్ట్‌లు మరియు మందుల కార్డులు ఇవే సమయాలను ఉపయోగిస్తాయి.',
     unableLoadNotificationTimings:
       'నోటిఫికేషన్ సమయాలను లోడ్ చేయలేకపోయాము',
     morning: 'ఉదయం',

@@ -75,9 +75,15 @@ type Filter = (typeof FILTERS)[number];
 export default function DocumentsScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const params = useLocalSearchParams<{ phone?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    patientId?: string | string[];
+    phone?: string | string[];
+  }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
+  const patientIdParam = Array.isArray(params.patientId)
+    ? params.patientId[0]
+    : params.patientId;
   const insets = useSafeAreaInsets();
   const action = getDocumentPrimaryAction();
 
@@ -111,19 +117,25 @@ export default function DocumentsScreen() {
     }
 
     try {
+      setIsLoading(true);
       setErrorMessage(null);
-      await ensureSecureReportSession();
-      const patient = await getPatientByPhone(phone);
-      if (!patient) {
+      const [, patient] = await Promise.all([
+        ensureSecureReportSession(),
+        patientIdParam
+          ? Promise.resolve(null)
+          : getPatientByPhone(phone),
+      ]);
+      const resolvedPatientId = patientIdParam ?? patient?.patientId;
+      if (!resolvedPatientId) {
         throw new Error('Patient profile is unavailable.');
       }
       const [verifiedHospitals, customHospitals, nextReports] =
         await Promise.all([
           fetchHospitals(),
-          fetchPatientCustomHospitals(patient.patientId).catch(() => []),
-          fetchPatientReports(patient.patientId),
+          fetchPatientCustomHospitals(resolvedPatientId).catch(() => []),
+          fetchPatientReports(resolvedPatientId),
         ]);
-      setPatientId(patient.patientId);
+      setPatientId(resolvedPatientId);
       setHospitals([...verifiedHospitals, ...customHospitals]);
       setReports(nextReports);
     } catch {
@@ -131,7 +143,7 @@ export default function DocumentsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [phone, t]);
+  }, [patientIdParam, phone, t]);
 
   useEffect(() => {
     void loadDocuments();

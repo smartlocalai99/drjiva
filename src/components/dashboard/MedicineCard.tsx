@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -21,20 +21,15 @@ import {
 import { DOSE_SLOT_THEME } from '../../lib/doseSlotTheme';
 import { DoctorAvatar } from '../DoctorAvatar';
 import { HospitalLogo } from '../HospitalLogo';
-import { PressableScale } from '../PressableScale';
 
 type MedicineCardProps = {
-  deleting: boolean;
   medicine: Medicine;
   index: number;
-  onDelete: () => void;
 };
 
 export function MedicineCard({
-  deleting,
   medicine,
   index,
-  onDelete,
 }: MedicineCardProps) {
   const scale = useSharedValue(1);
   const wasCompleted = useRef(medicine.completed);
@@ -68,23 +63,6 @@ export function MedicineCard({
             style={styles.image}
             transition={180}
           />
-          <PressableScale
-            accessibilityLabel={`Delete ${medicine.name} reminder`}
-            disabled={deleting}
-            hitSlop={8}
-            onPress={onDelete}
-            style={styles.deleteButton}
-          >
-            {deleting ? (
-              <ActivityIndicator color={dashboardColors.error} size="small" />
-            ) : (
-              <Ionicons
-                color={dashboardColors.error}
-                name="trash-outline"
-                size={18}
-              />
-            )}
-          </PressableScale>
           {medicine.completed ? (
             <View style={styles.badge}>
               <Ionicons color="#FFFFFF" name="checkmark" size={11} />
@@ -94,23 +72,32 @@ export function MedicineCard({
         </View>
 
         <View style={[styles.body, { backgroundColor: slotTheme.tint }]}>
-          <View style={styles.nameRow}>
-            <Text numberOfLines={1} style={styles.name}>
-              {medicine.name}
-            </Text>
-            <View style={styles.doseChip}>
-              <Ionicons color={slotTheme.accent} name="medical" size={13} />
-              <Text style={[styles.doseChipText, { color: slotTheme.accent }]}>
-                {medicine.tabletCount}
+          <View style={styles.summaryRow}>
+            <View style={styles.medicineInfo}>
+              <Text numberOfLines={1} style={styles.name}>
+                {medicine.name}
+              </Text>
+              <View style={styles.timingRow}>
+                <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={13} />
+                <Text
+                  numberOfLines={1}
+                  style={[styles.meta, { color: slotTheme.accent }]}
+                >
+                  {medicine.timing} · {medicine.nextReminderTime}
+                </Text>
+              </View>
+            </View>
+            <View
+              accessibilityLabel={medicine.tabletCount}
+              style={styles.doseCounter}
+            >
+              <Text style={[styles.doseNumber, { color: slotTheme.accent }]}>
+                {medicine.tabletCount.split(' ')[0]}
+              </Text>
+              <Text style={[styles.doseLabel, { color: slotTheme.accent }]}>
+                Tablet
               </Text>
             </View>
-          </View>
-
-          <View style={styles.slotBadge}>
-            <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={13} />
-            <Text style={[styles.meta, { color: slotTheme.accent }]}>
-              {medicine.timing} · {medicine.nextReminderTime}
-            </Text>
           </View>
 
           <View style={styles.peopleRow}>
@@ -120,7 +107,7 @@ export function MedicineCard({
                 {medicine.hospitalName}
               </Text>
             </View>
-            <DoctorAvatar size={48} />
+            <DoctorAvatar size={72} />
           </View>
         </View>
       </View>
@@ -131,7 +118,8 @@ export function MedicineCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: dashboardColors.card,
-    borderRadius: dashboardRadii.card,
+    borderRadius: 0,
+    marginHorizontal: -dashboardSpacing.pagePadding,
     marginBottom: dashboardSpacing.gap,
     overflow: 'hidden',
     shadowColor: dashboardColors.shadow,
@@ -148,33 +136,24 @@ const styles = StyleSheet.create({
     height: '100%',
     width: '100%',
   },
-  deleteButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: dashboardRadii.pill,
-    height: 36,
-    justifyContent: 'center',
-    left: dashboardSpacing.sm,
-    position: 'absolute',
-    top: dashboardSpacing.sm,
-    width: 36,
-  },
   body: {
     gap: 8,
     paddingHorizontal: dashboardSpacing.md,
     paddingVertical: 12,
   },
-  nameRow: {
+  summaryRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: dashboardSpacing.sm,
-    justifyContent: 'space-between',
+  },
+  medicineInfo: {
+    flex: 1,
+    gap: 4,
   },
   name: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    flex: 1,
-    fontSize: 18,
+    fontSize: 16,
   },
   badge: {
     alignItems: 'center',
@@ -193,32 +172,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
   },
-  doseChip: {
+  doseCounter: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: dashboardRadii.pill,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 12,
+    justifyContent: 'center',
+    minHeight: 50,
+    minWidth: 50,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
   },
-  doseChipText: {
-    ...dashboardTypography.caption,
+  doseNumber: {
     fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    fontVariant: ['tabular-nums'],
+    lineHeight: 20,
+  },
+  doseLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 9,
+    lineHeight: 11,
   },
   meta: {
     ...dashboardTypography.caption,
     fontFamily: 'Inter_700Bold',
   },
-  slotBadge: {
+  timingRow: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
   },
   peopleRow: {
     alignItems: 'center',

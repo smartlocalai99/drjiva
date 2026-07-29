@@ -14,6 +14,8 @@ import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
 import { SplashTransitionProvider } from '../src/components/SplashTransition';
 import { CartProvider } from '../src/lib/cart';
@@ -25,7 +27,7 @@ SplashScreen.setOptions({ duration: 0, fade: false });
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
@@ -45,6 +47,21 @@ export default function RootLayout() {
     NotoSansTelugu_400Regular,
     NotoSansTelugu_700Bold,
   });
+
+  useEffect(() => {
+    const clearBadge = () => {
+      void Notifications.setBadgeCountAsync(0).catch(() => undefined);
+    };
+
+    clearBadge();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        clearBadge();
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   if (fontError) {
     throw fontError;

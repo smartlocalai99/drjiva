@@ -648,6 +648,7 @@ export default function AddMedicineScreen() {
                       </View>
                       {details.slots.map((slot) => (
                         <SlotTimeEditor
+                          hint={t('tapToChooseTime')}
                           key={slot}
                           label={t(slot)}
                           onChange={(value) =>
