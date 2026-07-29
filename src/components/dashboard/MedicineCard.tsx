@@ -11,10 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import {
-  getHospitalInitials,
-  type Medicine,
-} from '../../data/medicineCourse';
+import type { Medicine } from '../../data/medicineCourse';
 import {
   dashboardColors,
   dashboardRadii,
@@ -22,6 +19,8 @@ import {
   dashboardTypography,
 } from '../../dashboardTheme';
 import { DOSE_SLOT_THEME } from '../../lib/doseSlotTheme';
+import { DoctorAvatar } from '../DoctorAvatar';
+import { HospitalLogo } from '../HospitalLogo';
 import { PressableScale } from '../PressableScale';
 import { MedicineToggle } from './MedicineToggle';
 
@@ -139,22 +138,14 @@ export function MedicineCard({
             </View>
 
             <View style={styles.hospitalCell}>
-              <View style={styles.hospitalLogo}>
-                <Text style={styles.hospitalLogoText}>
-                  {getHospitalInitials(medicine.hospitalName)}
-                </Text>
-              </View>
+              <HospitalLogo size={28} />
               <Text numberOfLines={1} style={styles.hospitalName}>
                 {medicine.hospitalName}
               </Text>
             </View>
 
             <View style={[styles.detailCell, styles.detailRight]}>
-              <Ionicons
-                color={dashboardColors.textMuted}
-                name="person-circle-outline"
-                size={16}
-              />
+              <DoctorAvatar size={16} />
               <Text numberOfLines={1} style={styles.doctor}>
                 {medicine.doctorName}
               </Text>
@@ -284,21 +275,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 0.9,
     paddingHorizontal: 4,
-  },
-  hospitalLogo: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderColor: dashboardColors.primary,
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  hospitalLogoText: {
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 9,
   },
   hospitalName: {
     ...dashboardTypography.caption,

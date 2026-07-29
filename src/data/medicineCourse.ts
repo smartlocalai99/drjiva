@@ -27,20 +27,6 @@ export type DoseRow = {
   tabletsPerDose: number;
 };
 
-export function getHospitalInitials(name: string): string {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter((word) => !['HOSPITAL', 'HOSPITALS'].includes(word.toUpperCase()));
-  if (words.length === 0) return 'H';
-  return words
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase();
-}
-
 function titleCase(value: string): string {
   return value ? `${value[0]!.toUpperCase()}${value.slice(1)}` : value;
 }

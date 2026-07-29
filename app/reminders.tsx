@@ -18,13 +18,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, type DateData } from 'react-native-calendars';
 
-import { getHospitalInitials } from '../src/data/medicineCourse';
 import {
   deleteMedicineReminder,
   fetchMedicinesForDate,
   fetchReminderDatesInRange,
   type Medicine,
 } from '../src/data/medicines';
+import { HospitalLogo } from '../src/components/HospitalLogo';
 import {
   dashboardColors,
   dashboardRadii,
@@ -301,11 +301,7 @@ function ReminderCard({
           </View>
 
           <View style={styles.hospitalCell}>
-            <View style={styles.hospitalLogo}>
-              <Text style={styles.hospitalLogoText}>
-                {getHospitalInitials(medicine.hospitalName)}
-              </Text>
-            </View>
+            <HospitalLogo size={28} />
             <Text numberOfLines={1} style={styles.hospitalName}>
               {medicine.hospitalName}
             </Text>
@@ -465,21 +461,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 0.9,
     paddingHorizontal: 4,
-  },
-  hospitalLogo: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderColor: dashboardColors.primary,
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  hospitalLogoText: {
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 9,
   },
   hospitalName: {
     ...dashboardTypography.caption,

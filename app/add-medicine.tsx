@@ -41,7 +41,7 @@ import {
   saveNotificationIds,
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
-import { getHospitalInitials } from '../src/data/medicineCourse';
+import { HospitalLogo } from '../src/components/HospitalLogo';
 import { DOSE_SLOT_THEME } from '../src/lib/doseSlotTheme';
 import {
   cancelDoseNotifications,
@@ -714,11 +714,7 @@ export default function AddMedicineScreen() {
                           </View>
 
                           <View style={styles.reviewHospitalCell}>
-                            <View style={styles.reviewHospitalLogo}>
-                              <Text style={styles.reviewHospitalLogoText}>
-                                {getHospitalInitials(hospitalName)}
-                              </Text>
-                            </View>
+                            <HospitalLogo size={28} />
                             <Text
                               numberOfLines={1}
                               style={styles.reviewHospitalName}
@@ -1329,21 +1325,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 0.9,
     paddingHorizontal: 4,
-  },
-  reviewHospitalLogo: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderColor: dashboardColors.primary,
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  reviewHospitalLogoText: {
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 9,
   },
   reviewHospitalName: {
     ...dashboardTypography.caption,
