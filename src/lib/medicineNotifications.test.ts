@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { requireExpoNotifications } = vi.hoisted(() => ({
+  requireExpoNotifications: vi.fn(),
+}));
 
 // medicineNotifications.ts statically imports Platform from react-native.
 // react-native's real source isn't parseable outside Metro's transform, so
@@ -9,18 +13,25 @@ vi.mock('expo-constants', () => ({
     expoConfig: {
       extra: {
         medicineReminderChannel: 'medicine-reminders',
-        medicineReminderSound: false,
+        medicineReminderSound: 'reminder.caf',
       },
     },
   },
 }));
 vi.mock('./expoNotifications', () => ({
-  requireExpoNotifications: vi.fn(),
+  requireExpoNotifications,
 }));
 
-import { scheduleDoseNotificationsWithAdapter } from './medicineNotifications';
+import {
+  scheduleDoseNotifications,
+  scheduleDoseNotificationsWithAdapter,
+} from './medicineNotifications';
 
 describe('scheduleDoseNotificationsWithAdapter', () => {
+  beforeEach(() => {
+    requireExpoNotifications.mockReset();
+  });
+
   it('cancels already-created notifications after partial failure', async () => {
     const cancelled: string[] = [];
     let calls = 0;
@@ -51,5 +62,36 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     ).rejects.toThrow('schedule failed');
 
     expect(cancelled).toEqual(['notification-1']);
+  });
+
+  it('places the configured custom sound in scheduled notification content', async () => {
+    const scheduledRequests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue({
+      SchedulableTriggerInputTypes: { DATE: 'date' },
+      scheduleNotificationAsync: async (request: unknown) => {
+        scheduledRequests.push(request);
+        return 'notification-custom-sound';
+      },
+    });
+
+    await scheduleDoseNotifications(
+      [
+        {
+          eventId: 'event-custom-sound',
+          scheduledFor: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ],
+      {
+        medicineName: 'Dolo 650',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 1,
+      },
+    );
+
+    expect(scheduledRequests).toHaveLength(1);
+    expect(scheduledRequests[0]).toMatchObject({
+      content: { sound: 'reminder.caf' },
+    });
   });
 });
