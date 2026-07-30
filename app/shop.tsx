@@ -36,7 +36,7 @@ import {
 } from '../src/components/dashboard/BottomNav';
 import { PressableScale } from '../src/components/PressableScale';
 import { ReminderMedicineList } from '../src/components/shop/reminder-medicine-list';
-import { ShopProductRow } from '../src/components/shop/shop-product-row';
+import { ShopProductCard } from '../src/components/shop/shop-product-card';
 import {
   dashboardColors,
   dashboardLayout,
@@ -547,7 +547,7 @@ function ProductRow({
   const quantity = getQuantity(product.id);
 
   return (
-    <ShopProductRow
+    <ShopProductCard
       onAdd={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
           () => undefined,

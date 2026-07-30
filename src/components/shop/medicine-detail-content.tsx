@@ -9,20 +9,11 @@ import {
 import type { ShopProduct } from '../../data/shopProducts';
 import { formatShopProductPrice } from '../../lib/currency';
 import { useLanguage } from '../../lib/i18n';
-import { ProductQuantityControl } from './product-quantity-control';
 
 export function MedicineDetailContent({
-  onAdd,
-  onDecrement,
-  onIncrement,
   product,
-  quantity,
 }: {
-  onAdd: () => void;
-  onDecrement: () => void;
-  onIncrement: () => void;
   product: ShopProduct;
-  quantity: number;
 }) {
   const { t } = useLanguage();
   const hasSource = Boolean(
@@ -68,16 +59,6 @@ export function MedicineDetailContent({
           </Text>
         </Pressable>
       ) : null}
-
-      <View style={styles.addRow}>
-        <ProductQuantityControl
-          onAdd={onAdd}
-          onDecrement={onDecrement}
-          onIncrement={onIncrement}
-          productName={product.name}
-          quantity={quantity}
-        />
-      </View>
     </View>
   );
 }
@@ -130,9 +111,5 @@ const styles = StyleSheet.create({
     color: dashboardColors.primary,
     fontFamily: 'Inter_600SemiBold',
     marginTop: dashboardSpacing.sm,
-  },
-  addRow: {
-    alignItems: 'flex-start',
-    marginTop: dashboardSpacing.xl,
   },
 });
