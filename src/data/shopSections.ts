@@ -7,7 +7,7 @@ import type {
 } from './shopProductModel';
 import { SHOP_SECTION_CODES } from './shopProductModel';
 
-export type ShopSectionKey = ShopSectionCode | 'search';
+export type ShopSectionKey = ShopSectionCode | 'all' | 'search';
 
 export type ShopProductSection = {
   code: ShopSectionKey;
@@ -42,6 +42,8 @@ function matchesProductSearch(
       product.composition,
       product.category,
       product.hospitalName,
+      product.shortDescription,
+      product.commonUses ?? '',
     ].join(' '),
   );
   return normalizedQuery
@@ -75,7 +77,7 @@ export function buildShopSections(
     ];
   }
 
-  return SHOP_SECTION_CODES.map((code) => ({
+  const curatedSections = SHOP_SECTION_CODES.map((code) => ({
     code,
     data: products
       .filter((product) => product.sectionRanks[code] !== undefined)
@@ -87,6 +89,19 @@ export function buildShopSections(
       ),
     title: SECTION_TITLES[code],
   })).filter((section) => section.data.length > 0);
+
+  const curatedIds = new Set(
+    curatedSections.flatMap((section) => section.data.map((item) => item.id)),
+  );
+  const remaining = products
+    .filter((product) => !curatedIds.has(product.id))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  const sections: ShopProductSection[] = [...curatedSections];
+  if (remaining.length > 0) {
+    sections.push({ code: 'all', data: remaining, title: 'All medicines' });
+  }
+  return sections;
 }
 
 export function getUniqueReminderMedicineNames(

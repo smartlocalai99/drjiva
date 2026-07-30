@@ -11,19 +11,27 @@ function product(
   id: string,
   name: string,
   sectionRanks: ShopProduct['sectionRanks'],
-  composition = '',
+  overrides: Partial<ShopProduct> = {},
 ): ShopProduct {
   return {
     category: 'Medicine',
-    composition,
+    commonUses: null,
+    composition: '',
+    fullDescription: 'Full description.',
     hasUniqueCatalogueName: true,
-    hospitalName: 'Verified hospital',
+    hospitalName: 'ASIAN MULTI SPECIALITY HOSPITALS',
     id,
     imageUrl: `https://images.test/${id}.jpg`,
+    informationReviewedAt: null,
+    informationSourceName: null,
+    informationSourceUrl: null,
     name,
     packSize: 'Tablet',
     price: 32,
+    safetyNote: 'Safety note.',
     sectionRanks,
+    shortDescription: 'Short description.',
+    ...overrides,
   };
 }
 
@@ -54,17 +62,48 @@ describe('shop sections', () => {
     ]);
   });
 
-  it('searches names and compositions without showing unpriced rows', () => {
+  it('appends one "All medicines" section with products outside every curated section', () => {
+    const curated = product('fever-1', 'Fever One', { fever: 1 });
+    const uncurated = product('generic-1', 'Generic One', {});
+
+    const sections = buildShopSections([curated, uncurated]);
+    const allSection = sections.at(-1);
+
+    expect(allSection).toEqual(
+      expect.objectContaining({
+        code: 'all',
+        title: 'All medicines',
+      }),
+    );
+    expect(allSection?.data.map((item) => item.id)).toEqual(['generic-1']);
+  });
+
+  it('omits "All medicines" entirely when every product is already curated', () => {
+    const curated = product('fever-1', 'Fever One', { fever: 1 });
+    const sections = buildShopSections([curated]);
+
+    expect(sections.some((section) => section.code === 'all')).toBe(false);
+  });
+
+  it('keeps a price-pending product discoverable through search', () => {
     const products = [
-      product('dolo', 'Dolo-650', { fever: 1 }, 'Paracetamol 650mg'),
-      product('cold', 'Cold tablet', { cold: 1 }, 'Cetirizine'),
+      product('dolo', 'Dolo-650', { fever: 1 }, {
+        composition: 'Paracetamol 650mg',
+      }),
+      product('cold', 'Cold tablet', { cold: 1 }, {
+        composition: 'Cetirizine',
+      }),
+      product('generic', 'Generic pending', {}, {
+        price: null,
+        shortDescription: 'Contains paracetamol derivative.',
+      }),
     ];
 
     expect(
       buildShopSections(products, 'paracetamol')[0]?.data.map(
         (item) => item.id,
       ),
-    ).toEqual(['dolo']);
+    ).toEqual(expect.arrayContaining(['dolo', 'generic']));
   });
 
   it('returns no sections when a medicine search has no matches', () => {
