@@ -412,6 +412,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardImage: {
+    backgroundColor: '#D9D9D9',
     height: 160,
     width: '100%',
   },
