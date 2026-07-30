@@ -4,7 +4,7 @@ import { dashboardColors, dashboardSpacing, dashboardTypography } from '../../da
 import type { ReminderMedicineReorder } from '../../data/shopSections';
 import { useCart } from '../../lib/cart';
 import { useLanguage } from '../../lib/i18n';
-import { ShopProductRow } from './shop-product-row';
+import { ShopProductCard } from './shop-product-card';
 
 export function ReminderMedicineList({
   medicines,
@@ -24,7 +24,7 @@ export function ReminderMedicineList({
     <View style={styles.section}>
       <Text style={styles.heading}>{t('yourReminderMedicines')}</Text>
       {medicines.map((medicine) => (
-        <ShopProductRow
+        <ShopProductCard
           key={medicine.key}
           onAdd={() => add(medicine.product)}
           onDecrement={() => decrement(medicine.product.id)}

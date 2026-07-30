@@ -246,10 +246,6 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderColor: dashboardColors.track,
-    borderRadius: dashboardRadii.card,
-    borderWidth: 1,
     flexDirection: 'row',
     height: 60,
     justifyContent: 'space-between',
@@ -257,10 +253,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: dashboardSpacing.sm,
     position: 'absolute',
     right: dashboardSpacing.pagePadding,
-    shadowColor: dashboardColors.shadow,
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
   },
   addToCartButton: {
     alignItems: 'center',
