@@ -1,4 +1,7 @@
 import { normalizeMedicineSearch } from '../lib/medicineSearch';
+import { getShopProductFallbackCopy } from './shop-product-copy';
+
+export const ASIAN_HOSPITAL_NAME = 'ASIAN MULTI SPECIALITY HOSPITALS';
 
 export const SHOP_SECTION_CODES = [
   'headache',
@@ -11,15 +14,22 @@ export type ShopSectionCode = (typeof SHOP_SECTION_CODES)[number];
 
 export type ShopProduct = {
   category: string;
+  commonUses: string | null;
   composition: string;
+  fullDescription: string;
   hasUniqueCatalogueName: boolean;
   hospitalName: string;
   id: string;
   imageUrl: string;
+  informationReviewedAt: string | null;
+  informationSourceName: string | null;
+  informationSourceUrl: string | null;
   name: string;
   packSize: string;
-  price: number;
+  price: number | null;
+  safetyNote: string;
   sectionRanks: Partial<Record<ShopSectionCode, number>>;
+  shortDescription: string;
 };
 
 export type ShopMedicineRow = {
@@ -31,6 +41,11 @@ export type ShopMedicineRow = {
   image_url: string | null;
   name: string;
   price: number | string | null;
+  shop_common_uses: string | null;
+  shop_full_description: string | null;
+  shop_information_reviewed_at: string | null;
+  shop_information_source_name: string | null;
+  shop_information_source_url: string | null;
   shop_product_section_items:
     | Array<{
         section_code: string;
@@ -41,6 +56,8 @@ export type ShopMedicineRow = {
         sort_order: number;
       }
     | null;
+  shop_safety_note: string | null;
+  shop_short_description: string | null;
 };
 
 function isShopSectionCode(value: string): value is ShopSectionCode {
@@ -56,6 +73,10 @@ function formatDosageForm(value: string | null): string {
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function isAsianHospital(value: string | null): boolean {
+  return (value ?? '').trim().toUpperCase() === ASIAN_HOSPITAL_NAME;
+}
+
 function parsePrice(value: number | string | null): number | null {
   const price =
     typeof value === 'number'
@@ -64,6 +85,11 @@ function parsePrice(value: number | string | null): number | null {
         ? Number(value)
         : Number.NaN;
   return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+function nonEmpty(value: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 export function mapMedicineRowsToShopProducts(
@@ -75,13 +101,7 @@ export function mapMedicineRowsToShopProducts(
     const name = row.name.trim();
     const imageUrl = row.image_url?.trim() ?? '';
     const normalizedName = normalizeMedicineSearch(name);
-    const price = parsePrice(row.price);
-    if (
-      !name ||
-      !imageUrl ||
-      !normalizedName ||
-      price === null
-    ) {
+    if (!name || !imageUrl || !normalizedName || !isAsianHospital(row.hospital_name)) {
       continue;
     }
 
@@ -109,17 +129,35 @@ export function mapMedicineRowsToShopProducts(
       }
     }
 
+    const category = row.category?.trim() ?? '';
+    const composition = row.composition?.trim() ?? '';
+    const dosageForm = row.dosage_form?.trim() ?? '';
+    const fallback = getShopProductFallbackCopy({
+      category,
+      composition,
+      dosageForm,
+    });
+
     unique.set(normalizedName, {
-      category: row.category?.trim() ?? '',
-      composition: row.composition?.trim() ?? '',
+      category,
+      commonUses: nonEmpty(row.shop_common_uses) ?? fallback.commonUses,
+      composition,
+      fullDescription:
+        nonEmpty(row.shop_full_description) ?? fallback.fullDescription,
       hasUniqueCatalogueName: true,
-      hospitalName: row.hospital_name?.trim() || 'Verified medicine',
+      hospitalName: ASIAN_HOSPITAL_NAME,
       id: row.id,
       imageUrl,
+      informationReviewedAt: nonEmpty(row.shop_information_reviewed_at),
+      informationSourceName: nonEmpty(row.shop_information_source_name),
+      informationSourceUrl: nonEmpty(row.shop_information_source_url),
       name,
       packSize: formatDosageForm(row.dosage_form),
-      price,
+      price: parsePrice(row.price),
+      safetyNote: nonEmpty(row.shop_safety_note) ?? fallback.safetyNote,
       sectionRanks,
+      shortDescription:
+        nonEmpty(row.shop_short_description) ?? fallback.shortDescription,
     });
   }
 

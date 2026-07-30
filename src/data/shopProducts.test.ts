@@ -1,44 +1,52 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapMedicineRowsToShopProducts } from './shopProductModel';
+import {
+  ASIAN_HOSPITAL_NAME,
+  mapMedicineRowsToShopProducts,
+} from './shopProductModel';
+
+const BASE_ROW = {
+  category: null,
+  composition: null,
+  dosage_form: null,
+  hospital_name: ASIAN_HOSPITAL_NAME,
+  id: '1',
+  image_url: 'https://db.test/ab-flo.jpg',
+  name: 'AB Flo',
+  price: 32,
+  shop_common_uses: null,
+  shop_full_description: null,
+  shop_information_reviewed_at: null,
+  shop_information_source_name: null,
+  shop_information_source_url: null,
+  shop_product_section_items: null,
+  shop_safety_note: null,
+  shop_short_description: null,
+};
 
 describe('shop product catalogue', () => {
-  it('keeps products with database images and removes normalized duplicates', () => {
+  it('keeps eligible Asian Hospitals products with a real image and removes normalized duplicates', () => {
     const products = mapMedicineRowsToShopProducts([
       {
+        ...BASE_ROW,
         category: 'PAIN MANAGEMENT',
         composition: 'PARACETAMOL-650MG',
         dosage_form: 'TABLET/CAPSULE',
-        hospital_name: 'Asian Hospital',
-        id: '1',
-        image_url: 'https://db.test/ab-flo.jpg',
-        name: 'AB Flo',
-        price: 32,
-        shop_product_section_items: [
-          { section_code: 'fever', sort_order: 1 },
-        ],
+        shop_product_section_items: [{ section_code: 'fever', sort_order: 1 }],
       },
       {
-        category: null,
-        composition: null,
-        dosage_form: null,
-        hospital_name: 'Dhruva Hospital',
+        ...BASE_ROW,
         id: '2',
         image_url: 'https://db.test/duplicate.jpg',
         name: 'ab-flo',
         price: 40,
-        shop_product_section_items: null,
       },
       {
-        category: null,
-        composition: null,
-        dosage_form: null,
-        hospital_name: 'Asian Hospital',
+        ...BASE_ROW,
         id: '3',
         image_url: null,
         name: 'No image',
         price: 20,
-        shop_product_section_items: null,
       },
     ]);
 
@@ -46,7 +54,7 @@ describe('shop product catalogue', () => {
     expect(products[0]).toEqual(
       expect.objectContaining({
         hasUniqueCatalogueName: false,
-        hospitalName: 'Asian Hospital',
+        hospitalName: ASIAN_HOSPITAL_NAME,
         id: '1',
         imageUrl: 'https://db.test/ab-flo.jpg',
         name: 'AB Flo',
@@ -57,32 +65,75 @@ describe('shop product catalogue', () => {
     );
   });
 
-  it('does not expose products without a real positive price', () => {
+  it('excludes rows from other hospitals even when priced and imaged', () => {
     expect(
       mapMedicineRowsToShopProducts([
-        {
-          category: null,
-          composition: null,
-          dosage_form: 'TABLET',
-          hospital_name: null,
-          id: 'missing',
-          image_url: 'https://db.test/missing.jpg',
-          name: 'Missing price',
-          price: null,
-          shop_product_section_items: null,
-        },
-        {
-          category: null,
-          composition: null,
-          dosage_form: 'TABLET',
-          hospital_name: null,
-          id: 'zero',
-          image_url: 'https://db.test/zero.jpg',
-          name: 'Zero price',
-          price: 0,
-          shop_product_section_items: null,
-        },
+        { ...BASE_ROW, hospital_name: 'Some Other Hospital', id: 'other' },
       ]),
     ).toEqual([]);
+  });
+
+  it('excludes rows without a real image even when priced', () => {
+    expect(
+      mapMedicineRowsToShopProducts([
+        { ...BASE_ROW, id: 'no-image', image_url: '' },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('keeps an eligible product with a missing or non-positive price instead of rejecting it', () => {
+    const [missing, zero] = mapMedicineRowsToShopProducts([
+      { ...BASE_ROW, id: 'missing', price: null },
+      { ...BASE_ROW, id: 'zero', name: 'Zero price', price: 0 },
+    ]);
+
+    expect(missing).toEqual(expect.objectContaining({ id: 'missing', price: null }));
+    expect(zero).toEqual(expect.objectContaining({ id: 'zero', price: null }));
+  });
+
+  it('prefers reviewed database copy over the generated fallback', () => {
+    const [product] = mapMedicineRowsToShopProducts([
+      {
+        ...BASE_ROW,
+        composition: 'CETIRIZINE 10MG',
+        shop_common_uses: 'Relieves allergy symptoms such as sneezing and itching.',
+        shop_full_description: 'Reviewed full description.',
+        shop_information_reviewed_at: '2026-07-01T00:00:00.000Z',
+        shop_information_source_name: 'MedlinePlus',
+        shop_information_source_url: 'https://medlineplus.gov/druginfo/example.html',
+        shop_safety_note: 'Reviewed safety note.',
+        shop_short_description: 'Reviewed short description.',
+      },
+    ]);
+
+    expect(product).toEqual(
+      expect.objectContaining({
+        commonUses: 'Relieves allergy symptoms such as sneezing and itching.',
+        fullDescription: 'Reviewed full description.',
+        informationReviewedAt: '2026-07-01T00:00:00.000Z',
+        informationSourceName: 'MedlinePlus',
+        informationSourceUrl: 'https://medlineplus.gov/druginfo/example.html',
+        safetyNote: 'Reviewed safety note.',
+        shortDescription: 'Reviewed short description.',
+      }),
+    );
+  });
+
+  it('fills missing description fields from the fallback copy generator', () => {
+    const [product] = mapMedicineRowsToShopProducts([
+      { ...BASE_ROW, composition: 'IBUPROFEN 400MG', dosage_form: 'TABLET' },
+    ]);
+
+    expect(product).toEqual(
+      expect.objectContaining({
+        commonUses: null,
+        fullDescription:
+          'This tablet contains IBUPROFEN 400MG. Use it only when it matches your prescription or a pharmacist confirms it.',
+        informationSourceName: null,
+        informationSourceUrl: null,
+        shortDescription:
+          'Tablet containing IBUPROFEN 400MG. Check that it matches your prescription.',
+      }),
+    );
   });
 });
