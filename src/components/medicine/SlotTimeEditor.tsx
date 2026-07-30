@@ -3,7 +3,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import {
   dashboardColors,
@@ -45,15 +45,22 @@ export function SlotTimeEditor({
   };
 
   const openAndroidPicker = () => {
-    DateTimePickerAndroid.open({
-      design: 'material',
-      initialInputMode: 'default',
-      is24Hour: false,
-      mode: 'time',
-      onValueChange: (_event, date) => setSelectedTime(date),
-      title: label,
-      value: pickerValue,
-    });
+    try {
+      DateTimePickerAndroid.open({
+        design: 'material',
+        initialInputMode: 'default',
+        is24Hour: false,
+        mode: 'time',
+        onValueChange: (_event, date) => setSelectedTime(date),
+        title: label,
+        value: pickerValue,
+      });
+    } catch {
+      Alert.alert(
+        "Can't open the time picker",
+        'Please close and reopen the app, then try again.',
+      );
+    }
   };
 
   const openPicker = () => {

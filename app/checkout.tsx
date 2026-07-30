@@ -282,23 +282,11 @@ export default function CheckoutScreen() {
                           hitSlop={4}
                           onPress={() => cart.decrement(line.product.id)}
                           pressedScale={0.88}
-                          style={[
-                            styles.quantityButton,
-                            line.quantity === 1 &&
-                              styles.quantityRemoveButton,
-                          ]}
+                          style={styles.quantityButton}
                         >
                           <Ionicons
-                            color={
-                              line.quantity === 1
-                                ? dashboardColors.error
-                                : dashboardColors.primary
-                            }
-                            name={
-                              line.quantity === 1
-                                ? 'trash-outline'
-                                : 'remove'
-                            }
+                            color={dashboardColors.primary}
+                            name="remove"
                             size={16}
                           />
                         </PressableScale>
@@ -728,9 +716,6 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     width: 44,
-  },
-  quantityRemoveButton: {
-    backgroundColor: dashboardColors.errorTint,
   },
   quantityValue: {
     ...dashboardTypography.body,

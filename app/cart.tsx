@@ -200,7 +200,7 @@ export default function CartScreen() {
                     >
                       <Ionicons
                         color={dashboardColors.primary}
-                        name={line.quantity === 1 ? 'trash-outline' : 'remove'}
+                        name="remove"
                         size={16}
                       />
                     </PressableScale>
