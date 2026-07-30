@@ -57,7 +57,8 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "medicine-reminders"
+          "defaultChannel": "medicine-reminders",
+          "sounds": ["./assets/sounds/reminder.caf"]
         }
       ],
       [

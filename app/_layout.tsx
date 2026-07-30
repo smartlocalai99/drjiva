@@ -17,6 +17,7 @@ import { SplashTransitionProvider } from '../src/components/SplashTransition';
 import { CartProvider } from '../src/lib/cart';
 import { loadExpoNotifications } from '../src/lib/expoNotifications';
 import { LanguageProvider } from '../src/lib/i18n';
+import { requestNotificationPermissions } from '../src/lib/reminderNotifications';
 import { colors } from '../src/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -59,6 +60,10 @@ export default function RootLayout() {
     });
 
     return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    void requestNotificationPermissions().catch(() => undefined);
   }, []);
 
   if (fontError) {
