@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -43,9 +42,6 @@ export function MedicineDetailContent({
       <Text style={styles.meta}>{product.packSize}</Text>
       <Text style={styles.price}>{formatShopProductPrice(product.price)}</Text>
 
-      <Text style={styles.body}>{product.shortDescription}</Text>
-      <Text style={styles.body}>{product.fullDescription}</Text>
-
       {product.commonUses ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('commonUse')}</Text>
@@ -60,22 +56,7 @@ export function MedicineDetailContent({
         </View>
       ) : null}
 
-      {product.category ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Category</Text>
-          <Text style={styles.sectionBody}>{product.category}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.safetyCard}>
-        <View style={styles.safetyHeadingRow}>
-          <Ionicons color={dashboardColors.primary} name="shield-checkmark-outline" size={18} />
-          <Text style={styles.safetyTitle}>Safety information</Text>
-        </View>
-        <Text style={styles.safetyBody}>{product.safetyNote}</Text>
-      </View>
-
-      <Text style={styles.notice}>{t('generalMedicineInformation')}</Text>
+      <Text style={styles.safetyNote}>{product.safetyNote}</Text>
 
       {hasSource ? (
         <Pressable
@@ -106,7 +87,7 @@ const styles = StyleSheet.create({
     padding: dashboardSpacing.pagePadding,
   },
   image: {
-    height: 220,
+    height: 240,
     marginBottom: dashboardSpacing.gap,
     width: '100%',
   },
@@ -124,12 +105,6 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     marginTop: dashboardSpacing.sm,
   },
-  body: {
-    ...dashboardTypography.body,
-    color: dashboardColors.textMuted,
-    lineHeight: 20,
-    marginTop: dashboardSpacing.sm,
-  },
   section: {
     marginTop: dashboardSpacing.gap,
   },
@@ -144,32 +119,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 4,
   },
-  safetyCard: {
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: 16,
-    marginTop: dashboardSpacing.gap,
-    padding: dashboardSpacing.md,
-  },
-  safetyHeadingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  safetyTitle: {
-    ...dashboardTypography.cardTitle,
-    color: dashboardColors.text,
-    fontSize: 14,
-  },
-  safetyBody: {
-    ...dashboardTypography.body,
-    color: dashboardColors.textMuted,
-    lineHeight: 20,
-    marginTop: dashboardSpacing.sm,
-  },
-  notice: {
+  safetyNote: {
     ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
-    lineHeight: 16,
+    color: dashboardColors.textMuted,
+    lineHeight: 17,
     marginTop: dashboardSpacing.gap,
   },
   sourceLink: {

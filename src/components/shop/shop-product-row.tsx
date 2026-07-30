@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors, dashboardSpacing, dashboardTypography } from '../../dashboardTheme';
 import { formatShopProductPrice } from '../../lib/currency';
-import { useLanguage } from '../../lib/i18n';
 import type { ShopProduct } from '../../data/shopProducts';
 import { ProductQuantityControl } from './product-quantity-control';
 
@@ -22,8 +21,6 @@ export function ShopProductRow({
   product: ShopProduct;
   quantity: number;
 }) {
-  const { t } = useLanguage();
-
   return (
     <View style={styles.row}>
       <Pressable
@@ -48,10 +45,6 @@ export function ShopProductRow({
           <Text numberOfLines={1} style={styles.meta}>
             {product.packSize}
           </Text>
-          <Text numberOfLines={2} style={styles.description}>
-            {product.shortDescription}
-          </Text>
-          <Text style={styles.viewMore}>{t('viewMore')}</Text>
           <Text style={styles.price}>
             {formatShopProductPrice(product.price)}
           </Text>
@@ -105,24 +98,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
-  description: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 3,
-  },
-  viewMore: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    marginTop: 3,
-  },
   price: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    fontSize: 14,
-    marginTop: 4,
+    fontSize: 15,
+    marginTop: 5,
   },
 });

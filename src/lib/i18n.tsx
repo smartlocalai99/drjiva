@@ -164,12 +164,9 @@ const translations = {
     shop: 'Shop',
     shopSubtitle: 'What medicine are you looking for?',
     yourReminderMedicines: 'Your reminder medicines',
-    viewMore: 'View more',
     medicineDetails: 'Medicine details',
     commonUse: 'Common use',
     composition: 'Composition',
-    generalMedicineInformation:
-      'This is general medicine information, not a diagnosis or prescription. Confirm suitability with your clinician or pharmacist.',
     support: 'Support',
     tapAddMedicine: 'Tap Add Medicine to create your first reminder.',
     today: "Today's Medicines",
@@ -326,12 +323,9 @@ const translations = {
     shop: 'షాప్',
     shopSubtitle: 'మీరు ఏ మందు కోసం చూస్తున్నారు?',
     yourReminderMedicines: 'మీ రిమైండర్ మందులు',
-    viewMore: 'మరింత చూడండి',
     medicineDetails: 'మందు వివరాలు',
     commonUse: 'సాధారణ వినియోగం',
     composition: 'కూర్పు',
-    generalMedicineInformation:
-      'ఇది సాధారణ మందు సమాచారం, రోగనిర్ధారణ లేదా ప్రిస్క్రిప్షన్ కాదు. మీ డాక్టర్ లేదా ఫార్మసిస్ట్‌తో అనుకూలతను నిర్ధారించుకోండి.',
     support: 'మద్దతు',
     tapAddMedicine:
       "మీ మొదటి రిమైండర్‌ను సృష్టించడానికి 'మందు జోడించు'ని నొక్కండి.",
