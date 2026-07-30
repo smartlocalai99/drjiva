@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatRupees, formatShopProductPrice } from './currency';
+import {
+  DUMMY_MEDICINE_PRICE,
+  formatRupees,
+  formatShopProductPrice,
+  resolveShopProductPrice,
+} from './currency';
 
 describe('currency formatting', () => {
   it('keeps whole rupee values compact', () => {
@@ -18,9 +23,17 @@ describe('formatShopProductPrice', () => {
     expect(formatShopProductPrice(32)).toBe('₹32');
   });
 
-  it('labels a missing price as pending rather than free', () => {
-    expect(formatShopProductPrice(null)).toBe(
-      'Price confirmed before delivery',
-    );
+  it('shows the dummy placeholder price when a real price is not set yet', () => {
+    expect(formatShopProductPrice(null)).toBe(`₹${DUMMY_MEDICINE_PRICE}`);
+  });
+});
+
+describe('resolveShopProductPrice', () => {
+  it('returns the real price when set', () => {
+    expect(resolveShopProductPrice(32)).toBe(32);
+  });
+
+  it('returns the dummy placeholder price when missing', () => {
+    expect(resolveShopProductPrice(null)).toBe(DUMMY_MEDICINE_PRICE);
   });
 });

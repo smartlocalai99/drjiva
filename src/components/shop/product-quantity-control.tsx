@@ -25,7 +25,7 @@ export function ProductQuantityControl({
         pressedScale={0.95}
         style={styles.addButton}
       >
-        <Ionicons color={dashboardColors.primary} name="add" size={16} />
+        <Ionicons color="#FFFFFF" name="add" size={19} />
         <Text style={styles.addButtonText}>Add</Text>
       </PressableScale>
     );
@@ -46,7 +46,7 @@ export function ProductQuantityControl({
         <Ionicons
           color={dashboardColors.primary}
           name={quantity === 1 ? 'trash-outline' : 'remove'}
-          size={16}
+          size={18}
         />
       </PressableScale>
       <Text style={styles.quantityValue}>{quantity}</Text>
@@ -56,7 +56,7 @@ export function ProductQuantityControl({
         pressedScale={0.88}
         style={styles.stepButton}
       >
-        <Ionicons color={dashboardColors.primary} name="add" size={16} />
+        <Ionicons color={dashboardColors.primary} name="add" size={18} />
       </PressableScale>
     </View>
   );
@@ -65,39 +65,42 @@ export function ProductQuantityControl({
 const styles = StyleSheet.create({
   addButton: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderColor: '#C9D8FE',
+    backgroundColor: dashboardColors.primary,
     borderRadius: dashboardRadii.pill,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: 4,
-    height: 44,
+    gap: 6,
+    height: 48,
     justifyContent: 'center',
-    minWidth: 76,
-    paddingHorizontal: 12,
+    minWidth: 104,
+    paddingHorizontal: 18,
+    shadowColor: dashboardColors.primary,
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   addButtonText: {
-    color: dashboardColors.primary,
+    color: '#FFFFFF',
     fontFamily: 'Inter_700Bold',
-    fontSize: 13,
+    fontSize: 16,
   },
   control: {
     alignItems: 'center',
     backgroundColor: dashboardColors.primaryTint,
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
-    height: 44,
+    height: 48,
+    minWidth: 104,
   },
   stepButton: {
     alignItems: 'center',
-    height: 44,
+    height: 48,
     justifyContent: 'center',
     width: 44,
   },
   quantityValue: {
     color: dashboardColors.primaryDark,
     fontFamily: 'Inter_700Bold',
-    fontSize: 15,
+    fontSize: 16,
     fontVariant: ['tabular-nums'],
     minWidth: 20,
     textAlign: 'center',

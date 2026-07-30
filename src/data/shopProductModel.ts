@@ -5,8 +5,9 @@ export const ASIAN_HOSPITAL_NAME = 'ASIAN MULTI SPECIALITY HOSPITALS';
 
 export const SHOP_SECTION_CODES = [
   'headache',
-  'body_pains',
   'fever',
+  'body_pains',
+  'stomach_pain',
   'cold',
 ] as const;
 

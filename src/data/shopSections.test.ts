@@ -43,46 +43,41 @@ describe('shop sections', () => {
       product('head-2', 'Head Two', { headache: 2 }),
       product('head-1', 'Head One', { headache: 1 }),
       product('fever-1', 'Fever One', { fever: 1 }),
+      product('stomach-1', 'Stomach One', { stomach_pain: 1 }),
       product('cold-1', 'Cold One', { cold: 1 }),
     ]);
 
     expect(sections.map((section) => section.title)).toEqual([
       'Headache',
-      'Body Pains',
       'Fever',
+      'Body Pains',
+      'Stomach Pain',
       'Cold',
     ]);
     expect(sections[0]?.data.map((item) => item.id)).toEqual([
       'head-1',
       'head-2',
     ]);
-    expect(sections[3]?.data.map((item) => item.id)).toEqual([
+    expect(sections[4]?.data.map((item) => item.id)).toEqual([
       'cold-1',
       'cold-2',
     ]);
   });
 
-  it('appends one "All medicines" section with products outside every curated section', () => {
+  it('never includes uncurated products outside of search', () => {
     const curated = product('fever-1', 'Fever One', { fever: 1 });
     const uncurated = product('generic-1', 'Generic One', {});
 
     const sections = buildShopSections([curated, uncurated]);
-    const allSection = sections.at(-1);
 
-    expect(allSection).toEqual(
-      expect.objectContaining({
-        code: 'all',
-        title: 'All medicines',
-      }),
-    );
-    expect(allSection?.data.map((item) => item.id)).toEqual(['generic-1']);
+    expect(sections.flatMap((section) => section.data.map((item) => item.id))).toEqual([
+      'fever-1',
+    ]);
   });
 
-  it('omits "All medicines" entirely when every product is already curated', () => {
-    const curated = product('fever-1', 'Fever One', { fever: 1 });
-    const sections = buildShopSections([curated]);
-
-    expect(sections.some((section) => section.code === 'all')).toBe(false);
+  it('returns no sections when nothing is curated', () => {
+    const uncurated = product('generic-1', 'Generic One', {});
+    expect(buildShopSections([uncurated])).toEqual([]);
   });
 
   it('keeps a price-pending product discoverable through search', () => {

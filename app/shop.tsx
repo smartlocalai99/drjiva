@@ -66,12 +66,11 @@ import {
   type SavedAddress,
 } from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
-import { formatRupees } from '../src/lib/currency';
+import { formatRupees, resolveShopProductPrice } from '../src/lib/currency';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 import { getSessionPhone } from '../src/lib/session';
-import { summarizeShopPricing } from '../src/lib/shop-pricing';
 
 const PLACEHOLDER_QUERIES = [
   'Dolo-650',
@@ -83,19 +82,15 @@ const PLACEHOLDER_ROTATION_MS = 2400;
 const DELIVERY_AGENT_IMAGE = require('../assets/shop/delivery-agent.png');
 
 const SECTION_ICONS = {
-  all: 'medkit-outline',
   body_pains: 'body-outline',
   cold: 'snow-outline',
   fever: 'thermometer-outline',
   headache: 'happy-outline',
   search: 'search-outline',
+  stomach_pain: 'nutrition-outline',
 } as const;
 
 const SECTION_TINTS = {
-  all: {
-    backgroundColor: dashboardColors.primaryTint,
-    color: dashboardColors.primary,
-  },
   body_pains: {
     backgroundColor: dashboardColors.primaryTint,
     color: dashboardColors.primary,
@@ -115,6 +110,10 @@ const SECTION_TINTS = {
   search: {
     backgroundColor: dashboardColors.primaryTint,
     color: dashboardColors.primary,
+  },
+  stomach_pain: {
+    backgroundColor: '#F1EAFB',
+    color: '#7C4DCC',
   },
 } as const;
 
@@ -255,13 +254,12 @@ export default function ShopScreen() {
     () => getDefaultAddress(addresses),
     [addresses],
   );
-  const cartPricing = useMemo(
+  const cartTotal = useMemo(
     () =>
-      summarizeShopPricing(
-        Object.entries(cart.quantities).map(([id, quantity]) => ({
-          price: cart.products[id]?.price ?? null,
-          quantity,
-        })),
+      Object.entries(cart.quantities).reduce(
+        (sum, [id, quantity]) =>
+          sum + resolveShopProductPrice(cart.products[id]?.price ?? null) * quantity,
+        0,
       ),
     [cart.products, cart.quantities],
   );
@@ -458,7 +456,7 @@ export default function ShopScreen() {
           onPress={() =>
             router.push({ params: { phone }, pathname: '/checkout' })
           }
-          pricing={cartPricing}
+          total={cartTotal}
         />
       ) : (
         <BottomNav
@@ -569,22 +567,16 @@ function CheckoutBar({
   bottomOffset,
   itemCount,
   onPress,
-  pricing,
+  total,
 }: {
   bottomOffset: number;
   itemCount: number;
   onPress: () => void;
-  pricing: ReturnType<typeof summarizeShopPricing>;
+  total: number;
 }) {
-  const { t } = useLanguage();
-  const showTotal = !pricing.hasPendingPrices || pricing.knownSubtotal > 0;
-  const totalLabel = pricing.hasPendingPrices ? t('knownSubtotal') : null;
-
   return (
     <PressableScale
-      accessibilityLabel={`Checkout ${itemCount} items${
-        showTotal ? `, ${formatRupees(pricing.knownSubtotal)}` : ''
-      }${pricing.hasPendingPrices ? ', some prices pending confirmation' : ''}`}
+      accessibilityLabel={`Checkout ${itemCount} items, ${formatRupees(total)}`}
       onPress={onPress}
       pressedScale={0.985}
       style={[styles.checkoutBar, { bottom: bottomOffset }]}
@@ -598,16 +590,7 @@ function CheckoutBar({
           {itemCount} {itemCount === 1 ? 'item' : 'items'}
         </Text>
       </View>
-      {showTotal ? (
-        <View style={styles.checkoutTotalWrap}>
-          {totalLabel ? (
-            <Text style={styles.checkoutTotalLabel}>{totalLabel}</Text>
-          ) : null}
-          <Text style={styles.checkoutTotal}>
-            {formatRupees(pricing.knownSubtotal)}
-          </Text>
-        </View>
-      ) : null}
+      <Text style={styles.checkoutTotal}>{formatRupees(total)}</Text>
       <Ionicons color="#FFFFFF" name="arrow-forward" size={19} />
     </PressableScale>
   );
@@ -878,15 +861,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 10,
     marginTop: 1,
-  },
-  checkoutTotalWrap: {
-    alignItems: 'flex-end',
-  },
-  checkoutTotalLabel: {
-    color: '#AFC6F4',
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 8,
-    textTransform: 'uppercase',
   },
   checkoutTotal: {
     color: '#FFFFFF',
