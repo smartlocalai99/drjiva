@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     alignItems: 'center',
-    backgroundColor: '#D9D9D9',
+    backgroundColor: '#D6D6D6',
     height: 160,
     justifyContent: 'center',
     width: '100%',
