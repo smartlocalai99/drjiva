@@ -36,7 +36,10 @@ function getMedicineReminderSoundConfig(): {
 } {
   const channelId =
     Constants.expoConfig?.extra?.medicineReminderChannel;
-  const sound = Constants.expoConfig?.extra?.medicineReminderSound;
+  const sound =
+    Platform.OS === 'ios'
+      ? Constants.expoConfig?.extra?.medicineReminderSoundIOS
+      : Constants.expoConfig?.extra?.medicineReminderSoundAndroid;
   return {
     channelId:
       typeof channelId === 'string' && channelId

@@ -1,19 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { requireExpoNotifications } = vi.hoisted(() => ({
+const { mockPlatform, requireExpoNotifications } = vi.hoisted(() => ({
+  mockPlatform: { OS: 'ios' as string },
   requireExpoNotifications: vi.fn(),
 }));
 
 // medicineNotifications.ts statically imports Platform from react-native.
 // react-native's real source isn't parseable outside Metro's transform, so
 // it's mocked here rather than letting Vitest try to load it directly.
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('react-native', () => ({ Platform: mockPlatform }));
 vi.mock('expo-constants', () => ({
   default: {
     expoConfig: {
       extra: {
         medicineReminderChannel: 'medicine-reminders',
-        medicineReminderSound: 'reminder.caf',
+        medicineReminderSoundAndroid: 'rec',
+        medicineReminderSoundIOS: 'reminder.caf',
       },
     },
   },
@@ -30,6 +32,7 @@ import {
 describe('scheduleDoseNotificationsWithAdapter', () => {
   beforeEach(() => {
     requireExpoNotifications.mockReset();
+    mockPlatform.OS = 'ios';
   });
 
   it('cancels already-created notifications after partial failure', async () => {
@@ -92,6 +95,42 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     expect(scheduledRequests).toHaveLength(1);
     expect(scheduledRequests[0]).toMatchObject({
       content: { sound: 'reminder.caf' },
+    });
+  });
+
+  it('uses the Android sound resource name on Android', async () => {
+    mockPlatform.OS = 'android';
+    const scheduledRequests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue({
+      AndroidAudioContentType: { SPEECH: 'speech' },
+      AndroidAudioUsage: { ALARM: 'alarm' },
+      AndroidImportance: { MAX: 5 },
+      SchedulableTriggerInputTypes: { DATE: 'date' },
+      scheduleNotificationAsync: async (request: unknown) => {
+        scheduledRequests.push(request);
+        return 'notification-android-sound';
+      },
+      setNotificationChannelAsync: async () => undefined,
+    });
+
+    await scheduleDoseNotifications(
+      [
+        {
+          eventId: 'event-android-sound',
+          scheduledFor: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ],
+      {
+        medicineName: 'Dolo 650',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 1,
+      },
+    );
+
+    expect(scheduledRequests).toHaveLength(1);
+    expect(scheduledRequests[0]).toMatchObject({
+      content: { sound: 'rec' },
     });
   });
 });
