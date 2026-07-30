@@ -43,11 +43,7 @@ export function ProductQuantityControl({
         pressedScale={0.88}
         style={styles.stepButton}
       >
-        <Ionicons
-          color={dashboardColors.primary}
-          name={quantity === 1 ? 'trash-outline' : 'remove'}
-          size={18}
-        />
+        <Ionicons color={dashboardColors.primary} name="remove" size={18} />
       </PressableScale>
       <Text style={styles.quantityValue}>{quantity}</Text>
       <PressableScale
