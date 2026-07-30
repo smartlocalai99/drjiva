@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   ASIAN_HOSPITAL_NAME,
   mapMedicineRowsToShopProducts,
+  type ShopProduct,
 } from './shopProductModel';
+
+vi.mock('../lib/supabase', () => ({
+  supabase: { from: () => ({}) },
+}));
+vi.mock('../lib/reportAuth', () => ({
+  ensureSecureReportSession: vi.fn(async () => 'anonymous-user'),
+}));
+
+import { findCachedShopProduct } from './shopProducts';
 
 const BASE_ROW = {
   category: null,
@@ -22,6 +32,26 @@ const BASE_ROW = {
   shop_product_section_items: null,
   shop_safety_note: null,
   shop_short_description: null,
+};
+
+const BASE_PRODUCT: ShopProduct = {
+  category: 'PAIN MANAGEMENT',
+  commonUses: null,
+  composition: 'PARACETAMOL-650MG',
+  fullDescription: 'Full description.',
+  hasUniqueCatalogueName: true,
+  hospitalName: ASIAN_HOSPITAL_NAME,
+  id: '1',
+  imageUrl: 'https://db.test/ab-flo.jpg',
+  informationReviewedAt: null,
+  informationSourceName: null,
+  informationSourceUrl: null,
+  name: 'AB Flo',
+  packSize: 'Tablet',
+  price: 32,
+  safetyNote: 'Safety note.',
+  sectionRanks: {},
+  shortDescription: 'Short description.',
 };
 
 describe('shop product catalogue', () => {
@@ -135,5 +165,22 @@ describe('shop product catalogue', () => {
           'Tablet containing IBUPROFEN 400MG. Check that it matches your prescription.',
       }),
     );
+  });
+});
+
+describe('findCachedShopProduct', () => {
+  const products: ShopProduct[] = [
+    { ...BASE_PRODUCT, id: 'ab-flo-uuid', name: 'AB Flo' },
+    { ...BASE_PRODUCT, id: 'zerodol-uuid', name: 'Zerodol SP' },
+  ];
+
+  it('returns the exact matching product by id', () => {
+    expect(findCachedShopProduct(products, 'zerodol-uuid')).toEqual(
+      expect.objectContaining({ id: 'zerodol-uuid', name: 'Zerodol SP' }),
+    );
+  });
+
+  it('returns null when no product matches the id', () => {
+    expect(findCachedShopProduct(products, 'missing-uuid')).toBeNull();
   });
 });

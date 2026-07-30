@@ -15,6 +15,51 @@ let catalogueCache:
   | { expiresAt: number; products: ShopProduct[] }
   | undefined;
 
+export function findCachedShopProduct(
+  products: readonly ShopProduct[],
+  id: string,
+): ShopProduct | null {
+  return products.find((product) => product.id === id) ?? null;
+}
+
+export async function fetchShopProductById(
+  id: string,
+  signal?: AbortSignal,
+): Promise<ShopProduct | null> {
+  if (catalogueCache && catalogueCache.expiresAt > Date.now()) {
+    const cached = findCachedShopProduct(catalogueCache.products, id);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  await ensureSecureReportSession();
+  let request = supabase
+    .from('medicines')
+    .select(
+      'id, name, image_url, hospital_name, category, composition, dosage_form, price, shop_product_section_items(section_code, sort_order)',
+    )
+    .eq('id', id);
+
+  if (signal) {
+    request = request.abortSignal(signal);
+  }
+
+  const { data, error } = await request.maybeSingle();
+  if (error) {
+    if (signal?.aborted) {
+      throw new DOMException('Shop request cancelled', 'AbortError');
+    }
+    throw error;
+  }
+  if (!data) {
+    return null;
+  }
+
+  const [product] = mapMedicineRowsToShopProducts([data as ShopMedicineRow]);
+  return product ?? null;
+}
+
 export async function fetchShopProducts(
   query = '',
   signal?: AbortSignal,
