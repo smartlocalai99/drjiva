@@ -35,6 +35,8 @@ import {
   type NavTabKey,
 } from '../src/components/dashboard/BottomNav';
 import { PressableScale } from '../src/components/PressableScale';
+import { ReminderMedicineList } from '../src/components/shop/reminder-medicine-list';
+import { ShopProductRow } from '../src/components/shop/shop-product-row';
 import {
   dashboardColors,
   dashboardLayout,
@@ -69,6 +71,7 @@ import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 import { getSessionPhone } from '../src/lib/session';
+import { summarizeShopPricing } from '../src/lib/shop-pricing';
 
 const PLACEHOLDER_QUERIES = [
   'Dolo-650',
@@ -80,6 +83,7 @@ const PLACEHOLDER_ROTATION_MS = 2400;
 const DELIVERY_AGENT_IMAGE = require('../assets/shop/delivery-agent.png');
 
 const SECTION_ICONS = {
+  all: 'medkit-outline',
   body_pains: 'body-outline',
   cold: 'snow-outline',
   fever: 'thermometer-outline',
@@ -88,6 +92,10 @@ const SECTION_ICONS = {
 } as const;
 
 const SECTION_TINTS = {
+  all: {
+    backgroundColor: dashboardColors.primaryTint,
+    color: dashboardColors.primary,
+  },
   body_pains: {
     backgroundColor: dashboardColors.primaryTint,
     color: dashboardColors.primary,
@@ -247,12 +255,14 @@ export default function ShopScreen() {
     () => getDefaultAddress(addresses),
     [addresses],
   );
-  const cartTotal = useMemo(
+  const cartPricing = useMemo(
     () =>
-      Object.entries(cart.quantities).reduce((total, [id, quantity]) => {
-        const product = cart.products[id];
-        return total + (product ? product.price * quantity : 0);
-      }, 0),
+      summarizeShopPricing(
+        Object.entries(cart.quantities).map(([id, quantity]) => ({
+          price: cart.products[id]?.price ?? null,
+          quantity,
+        })),
+      ),
     [cart.products, cart.quantities],
   );
 
@@ -279,9 +289,21 @@ export default function ShopScreen() {
     router.push({ params: { phone }, pathname: '/shop-address' });
   };
 
+  const openProduct = useCallback(
+    (product: ShopProduct) => {
+      router.push({
+        params: { id: product.id, phone },
+        pathname: '/medicine/[id]',
+      });
+    },
+    [phone, router],
+  );
+
   const renderProduct = useCallback(
-    ({ item }: { item: ShopProduct }) => <ProductRow product={item} />,
-    [],
+    ({ item }: { item: ShopProduct }) => (
+      <ProductRow onOpen={() => openProduct(item)} product={item} />
+    ),
+    [openProduct],
   );
 
   return (
@@ -411,7 +433,10 @@ export default function ShopScreen() {
           ListEmptyComponent={<EmptySearch query={query} />}
           ListHeaderComponent={
             isSearching ? null : (
-              <ShopListHeader reminderMedicines={reminderMedicines} />
+              <ShopListHeader
+                onOpenProduct={openProduct}
+                reminderMedicines={reminderMedicines}
+              />
             )
           }
           maxToRenderPerBatch={8}
@@ -433,7 +458,7 @@ export default function ShopScreen() {
           onPress={() =>
             router.push({ params: { phone }, pathname: '/checkout' })
           }
-          total={cartTotal}
+          pricing={cartPricing}
         />
       ) : (
         <BottomNav
@@ -447,8 +472,10 @@ export default function ShopScreen() {
 }
 
 function ShopListHeader({
+  onOpenProduct,
   reminderMedicines,
 }: {
+  onOpenProduct: (product: ShopProduct) => void;
   reminderMedicines: ReminderMedicineReorder[];
 }) {
   return (
@@ -466,35 +493,10 @@ function ShopListHeader({
         />
       </View>
 
-      {reminderMedicines.length > 0 ? (
-        <View style={styles.reminderPanel}>
-          <View style={styles.reminderHeadingRow}>
-            <View style={styles.reminderIcon}>
-              <Ionicons
-                color={dashboardColors.primary}
-                name="repeat-outline"
-                size={18}
-              />
-            </View>
-            <View style={styles.reminderHeadingCopy}>
-              <Text style={styles.reminderTitle}>
-                Your reminder medicines
-              </Text>
-              <Text style={styles.reminderSubtitle}>
-                Reorder verified matches from your active routine
-              </Text>
-            </View>
-          </View>
-          <View style={styles.reminderNames}>
-            {reminderMedicines.map((medicine) => (
-              <ReminderMedicineRow
-                key={medicine.key}
-                medicine={medicine}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
+      <ReminderMedicineList
+        medicines={reminderMedicines}
+        onOpen={onOpenProduct}
+      />
 
       <View style={styles.guidance}>
         <Ionicons
@@ -506,59 +508,6 @@ function ShopListHeader({
           Use medicines only as directed by your clinician.
         </Text>
       </View>
-    </View>
-  );
-}
-
-function ReminderMedicineRow({
-  medicine,
-}: {
-  medicine: ReminderMedicineReorder;
-}) {
-  const { add, getQuantity, increment } = useCart();
-  const product = medicine.product;
-  const quantity = getQuantity(product.id);
-
-  const reorder = () => {
-    void Haptics.impactAsync(
-      Haptics.ImpactFeedbackStyle.Light,
-    ).catch(() => undefined);
-
-    if (quantity === 0) {
-      add(product);
-    } else {
-      increment(product.id);
-    }
-  };
-
-  return (
-    <View style={styles.reminderMedicineRow}>
-      <View style={styles.reminderMedicineCopy}>
-        <Text numberOfLines={1} style={styles.reminderMedicineName}>
-          {medicine.medicineName}
-        </Text>
-        <Text numberOfLines={1} style={styles.reminderMedicineMeta}>
-          {product.packSize} · {formatRupees(product.price)}
-          {quantity > 0 ? ` · ${quantity} in bag` : ''}
-        </Text>
-      </View>
-
-      <PressableScale
-        accessibilityHint="Adds one more to your shopping bag"
-        accessibilityLabel={`Reorder ${medicine.medicineName}${
-          quantity > 0 ? `, ${quantity} already in bag` : ''
-        }`}
-        onPress={reorder}
-        pressedScale={0.94}
-        style={styles.reorderButton}
-      >
-        <Ionicons
-          color={dashboardColors.primary}
-          name="repeat-outline"
-          size={14}
-        />
-        <Text style={styles.reorderButtonText}>Reorder</Text>
-      </PressableScale>
     </View>
   );
 }
@@ -589,90 +538,30 @@ function ShopSectionHeader({
   );
 }
 
-function ProductRow({ product }: { product: ShopProduct }) {
-  const { t } = useLanguage();
+function ProductRow({
+  onOpen,
+  product,
+}: {
+  onOpen: () => void;
+  product: ShopProduct;
+}) {
   const { add, decrement, getQuantity, increment } = useCart();
   const quantity = getQuantity(product.id);
 
-  const addProduct = () => {
-    void Haptics.impactAsync(
-      Haptics.ImpactFeedbackStyle.Light,
-    ).catch(() => undefined);
-    add(product);
-  };
-
   return (
-    <View style={styles.productCard}>
-      <View style={styles.productImageFrame}>
-        <Image
-          accessibilityLabel={product.name}
-          cachePolicy="memory-disk"
-          contentFit="contain"
-          recyclingKey={product.id}
-          source={{ uri: product.imageUrl }}
-          style={styles.productImage}
-          transition={100}
-        />
-      </View>
-      <View style={styles.productCopy}>
-        <Text numberOfLines={2} style={styles.productName}>
-          {product.name}
-        </Text>
-        <Text numberOfLines={1} style={styles.productMeta}>
-          {product.packSize}
-        </Text>
-        <Text style={styles.productPrice}>
-          {formatRupees(product.price)}
-        </Text>
-      </View>
-
-      {quantity === 0 ? (
-        <PressableScale
-          accessibilityLabel={`${t('addToCart')}: ${product.name}`}
-          onPress={addProduct}
-          pressedScale={0.95}
-          style={styles.addToCartButton}
-        >
-          <Ionicons
-            color={dashboardColors.primary}
-            name="add"
-            size={16}
-          />
-          <Text style={styles.addToCartText}>Add</Text>
-        </PressableScale>
-      ) : (
-        <View style={styles.quantityControl}>
-          <PressableScale
-            accessibilityLabel={`Decrease ${product.name} quantity`}
-            onPress={() => decrement(product.id)}
-            pressedScale={0.88}
-            style={styles.quantityButton}
-          >
-            <Ionicons
-              color={dashboardColors.primary}
-              name={quantity === 1 ? 'trash-outline' : 'remove'}
-              size={15}
-            />
-          </PressableScale>
-          <View style={styles.quantityValueWrap}>
-            <Text style={styles.quantityLabel}>QTY</Text>
-            <Text style={styles.quantityValue}>{quantity}</Text>
-          </View>
-          <PressableScale
-            accessibilityLabel={`Increase ${product.name} quantity`}
-            onPress={() => increment(product.id)}
-            pressedScale={0.88}
-            style={styles.quantityButton}
-          >
-            <Ionicons
-              color={dashboardColors.primary}
-              name="add"
-              size={15}
-            />
-          </PressableScale>
-        </View>
-      )}
-    </View>
+    <ShopProductRow
+      onAdd={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+          () => undefined,
+        );
+        add(product);
+      }}
+      onDecrement={() => decrement(product.id)}
+      onIncrement={() => increment(product.id)}
+      onOpen={onOpen}
+      product={product}
+      quantity={quantity}
+    />
   );
 }
 
@@ -680,16 +569,22 @@ function CheckoutBar({
   bottomOffset,
   itemCount,
   onPress,
-  total,
+  pricing,
 }: {
   bottomOffset: number;
   itemCount: number;
   onPress: () => void;
-  total: number;
+  pricing: ReturnType<typeof summarizeShopPricing>;
 }) {
+  const { t } = useLanguage();
+  const showTotal = !pricing.hasPendingPrices || pricing.knownSubtotal > 0;
+  const totalLabel = pricing.hasPendingPrices ? t('knownSubtotal') : null;
+
   return (
     <PressableScale
-      accessibilityLabel={`Checkout ${itemCount} items for ${formatRupees(total)}`}
+      accessibilityLabel={`Checkout ${itemCount} items${
+        showTotal ? `, ${formatRupees(pricing.knownSubtotal)}` : ''
+      }${pricing.hasPendingPrices ? ', some prices pending confirmation' : ''}`}
       onPress={onPress}
       pressedScale={0.985}
       style={[styles.checkoutBar, { bottom: bottomOffset }]}
@@ -703,7 +598,16 @@ function CheckoutBar({
           {itemCount} {itemCount === 1 ? 'item' : 'items'}
         </Text>
       </View>
-      <Text style={styles.checkoutTotal}>{formatRupees(total)}</Text>
+      {showTotal ? (
+        <View style={styles.checkoutTotalWrap}>
+          {totalLabel ? (
+            <Text style={styles.checkoutTotalLabel}>{totalLabel}</Text>
+          ) : null}
+          <Text style={styles.checkoutTotal}>
+            {formatRupees(pricing.knownSubtotal)}
+          </Text>
+        </View>
+      ) : null}
       <Ionicons color="#FFFFFF" name="arrow-forward" size={19} />
     </PressableScale>
   );
@@ -725,7 +629,7 @@ function EmptySearch({ query }: { query: string }) {
       <Text style={styles.stateText}>
         {query
           ? 'Try a different medicine name or active ingredient.'
-          : 'Products with verified images and prices will appear here.'}
+          : 'Asian Hospitals medicines with a real photo will appear here.'}
       </Text>
     </View>
   );
@@ -900,88 +804,6 @@ const styles = StyleSheet.create({
     height: 168,
     width: 112,
   },
-  reminderPanel: {
-    backgroundColor: dashboardColors.card,
-    borderColor: '#E4E8F0',
-    borderRadius: 22,
-    borderWidth: 1,
-    marginTop: dashboardSpacing.gap,
-    padding: dashboardSpacing.md,
-  },
-  reminderHeadingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: dashboardSpacing.sm,
-  },
-  reminderIcon: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: 17,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  reminderHeadingCopy: {
-    flex: 1,
-  },
-  reminderTitle: {
-    ...dashboardTypography.cardTitle,
-    color: dashboardColors.text,
-    fontSize: 14,
-  },
-  reminderSubtitle: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    fontSize: 10,
-    marginTop: 1,
-  },
-  reminderNames: {
-    gap: 8,
-    marginTop: dashboardSpacing.md,
-  },
-  reminderMedicineRow: {
-    alignItems: 'center',
-    backgroundColor: '#F3F6FC',
-    borderRadius: 14,
-    flexDirection: 'row',
-    gap: dashboardSpacing.sm,
-    minHeight: 54,
-    paddingHorizontal: dashboardSpacing.sm,
-    paddingVertical: 8,
-  },
-  reminderMedicineCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  reminderMedicineName: {
-    ...dashboardTypography.body,
-    color: dashboardColors.text,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-  },
-  reminderMedicineMeta: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    fontSize: 9,
-    marginTop: 2,
-  },
-  reorderButton: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderColor: '#C9D8FE',
-    borderRadius: dashboardRadii.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
-    minHeight: 34,
-    paddingHorizontal: 10,
-  },
-  reorderButtonText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-  },
   guidance: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1018,105 +840,6 @@ const styles = StyleSheet.create({
   sectionCount: {
     ...dashboardTypography.caption,
     color: dashboardColors.textFaint,
-  },
-  productCard: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderColor: '#E4E8F0',
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: dashboardSpacing.md,
-    marginBottom: dashboardSpacing.md,
-    minHeight: 112,
-    padding: dashboardSpacing.md,
-  },
-  productImageFrame: {
-    alignItems: 'center',
-    backgroundColor: '#F7F8FA',
-    borderRadius: 16,
-    height: 78,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 78,
-  },
-  productImage: {
-    height: '100%',
-    width: '100%',
-  },
-  productCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  productName: {
-    ...dashboardTypography.body,
-    color: dashboardColors.text,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  productMeta: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    fontSize: 10,
-    marginTop: 4,
-  },
-  productPrice: {
-    ...dashboardTypography.cardTitle,
-    color: dashboardColors.text,
-    fontSize: 16,
-    marginTop: 7,
-  },
-  addToCartButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    backgroundColor: dashboardColors.primaryTint,
-    borderColor: '#C9D8FE',
-    borderRadius: dashboardRadii.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 3,
-    justifyContent: 'center',
-    minHeight: 38,
-    minWidth: 70,
-    paddingHorizontal: 12,
-  },
-  addToCartText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-  },
-  quantityControl: {
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: 17,
-    flexDirection: 'row',
-    height: 40,
-    overflow: 'hidden',
-  },
-  quantityButton: {
-    alignItems: 'center',
-    height: 40,
-    justifyContent: 'center',
-    width: 34,
-  },
-  quantityValueWrap: {
-    alignItems: 'center',
-    minWidth: 30,
-  },
-  quantityLabel: {
-    color: dashboardColors.textMuted,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 7,
-    lineHeight: 9,
-  },
-  quantityValue: {
-    color: dashboardColors.primaryDark,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    lineHeight: 15,
   },
   checkoutBar: {
     alignItems: 'center',
@@ -1155,6 +878,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 10,
     marginTop: 1,
+  },
+  checkoutTotalWrap: {
+    alignItems: 'flex-end',
+  },
+  checkoutTotalLabel: {
+    color: '#AFC6F4',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 8,
+    textTransform: 'uppercase',
   },
   checkoutTotal: {
     color: '#FFFFFF',

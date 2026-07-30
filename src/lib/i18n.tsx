@@ -163,6 +163,18 @@ const translations = {
     searchMedicine: 'Search medicine',
     shop: 'Shop',
     shopSubtitle: 'What medicine are you looking for?',
+    allMedicines: 'All medicines',
+    yourReminderMedicines: 'Your reminder medicines',
+    viewMore: 'View more',
+    priceConfirmedBeforeDelivery: 'Price confirmed before delivery',
+    knownSubtotal: 'Known subtotal',
+    pendingPriceNotice:
+      'The pharmacy will confirm pending prices before delivery.',
+    medicineDetails: 'Medicine details',
+    commonUse: 'Common use',
+    composition: 'Composition',
+    generalMedicineInformation:
+      'This is general medicine information, not a diagnosis or prescription. Confirm suitability with your clinician or pharmacist.',
     support: 'Support',
     tapAddMedicine: 'Tap Add Medicine to create your first reminder.',
     today: "Today's Medicines",
@@ -318,6 +330,18 @@ const translations = {
     searchMedicine: 'మందు వెతకండి',
     shop: 'షాప్',
     shopSubtitle: 'మీరు ఏ మందు కోసం చూస్తున్నారు?',
+    allMedicines: 'అన్ని మందులు',
+    yourReminderMedicines: 'మీ రిమైండర్ మందులు',
+    viewMore: 'మరింత చూడండి',
+    priceConfirmedBeforeDelivery: 'డెలివరీకి ముందు ధర నిర్ధారించబడుతుంది',
+    knownSubtotal: 'తెలిసిన ఉప మొత్తం',
+    pendingPriceNotice:
+      'పెండింగ్‌లో ఉన్న ధరలను ఫార్మసీ డెలివరీకి ముందు నిర్ధారిస్తుంది.',
+    medicineDetails: 'మందు వివరాలు',
+    commonUse: 'సాధారణ వినియోగం',
+    composition: 'కూర్పు',
+    generalMedicineInformation:
+      'ఇది సాధారణ మందు సమాచారం, రోగనిర్ధారణ లేదా ప్రిస్క్రిప్షన్ కాదు. మీ డాక్టర్ లేదా ఫార్మసిస్ట్‌తో అనుకూలతను నిర్ధారించుకోండి.',
     support: 'మద్దతు',
     tapAddMedicine:
       "మీ మొదటి రిమైండర్‌ను సృష్టించడానికి 'మందు జోడించు'ని నొక్కండి.",
