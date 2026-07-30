@@ -3,9 +3,8 @@ const { join } = require('node:path');
 
 const MEDICINE_REMINDER_CHANNEL = 'medicine-reminders';
 const MEDICINE_REMINDER_SOUND_CHANNEL = 'medicine-reminders-voice-v1';
-const MEDICINE_REMINDER_SOUND_PATH =
-  './assets/sounds/medicine-reminder.wav';
-const MEDICINE_REMINDER_SOUND_FILE = 'medicine-reminder.wav';
+const MEDICINE_REMINDER_SOUND_PATH = './assets/sounds/reminder.caf';
+const MEDICINE_REMINDER_SOUND_FILE = 'reminder.caf';
 
 /** @param {import('expo/config').ConfigContext} context */
 module.exports = ({ config }) => {
