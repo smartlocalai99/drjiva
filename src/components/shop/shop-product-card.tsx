@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -52,10 +51,7 @@ export function ShopProductCard({
       </Pressable>
 
       <View style={styles.chipRow}>
-        <View style={styles.priceChip}>
-          <Ionicons color={dashboardColors.primary} name="pricetag-outline" size={13} />
-          <Text style={styles.priceChipText}>{formatShopProductPrice(product.price)}</Text>
-        </View>
+        <Text style={styles.price}>{formatShopProductPrice(product.price)}</Text>
 
         <ProductQuantityControl
           onAdd={onAdd}
@@ -83,7 +79,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     alignItems: 'center',
-    backgroundColor: '#F7F8FA',
+    backgroundColor: '#D9D9D9',
     height: 152,
     justifyContent: 'center',
     width: '100%',
@@ -117,19 +113,10 @@ const styles = StyleSheet.create({
     paddingBottom: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.md,
   },
-  priceChip: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.pill,
-    flexDirection: 'row',
-    gap: 5,
-    height: 40,
-    paddingHorizontal: 12,
-  },
-  priceChipText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
+  price: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
     fontFamily: 'Inter_700Bold',
-    fontSize: 12,
+    fontSize: 16,
   },
 });

@@ -263,17 +263,19 @@ function ReminderCard({
 
   return (
     <View style={styles.card}>
-      <Image
-        accessibilityLabel={medicine.name}
-        contentFit="contain"
-        source={
-          medicine.imageUrl
-            ? { uri: medicine.imageUrl }
-            : MEDICINE_PLACEHOLDER
-        }
-        style={styles.cardImage}
-        transition={120}
-      />
+      <View style={styles.imageWrap}>
+        <Image
+          accessibilityLabel={medicine.name}
+          contentFit="contain"
+          source={
+            medicine.imageUrl
+              ? { uri: medicine.imageUrl }
+              : MEDICINE_PLACEHOLDER
+          }
+          style={styles.cardImage}
+          transition={120}
+        />
+      </View>
       <Pressable
         accessibilityLabel={`Delete ${medicine.name} reminder`}
         disabled={deleting}
@@ -411,10 +413,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  cardImage: {
+  imageWrap: {
+    alignItems: 'center',
     backgroundColor: '#D9D9D9',
     height: 160,
+    justifyContent: 'center',
     width: '100%',
+  },
+  cardImage: {
+    height: '82%',
+    width: '82%',
   },
   deleteButton: {
     alignItems: 'center',
