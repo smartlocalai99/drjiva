@@ -1,12 +1,16 @@
 import { ensureSecureReportSession } from '../lib/reportAuth';
 import { supabase } from '../lib/supabase';
 import {
+  ASIAN_HOSPITAL_NAME,
   mapMedicineRowsToShopProducts,
   type ShopMedicineRow,
   type ShopProduct,
 } from './shopProductModel';
 
 export type { ShopProduct } from './shopProductModel';
+
+const SHOP_MEDICINE_COLUMNS =
+  'id, name, image_url, hospital_name, category, composition, dosage_form, price, shop_short_description, shop_full_description, shop_common_uses, shop_safety_note, shop_information_source_name, shop_information_source_url, shop_information_reviewed_at, shop_product_section_items(section_code, sort_order)' as const;
 
 const DATABASE_PAGE_SIZE = 1000;
 const CATALOGUE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -36,9 +40,7 @@ export async function fetchShopProductById(
   await ensureSecureReportSession();
   let request = supabase
     .from('medicines')
-    .select(
-      'id, name, image_url, hospital_name, category, composition, dosage_form, price, shop_product_section_items(section_code, sort_order)',
-    )
+    .select(SHOP_MEDICINE_COLUMNS)
     .eq('id', id);
 
   if (signal) {
@@ -78,12 +80,10 @@ export async function fetchShopProducts(
   for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
     let request = supabase
       .from('medicines')
-      .select(
-        'id, name, image_url, hospital_name, category, composition, dosage_form, price, shop_product_section_items(section_code, sort_order)',
-      )
+      .select(SHOP_MEDICINE_COLUMNS)
+      .ilike('hospital_name', ASIAN_HOSPITAL_NAME)
       .not('image_url', 'is', null)
       .neq('image_url', '')
-      .gt('price', 0)
       .order('name')
       .order('id')
       .range(from, from + DATABASE_PAGE_SIZE - 1);
