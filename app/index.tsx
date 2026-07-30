@@ -16,11 +16,12 @@ import {
 } from '../src/components/PhoneInput';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { copy } from '../src/copy';
-import { navigateToOtpOnce } from '../src/lib/auth';
 import { checkPatientExists } from '../src/lib/patients';
+import { ensureSecureReportSession } from '../src/lib/reportAuth';
 import {
   getCachedPatientName,
   getSessionPhone,
+  saveSessionPhone,
 } from '../src/lib/session';
 import { colors, spacing, typography } from '../src/theme';
 
@@ -100,21 +101,30 @@ export default function LoginScreen() {
     setPhone(nextPhone);
   };
 
+  // OTP verification is temporarily skipped (no real SMS backend checks it
+  // yet) — go straight to the same destination a verified OTP would.
   const submitPhone = useCallback((submittedPhone: string) => {
-    if (!isValidIndianPhone(submittedPhone)) {
+    if (!isValidIndianPhone(submittedPhone) || otpNavigationStartedRef.current) {
       return;
     }
+    otpNavigationStartedRef.current = true;
 
-    navigateToOtpOnce(
-      submittedPhone,
-      otpNavigationStartedRef,
-      (route) => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-          () => undefined,
-        );
-        router.push(route);
-      },
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+      () => undefined,
     );
+
+    const mobile = submittedPhone.replace(/\D/g, '').slice(-10);
+    void saveSessionPhone(mobile).catch(() => undefined);
+    void ensureSecureReportSession().catch(() => undefined);
+
+    void checkPatientExists(mobile)
+      .catch(() => false)
+      .then((patientExists) => {
+        router.replace({
+          params: { phone: mobile },
+          pathname: patientExists ? '/home' : '/add-patient-details',
+        });
+      });
   }, [router]);
 
   useEffect(() => {

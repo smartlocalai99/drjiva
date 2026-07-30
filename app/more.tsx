@@ -147,8 +147,9 @@ export default function MoreScreen() {
       {
         onPress: () => {
           clearDashboardPreload();
-          void clearSessionPhone().catch(() => undefined);
-          router.replace('/');
+          void clearSessionPhone()
+            .catch(() => undefined)
+            .finally(() => router.replace('/'));
         },
         style: 'destructive',
         text: t('logOut'),
