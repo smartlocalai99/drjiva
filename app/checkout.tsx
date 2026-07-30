@@ -30,10 +30,13 @@ import {
   type SavedAddress,
 } from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
-import { formatRupees } from '../src/lib/currency';
+import { formatRupees, formatShopProductPrice } from '../src/lib/currency';
+import { useLanguage } from '../src/lib/i18n';
+import { summarizeShopPricing } from '../src/lib/shop-pricing';
 
 export default function CheckoutScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
@@ -56,11 +59,10 @@ export default function CheckoutScreen() {
     () => lines.reduce((sum, line) => sum + line.quantity, 0),
     [lines],
   );
-  const subtotal = useMemo(
+  const pricing = useMemo(
     () =>
-      lines.reduce(
-        (sum, line) => sum + line.product.price * line.quantity,
-        0,
+      summarizeShopPricing(
+        lines.map((line) => ({ price: line.product.price, quantity: line.quantity })),
       ),
     [lines],
   );
@@ -260,7 +262,9 @@ export default function CheckoutScreen() {
                     </View>
                     <View style={styles.productTrailing}>
                       <Text style={styles.productPrice}>
-                        {formatRupees(line.product.price * line.quantity)}
+                        {line.product.price === null
+                          ? formatShopProductPrice(null)
+                          : formatRupees(line.product.price * line.quantity)}
                       </Text>
                       <View
                         accessibilityLabel={`Quantity for ${line.product.name}`}
@@ -329,14 +333,20 @@ export default function CheckoutScreen() {
 
             <Text style={styles.sectionTitle}>Payment details</Text>
             <View style={styles.paymentCard}>
-              <PriceRow label="Item total" value={formatRupees(subtotal)} />
+              <PriceRow
+                label={pricing.hasPendingPrices ? t('knownSubtotal') : 'Item total'}
+                value={formatRupees(pricing.knownSubtotal)}
+              />
               <PriceRow label="Delivery" value="FREE" valueSuccess />
               <View style={styles.paymentDivider} />
               <PriceRow
                 bold
                 label="Amount to pay"
-                value={formatRupees(subtotal)}
+                value={formatRupees(pricing.knownSubtotal)}
               />
+              {pricing.hasPendingPrices ? (
+                <Text style={styles.pendingNotice}>{t('pendingPriceNotice')}</Text>
+              ) : null}
             </View>
           </ScrollView>
 
@@ -347,9 +357,11 @@ export default function CheckoutScreen() {
             ]}
           >
             <View>
-              <Text style={styles.footerLabel}>Total</Text>
+              <Text style={styles.footerLabel}>
+                {pricing.hasPendingPrices ? t('knownSubtotal') : 'Total'}
+              </Text>
               <Text style={styles.footerTotal}>
-                {formatRupees(subtotal)}
+                {formatRupees(pricing.knownSubtotal)}
               </Text>
             </View>
             <PressableScale
@@ -775,6 +787,11 @@ const styles = StyleSheet.create({
   paymentDivider: {
     backgroundColor: dashboardColors.track,
     height: StyleSheet.hairlineWidth,
+  },
+  pendingNotice: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: dashboardSpacing.sm,
   },
   footer: {
     alignItems: 'center',

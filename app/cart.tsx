@@ -30,7 +30,9 @@ import {
   type SavedAddress,
 } from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
+import { formatRupees, formatShopProductPrice } from '../src/lib/currency';
 import { useLanguage } from '../src/lib/i18n';
+import { summarizeShopPricing } from '../src/lib/shop-pricing';
 
 type CartLine = {
   product: ShopProduct;
@@ -60,8 +62,11 @@ export default function CartScreen() {
     [lines],
   );
 
-  const total = useMemo(
-    () => lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0),
+  const pricing = useMemo(
+    () =>
+      summarizeShopPricing(
+        lines.map((line) => ({ price: line.product.price, quantity: line.quantity })),
+      ),
     [lines],
   );
   const deliveryAddress = useMemo(
@@ -178,7 +183,9 @@ export default function CartScreen() {
                   <View style={styles.rowBody}>
                     <Text style={styles.rowName}>{line.product.name}</Text>
                     <Text style={styles.rowPack}>{line.product.packSize}</Text>
-                    <Text style={styles.rowPrice}>₹{line.product.price}</Text>
+                    <Text style={styles.rowPrice}>
+                      {formatShopProductPrice(line.product.price)}
+                    </Text>
                   </View>
                   <View style={styles.stepper}>
                     <PressableScale
@@ -210,9 +217,14 @@ export default function CartScreen() {
 
           <View style={[styles.footer, { paddingBottom: insets.bottom + dashboardSpacing.gap }]}>
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>{t('cartTotal')}</Text>
-              <Text style={styles.totalValue}>₹{total}</Text>
+              <Text style={styles.totalLabel}>
+                {pricing.hasPendingPrices ? t('knownSubtotal') : t('cartTotal')}
+              </Text>
+              <Text style={styles.totalValue}>{formatRupees(pricing.knownSubtotal)}</Text>
             </View>
+            {pricing.hasPendingPrices ? (
+              <Text style={styles.pendingNotice}>{t('pendingPriceNotice')}</Text>
+            ) : null}
             <PressableScale
               accessibilityLabel={t('checkout')}
               onPress={handleCheckout}
@@ -494,6 +506,11 @@ const styles = StyleSheet.create({
   totalValue: {
     ...dashboardTypography.title,
     color: dashboardColors.text,
+  },
+  pendingNotice: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginBottom: dashboardSpacing.gap,
   },
   checkoutButton: {
     alignItems: 'center',
