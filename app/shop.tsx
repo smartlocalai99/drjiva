@@ -82,15 +82,24 @@ const PLACEHOLDER_ROTATION_MS = 2400;
 const DELIVERY_AGENT_IMAGE = require('../assets/shop/delivery-agent.png');
 
 const SECTION_ICONS = {
+  allergy_cough: 'medkit-outline',
   body_pains: 'body-outline',
   cold: 'snow-outline',
+  diabetes_care: 'water-outline',
   fever: 'thermometer-outline',
   headache: 'happy-outline',
+  heart_bp: 'heart-outline',
   search: 'search-outline',
+  skin_care: 'bandage-outline',
   stomach_pain: 'nutrition-outline',
+  vitamins: 'leaf-outline',
 } as const;
 
 const SECTION_TINTS = {
+  allergy_cough: {
+    backgroundColor: '#F1F8E9',
+    color: '#558B2F',
+  },
   body_pains: {
     backgroundColor: dashboardColors.primaryTint,
     color: dashboardColors.primary,
@@ -98,6 +107,10 @@ const SECTION_TINTS = {
   cold: {
     backgroundColor: '#E9F7F8',
     color: '#0F8A94',
+  },
+  diabetes_care: {
+    backgroundColor: '#E8F3FB',
+    color: '#1E6FA8',
   },
   fever: {
     backgroundColor: dashboardColors.errorTint,
@@ -107,13 +120,25 @@ const SECTION_TINTS = {
     backgroundColor: dashboardColors.warningTint,
     color: '#C87906',
   },
+  heart_bp: {
+    backgroundColor: '#FDEBEE',
+    color: '#C23A54',
+  },
   search: {
     backgroundColor: dashboardColors.primaryTint,
     color: dashboardColors.primary,
   },
+  skin_care: {
+    backgroundColor: '#FBEFF6',
+    color: '#B0509A',
+  },
   stomach_pain: {
     backgroundColor: '#F1EAFB',
     color: '#7C4DCC',
+  },
+  vitamins: {
+    backgroundColor: '#FFF8E1',
+    color: '#B8860B',
   },
 } as const;
 

@@ -22,11 +22,16 @@ export type ReminderMedicineReorder = {
 };
 
 const SECTION_TITLES: Record<ShopSectionCode, string> = {
+  allergy_cough: 'Allergy & Cough',
   body_pains: 'Body Pains',
   cold: 'Cold',
+  diabetes_care: 'Diabetes Care',
   fever: 'Fever',
   headache: 'Headache',
+  heart_bp: 'Heart & BP',
+  skin_care: 'Skin Care',
   stomach_pain: 'Stomach Pain',
+  vitamins: 'Vitamins & Supplements',
 };
 
 function matchesProductSearch(

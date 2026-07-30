@@ -9,6 +9,11 @@ export const SHOP_SECTION_CODES = [
   'body_pains',
   'stomach_pain',
   'cold',
+  'allergy_cough',
+  'heart_bp',
+  'diabetes_care',
+  'skin_care',
+  'vitamins',
 ] as const;
 
 export type ShopSectionCode = (typeof SHOP_SECTION_CODES)[number];
