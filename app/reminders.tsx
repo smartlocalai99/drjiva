@@ -18,6 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, type DateData } from 'react-native-calendars';
 
+const MEDICINE_PLACEHOLDER = require('../assets/notabs.png');
+
 import {
   deleteMedicineReminder,
   fetchMedicinesForDate,
@@ -63,9 +65,7 @@ export default function RemindersScreen() {
         }
         setPatientId(patient.patientId);
         setMedicines(
-          await fetchMedicinesForDate(patient.patientId, date, new Date(), {
-            showAll: true,
-          }),
+          await fetchMedicinesForDate(patient.patientId, date),
         );
       } catch {
         setErrorMessage(t('unableLoadReminders'));
@@ -265,8 +265,12 @@ function ReminderCard({
     <View style={styles.card}>
       <Image
         accessibilityLabel={medicine.name}
-        contentFit="cover"
-        source={{ uri: medicine.imageUrl }}
+        contentFit={medicine.imageUrl ? 'cover' : 'contain'}
+        source={
+          medicine.imageUrl
+            ? { uri: medicine.imageUrl }
+            : MEDICINE_PLACEHOLDER
+        }
         style={styles.cardImage}
         transition={120}
       />

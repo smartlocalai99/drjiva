@@ -43,4 +43,18 @@ describe('scanReportPages', () => {
     expect(html).toContain('data:image/jpeg;base64,page-one');
     expect(html).toContain('data:image/jpeg;base64,page-two');
   });
+
+  it('enhances scanned pages without cropping their edges', () => {
+    const html = buildReportPdfHtml(['page-one']);
+
+    expect(html).toContain(
+      'filter: contrast(1.16) brightness(1.06) saturate(0.35)',
+    );
+    expect(html).toContain('object-fit: contain');
+    expect(html).toContain('max-height: 100%');
+    expect(html).toContain('max-width: 100%');
+    expect(html).toContain('height: 297mm');
+    expect(html).toContain('padding: 3mm');
+    expect(html).toContain('width: 210mm');
+  });
 });

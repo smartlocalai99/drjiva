@@ -22,9 +22,10 @@ function geocodedAddress(overrides: Partial<GeocodedAddress> = {}): GeocodedAddr
 }
 
 describe('mapGeocodedAddressToFields', () => {
-  it('combines street number and street into the area line', () => {
+  it('maps the house and building separately from the street', () => {
     expect(mapGeocodedAddressToFields(geocodedAddress())).toEqual({
-      area: '302 Road No. 12',
+      area: 'Road No. 12',
+      building: '302, Lotus Heights',
       city: 'Hyderabad',
       pinCode: '500001',
       state: 'Telangana',
@@ -36,6 +37,15 @@ describe('mapGeocodedAddressToFields', () => {
       geocodedAddress({ street: null, streetNumber: null }),
     );
     expect(result.area).toBe('Lotus Heights');
+    expect(result.building).toBe('Lotus Heights');
+  });
+
+  it('does not repeat the street name in the building field', () => {
+    const result = mapGeocodedAddressToFields(
+      geocodedAddress({ name: '302 Road No. 12' }),
+    );
+    expect(result.building).toBe('302');
+    expect(result.area).toBe('Road No. 12');
   });
 
   it('falls back through district then subregion when city is missing', () => {
@@ -63,7 +73,7 @@ describe('mapGeocodedAddressToFields', () => {
         streetNumber: null,
         subregion: null,
       }),
-    ).toEqual({ area: '', city: '', pinCode: '', state: '' });
+    ).toEqual({ area: '', building: '', city: '', pinCode: '', state: '' });
   });
 });
 
@@ -102,7 +112,8 @@ describe('resolveCurrentAddressFields', () => {
 
     await expect(resolveCurrentAddressFields(adapter)).resolves.toEqual({
       fields: {
-        area: '302 Road No. 12',
+        area: 'Road No. 12',
+        building: '302, Lotus Heights',
         city: 'Hyderabad',
         pinCode: '500001',
         state: 'Telangana',

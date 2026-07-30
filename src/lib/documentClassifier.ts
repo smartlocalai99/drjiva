@@ -4,14 +4,18 @@ export const REPORT_TYPES = [
   'Lab Report',
   'Imaging',
   'Discharge Summary',
+  'Medical Bill',
   'Other',
 ] as const;
 
 export type ReportType = (typeof REPORT_TYPES)[number];
 
+export type HospitalSource = 'directory' | 'patient';
+
 export type HospitalOption = {
   id: string;
   name: string;
+  source: HospitalSource;
 };
 
 export type DocumentClassification = {
@@ -34,6 +38,13 @@ const TYPE_KEYWORDS: Record<Exclude<ReportType, 'Other'>, readonly string[]> = {
     'hemoglobin',
     'blood',
     'urine',
+  ],
+  'Medical Bill': [
+    'medical bill',
+    'hospital bill',
+    'invoice',
+    'amount paid',
+    'payment receipt',
   ],
   'OP Consultation': [
     'op consultation',

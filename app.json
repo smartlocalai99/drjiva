@@ -17,6 +17,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Allow DrJiva to take your profile photo.",
+        "NSLocationWhenInUseUsageDescription": "Allow DrJiva to use your current location to fill in your delivery address.",
         "NSPhotoLibraryUsageDescription": "Allow DrJiva to choose your profile photo."
       }
     },
@@ -39,7 +40,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/logo.png",
+          "image": "./assets/splash-logo.png",
           "imageWidth": 116,
           "resizeMode": "contain"
         }

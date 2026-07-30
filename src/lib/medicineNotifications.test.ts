@@ -14,6 +14,9 @@ vi.mock('expo-constants', () => ({
     },
   },
 }));
+vi.mock('./expoNotifications', () => ({
+  requireExpoNotifications: vi.fn(),
+}));
 
 import { scheduleDoseNotificationsWithAdapter } from './medicineNotifications';
 

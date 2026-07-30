@@ -23,6 +23,7 @@ import {
 import {
   getNotificationSettings,
   fetchScheduledDoseRemindersFromToday,
+  saveNotificationIds,
   saveNotificationSettings,
   replaceNotificationSchedule,
 } from '../src/lib/medicineCourses';
@@ -130,102 +131,123 @@ export default function NotificationTimingsScreen() {
         timezone:
           Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
       };
-      const reminders =
-        await fetchScheduledDoseRemindersFromToday(patientId);
-      const newNotifications: Array<{
-        eventId: string;
-        notificationId: string;
-        scheduledFor: string;
-      }> = [];
-      if (reminders.length > 0) {
-        const permitted = await requestMedicineNotificationPermission();
-        if (!permitted) {
-          Alert.alert(t('notifications'), t('phoneAlertsDisabled'), [
+
+      // Persist the selected times first. Refreshing existing phone alerts is
+      // best-effort and must not turn a successful settings save into a
+      // misleading failure.
+      await saveNotificationSettings(patientId, nextSettings);
+
+      const saved = await getNotificationSettings(patientId);
+      if (
+        saved.morningTime !== morning ||
+        saved.afternoonTime !== afternoon ||
+        saved.nightTime !== night
+      ) {
+        throw new Error('Saved notification times could not be verified.');
+      }
+
+      let alertSyncPending = false;
+      let cleanupPending = false;
+      let phoneAlertsUnavailable = false;
+
+      try {
+        const reminders =
+          await fetchScheduledDoseRemindersFromToday(patientId);
+        const slotTimes = { afternoon, morning, night };
+        const updates = reminders.map((reminder) => ({
+          eventId: reminder.eventId,
+          notificationId: null,
+          scheduledFor: replaceEventSlotTime(
+            reminder.scheduledFor,
+            slotTimes[reminder.slot],
+          ),
+        }));
+
+        if (reminders.length > 0) {
+          await replaceNotificationSchedule(patientId, nextSettings, updates);
+
+          const oldIds = reminders.flatMap((item) =>
+            item.notificationId ? [item.notificationId] : [],
+          );
+          try {
+            await cancelDoseNotifications(oldIds);
+          } catch {
+            await queueNotificationCancellations(oldIds);
+            cleanupPending = true;
+          }
+
+          const permitted =
+            await requestMedicineNotificationPermission().catch(() => false);
+          if (!permitted) {
+            phoneAlertsUnavailable = true;
+          } else {
+            const newNotifications: Array<{
+              eventId: string;
+              notificationId: string;
+            }> = [];
+            try {
+              for (const reminder of reminders) {
+                const update = updates.find(
+                  (item) => item.eventId === reminder.eventId,
+                );
+                if (!update) {
+                  continue;
+                }
+                const scheduled = await scheduleDoseNotifications(
+                  [
+                    {
+                      eventId: reminder.eventId,
+                      scheduledFor: update.scheduledFor,
+                    },
+                  ],
+                  {
+                    medicineName: reminder.medicineName,
+                    slot: t(reminder.slot),
+                    slotKey: reminder.slot,
+                    tablets: reminder.tablets,
+                  },
+                );
+                newNotifications.push(...scheduled);
+              }
+              await saveNotificationIds(newNotifications);
+            } catch {
+              phoneAlertsUnavailable = true;
+              await cancelDoseNotifications(
+                newNotifications.map((item) => item.notificationId),
+              ).catch(() => undefined);
+            }
+          }
+        }
+      } catch (error) {
+        alertSyncPending = true;
+        console.warn('Unable to refresh existing notification alerts', error);
+      }
+
+      if (alertSyncPending) {
+        Alert.alert(t('timingsSaved'), t('timingsSavedAlertsPending'));
+      } else if (phoneAlertsUnavailable) {
+        Alert.alert(
+          t('timingsSaved'),
+          `${t('timingsSynced')}\n\n${t('phoneAlertsDisabled')}`,
+          [
             { style: 'cancel', text: t('notNow') },
             {
               onPress: () => void Linking.openSettings(),
               text: t('openSettings'),
             },
-          ]);
-        } else {
-          try {
-            for (const reminder of reminders) {
-              const slotTime = {
-                afternoon,
-                morning,
-                night,
-              }[reminder.slot as DoseSlot];
-              const scheduledFor = replaceEventSlotTime(
-                reminder.scheduledFor,
-                slotTime,
-              );
-              const scheduled = await scheduleDoseNotifications(
-                [{ eventId: reminder.eventId, scheduledFor }],
-                {
-                  medicineName: reminder.medicineName,
-                  slot: t(reminder.slot),
-                  slotKey: reminder.slot,
-                  tablets: reminder.tablets,
-                },
-              );
-              if (scheduled[0]) {
-                newNotifications.push({
-                  ...scheduled[0],
-                  scheduledFor,
-                });
-              }
-            }
-          } catch (error) {
-            await cancelDoseNotifications(
-              newNotifications.map((item) => item.notificationId),
-            );
-            throw error;
-          }
-        }
-      }
-      const updates = reminders.map((reminder) => {
-        const scheduled = newNotifications.find(
-          (item) => item.eventId === reminder.eventId,
+          ],
         );
-        return {
-          eventId: reminder.eventId,
-          notificationId: scheduled?.notificationId ?? null,
-          scheduledFor:
-            scheduled?.scheduledFor ??
-            replaceEventSlotTime(
-              reminder.scheduledFor,
-              { afternoon, morning, night }[reminder.slot],
-            ),
-        };
-      });
-      try {
-        if (reminders.length > 0) {
-          await replaceNotificationSchedule(
-            patientId,
-            nextSettings,
-            updates,
-          );
-        } else {
-          await saveNotificationSettings(patientId, nextSettings);
-        }
-      } catch (error) {
-        await cancelDoseNotifications(
-          newNotifications.map((item) => item.notificationId),
+      } else {
+        Alert.alert(
+          t('timingsSaved'),
+          cleanupPending
+            ? `${t('timingsSynced')}\n\n${t('oldAlertsCleanupPending')}`
+            : t('timingsSynced'),
         );
-        throw error;
       }
-      const oldIds = reminders.flatMap((item) =>
-        item.notificationId ? [item.notificationId] : [],
-      );
-      try {
-        await cancelDoseNotifications(oldIds);
-      } catch {
-        await queueNotificationCancellations(oldIds);
-        Alert.alert(t('notifications'), t('oldAlertsCleanupPending'));
-      }
-      Alert.alert(t('timingsSaved'), t('timingsSynced'));
-    } catch {
-      Alert.alert(t('unableToSaveDocument'), t('tryAgain'));
+    } catch (error) {
+      console.error('Unable to save notification timings', error);
+      Alert.alert(t('unableToSaveNotificationTimings'), t('tryAgain'));
     } finally {
       setSaving(false);
     }
@@ -262,6 +284,7 @@ export default function NotificationTimingsScreen() {
             </View>
           </View>
           <SlotTimeEditor
+            changeLabel={t('changeTime')}
             hint={t('tapToChooseTime')}
             label={t('morning')}
             onChange={setMorning}
@@ -269,6 +292,7 @@ export default function NotificationTimingsScreen() {
             value={morning}
           />
           <SlotTimeEditor
+            changeLabel={t('changeTime')}
             hint={t('tapToChooseTime')}
             label={t('afternoon')}
             onChange={setAfternoon}
@@ -276,6 +300,7 @@ export default function NotificationTimingsScreen() {
             value={afternoon}
           />
           <SlotTimeEditor
+            changeLabel={t('changeTime')}
             hint={t('tapToChooseTime')}
             label={t('night')}
             onChange={setNight}

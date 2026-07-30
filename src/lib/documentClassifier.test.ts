@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyDocument,
+  type HospitalOption,
   validateReportMetadata,
 } from './documentClassifier';
 
-const HOSPITALS = [
-  { id: 'hospital-1', name: 'City Hospital' },
-  { id: 'hospital-2', name: 'Shankar Gastro Hospital' },
+const HOSPITALS: HospitalOption[] = [
+  { id: 'hospital-1', name: 'City Hospital', source: 'directory' },
+  {
+    id: 'hospital-2',
+    name: 'Shankar Gastro Hospital',
+    source: 'patient',
+  },
 ];
 
 describe('classifyDocument', () => {
@@ -17,6 +22,7 @@ describe('classifyDocument', () => {
     ['Laboratory blood haemoglobin result', 'Lab Report'],
     ['Radiology CT scan imaging report', 'Imaging'],
     ['Discharge summary admission discharged', 'Discharge Summary'],
+    ['Hospital invoice medical bill amount paid', 'Medical Bill'],
   ] as const)('classifies "%s" as %s', (text, expectedType) => {
     expect(classifyDocument(text, []).reportType).toBe(expectedType);
   });

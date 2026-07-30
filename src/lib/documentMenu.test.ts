@@ -20,5 +20,6 @@ describe('getReportTypeTranslationKey', () => {
     expect(getReportTypeTranslationKey('OP Consultation')).toBe(
       'opConsultation',
     );
+    expect(getReportTypeTranslationKey('Medical Bill')).toBe('medicalBill');
   });
 });

@@ -45,6 +45,35 @@ module.exports = ({ config }) => {
   ) {
     plugins.push('@react-native-community/datetimepicker');
   }
+  if (
+    !plugins.some(
+      (plugin) =>
+        (Array.isArray(plugin) ? plugin[0] : plugin) === 'expo-audio',
+    )
+  ) {
+    plugins.push('expo-audio');
+  }
+  if (
+    !plugins.some(
+      (plugin) =>
+        (Array.isArray(plugin) ? plugin[0] : plugin) === 'expo-asset',
+    )
+  ) {
+    plugins.push('expo-asset');
+  }
+  if (
+    !plugins.some(
+      (plugin) =>
+        (Array.isArray(plugin) ? plugin[0] : plugin) === 'expo-dev-client',
+    )
+  ) {
+    plugins.push([
+      'expo-dev-client',
+      {
+        launchMode: 'launcher',
+      },
+    ]);
+  }
 
   return {
     ...config,

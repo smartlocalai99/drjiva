@@ -22,6 +22,12 @@ type NamedMedicine = {
   name: string;
 };
 
+export function hasMedicineImage<T extends { imageUrl?: string | null }>(
+  medicine: T,
+): boolean {
+  return Boolean(medicine.imageUrl?.trim());
+}
+
 export function getNewCatalogueEntryName<T extends NamedMedicine>(
   entries: readonly T[],
   query: string,

@@ -4,6 +4,7 @@ import type {
   HospitalOption,
   ReportType,
 } from './documentClassifier';
+import { normalizeMedicineSearch } from './medicineSearch';
 import {
   buildPatientReportInsert,
   buildReportStoragePath,
@@ -16,7 +17,7 @@ import { ensureSecureReportSession } from './reportAuth';
 import { supabase } from './supabase';
 
 const REPORT_COLUMNS =
-  'id, patient_id, hospital_id, label, report_type, page_count, storage_path, created_at';
+  'id, patient_id, hospital_id, document_hospital_id, patient_document_hospital_id, label, report_type, page_count, storage_path, created_at';
 const MAX_REPORT_BYTES = 20 * 1024 * 1024;
 const HOSPITALS_CACHE_TTL_MS = 5 * 60 * 1000;
 const SIGNED_URL_TTL_SECONDS = 10 * 60;
@@ -32,23 +33,87 @@ function createDocumentId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-export async function fetchHospitals(): Promise<HospitalOption[]> {
+async function fetchDirectoryHospitals(): Promise<HospitalOption[]> {
   if (hospitalsCache && hospitalsCache.expiresAt > Date.now()) {
     return hospitalsCache.hospitals;
   }
 
   const { data, error } = await supabase
-    .from('hospitals')
+    .from('document_hospitals')
     .select('id, name')
-    .order('name');
+    .order('sort_order');
 
   if (error) {
     throw error;
   }
 
-  const hospitals = (data ?? []) as HospitalOption[];
+  const hospitals = ((data ?? []) as Array<{ id: string; name: string }>).map(
+    (hospital) => ({ ...hospital, source: 'directory' as const }),
+  );
   hospitalsCache = { expiresAt: Date.now() + HOSPITALS_CACHE_TTL_MS, hospitals };
   return hospitals;
+}
+
+export async function fetchHospitals(
+  patientId: string,
+): Promise<HospitalOption[]> {
+  await ensureSecureReportSession();
+  const [directoryHospitals, { data, error }] = await Promise.all([
+    fetchDirectoryHospitals(),
+    supabase
+      .from('patient_document_hospitals')
+      .select('id, name')
+      .eq('patient_id', patientId)
+      .order('name'),
+  ]);
+
+  if (error) {
+    throw error;
+  }
+
+  const patientHospitals = (
+    (data ?? []) as Array<{ id: string; name: string }>
+  ).map((hospital) => ({ ...hospital, source: 'patient' as const }));
+  return [...patientHospitals, ...directoryHospitals];
+}
+
+export async function createPatientDocumentHospital(
+  patientId: string,
+  name: string,
+): Promise<HospitalOption> {
+  const ownerUserId = await ensureSecureReportSession();
+  const displayName = name.trim().replace(/\s+/g, ' ');
+  if (
+    displayName.length < 2 ||
+    displayName.length > 120 ||
+    !normalizeMedicineSearch(displayName)
+  ) {
+    throw new Error('Enter a valid hospital name.');
+  }
+
+  const { data, error } = await supabase
+    .from('patient_document_hospitals')
+    .upsert(
+      {
+        name: displayName,
+        owner_user_id: ownerUserId,
+        patient_id: patientId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'owner_user_id,patient_id,normalized_name' },
+    )
+    .select('id, name')
+    .single();
+
+  if (error || !data) {
+    throw error ?? new Error('Unable to save hospital.');
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    source: 'patient',
+  };
 }
 
 export async function fetchPatientReports(
@@ -68,7 +133,7 @@ export async function fetchPatientReports(
 }
 
 export async function uploadPatientReport(input: {
-  hospitalId: string;
+  hospital: HospitalOption;
   label: string;
   pageCount: number;
   patientId: string;
@@ -107,7 +172,7 @@ export async function uploadPatientReport(input: {
     .from('patient_reports')
     .insert(
       buildPatientReportInsert({
-        hospitalId: input.hospitalId,
+        hospital: input.hospital,
         label: input.label,
         ownerUserId: userId,
         pageCount: input.pageCount,

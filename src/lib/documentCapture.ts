@@ -51,16 +51,27 @@ export function buildReportPdfHtml(base64Pages: string[]): string {
       html, body { margin: 0; padding: 0; }
       .page {
         align-items: center;
+        background: #ffffff;
+        box-sizing: border-box;
         break-after: page;
         display: flex;
-        height: 842px;
+        height: 297mm;
         justify-content: center;
         overflow: hidden;
+        padding: 3mm;
         page-break-after: always;
-        width: 595px;
+        width: 210mm;
       }
       .page:last-child { break-after: auto; page-break-after: auto; }
-      img { height: 100%; object-fit: contain; width: 100%; }
+      img {
+        display: block;
+        filter: contrast(1.16) brightness(1.06) saturate(0.35);
+        height: auto;
+        max-height: 100%;
+        max-width: 100%;
+        object-fit: contain;
+        width: auto;
+      }
     </style>
   </head>
   <body>${pages}</body>

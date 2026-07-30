@@ -18,8 +18,13 @@ import { PrimaryButton } from '../src/components/PrimaryButton';
 import { copy } from '../src/copy';
 import { navigateToOtpOnce } from '../src/lib/auth';
 import { checkPatientExists } from '../src/lib/patients';
-import { getSessionPhone } from '../src/lib/session';
+import {
+  getCachedPatientName,
+  getSessionPhone,
+} from '../src/lib/session';
 import { colors, spacing, typography } from '../src/theme';
+
+const SESSION_LOOKUP_TIMEOUT_MS = 1200;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -49,20 +54,38 @@ export default function LoginScreen() {
         return;
       }
 
-      const exists = await checkPatientExists(sessionPhone).catch(() => null);
+      const normalizedSessionPhone = sessionPhone.replace(/\D/g, '').slice(-10);
+      const cachedPatientName = await getCachedPatientName(
+        normalizedSessionPhone,
+      ).catch(() => null);
 
       if (!isMountedRef.current) {
         return;
       }
 
-      if (exists === null) {
-        setIsCheckingSession(false);
+      if (cachedPatientName) {
+        router.replace({
+          params: { phone: normalizedSessionPhone },
+          pathname: '/home',
+        });
+        return;
+      }
+
+      const exists = await Promise.race<boolean | null>([
+        checkPatientExists(sessionPhone).catch(() => null),
+        new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), SESSION_LOOKUP_TIMEOUT_MS);
+        }),
+      ]);
+
+      if (!isMountedRef.current) {
         return;
       }
 
       router.replace({
-        params: { phone: sessionPhone },
-        pathname: exists ? '/home' : '/add-patient-details',
+        params: { phone: normalizedSessionPhone },
+        pathname:
+          exists === false ? '/add-patient-details' : '/home',
       });
     })();
   }, [router]);

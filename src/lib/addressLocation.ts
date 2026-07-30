@@ -11,6 +11,7 @@ export type GeocodedAddress = {
 
 export type AddressLocationFields = {
   area: string;
+  building: string;
   city: string;
   pinCode: string;
   state: string;
@@ -34,15 +35,34 @@ export type AddressLocationResult =
 export function mapGeocodedAddressToFields(
   address: GeocodedAddress,
 ): AddressLocationFields {
-  const streetLine = [address.streetNumber, address.street]
-    .filter((part): part is string => Boolean(part && part.trim()))
-    .join(' ');
+  const clean = (value: string | null): string => value?.trim() || '';
+  const city = clean(address.city);
+  const district = clean(address.district);
+  const name = clean(address.name);
+  const street = clean(address.street);
+  const streetNumber = clean(address.streetNumber);
+  const normalizedStreet = street.toLocaleLowerCase();
+  const normalizedName = name.toLocaleLowerCase();
+  const nameDescribesStreet =
+    Boolean(normalizedStreet) && normalizedName.includes(normalizedStreet);
+  const buildingName =
+    name &&
+    !nameDescribesStreet &&
+    ![city, district, clean(address.subregion)].some(
+      (part) => part && part.toLocaleLowerCase() === normalizedName,
+    )
+      ? name
+      : '';
+  const building = Array.from(
+    new Set([streetNumber, buildingName].filter(Boolean)),
+  ).join(', ');
 
   return {
-    area: streetLine || address.name?.trim() || '',
-    city: address.city?.trim() || address.district?.trim() || address.subregion?.trim() || '',
-    pinCode: address.postalCode?.trim() || '',
-    state: address.region?.trim() || '',
+    area: street || district || name,
+    building,
+    city: city || district || clean(address.subregion),
+    pinCode: clean(address.postalCode),
+    state: clean(address.region),
   };
 }
 

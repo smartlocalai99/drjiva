@@ -39,6 +39,10 @@ function buildAdapter(
       };
     },
     async requestPermission() {
+      const current = await Location.getForegroundPermissionsAsync();
+      if (current.granted) {
+        return 'granted';
+      }
       const { status } = await Location.requestForegroundPermissionsAsync();
       return status === 'granted' ? 'granted' : 'denied';
     },

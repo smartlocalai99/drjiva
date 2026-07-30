@@ -1,7 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +26,7 @@ import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../src/components/PressableScale';
+import { CourseStartDatePicker } from '../src/components/medicine/course-start-date-picker';
 import { SlotTimeEditor } from '../src/components/medicine/SlotTimeEditor';
 import {
   dashboardColors,
@@ -29,6 +38,7 @@ import { useLanguage } from '../src/lib/i18n';
 import {
   formatDateOnly,
   getCourseEndDate,
+  parseDateOnly,
 } from '../src/lib/medicineCalendar';
 import {
   createCustomHospital,
@@ -61,6 +71,7 @@ import { areSelectedSlotTimesOrdered } from '../src/lib/medicineTime';
 import {
   filterMedicineCatalogue,
   getNewCatalogueEntryName,
+  hasMedicineImage,
 } from '../src/lib/medicineSearch';
 import {
   getMedicineWorkflowTitleKey,
@@ -71,6 +82,9 @@ import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 
 const SLOT_KEYS: DoseSlot[] = ['morning', 'afternoon', 'night'];
+const SUCCESS_SOUND = require('../assets/sounds/success.wav');
+const MAX_VISIBLE_MEDICINE_RESULTS = 40;
+const MAX_PREFETCHED_MEDICINE_IMAGES = 24;
 
 type MedicineReminderDetails = {
   slotTimes: Record<DoseSlot, string>;
@@ -88,6 +102,17 @@ function todayString() {
   return formatDateOnly(new Date());
 }
 
+function formatCourseDate(value: string): string {
+  const parsed = parseDateOnly(value);
+  return parsed
+    ? parsed.toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : value;
+}
+
 export default function AddMedicineScreen() {
   const router = useRouter();
   const { t } = useLanguage();
@@ -102,13 +127,14 @@ export default function AddMedicineScreen() {
   const [hospitalQuery, setHospitalQuery] = useState('');
   const [customHospitalName, setCustomHospitalName] = useState('');
   const [isCustomHospital, setIsCustomHospital] = useState(false);
-  const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(false);
+  const [hospitalDropdownOpen, setHospitalDropdownOpen] = useState(true);
+  const [isLoadingHospitals, setIsLoadingHospitals] = useState(true);
   const [query, setQuery] = useState('');
   const [medicineDropdownOpen, setMedicineDropdownOpen] = useState(false);
   const [catalogue, setCatalogue] = useState<MedicineCatalogueItem[]>([]);
   const [isLoadingCatalogue, setIsLoadingCatalogue] = useState(false);
   const [days, setDays] = useState('7');
-  const [startDate] = useState(todayString);
+  const [startDate, setStartDate] = useState(todayString);
   const [defaultSlotTimes, setDefaultSlotTimes] = useState<
     Record<DoseSlot, string>
   >({
@@ -122,6 +148,8 @@ export default function AddMedicineScreen() {
   const [pattern, setPattern] = useState<DayPattern>('daily');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
+  const deferredQuery = useDeferredValue(query);
+  const successPlayer = useAudioPlayer(SUCCESS_SOUND);
 
   useEffect(() => {
     if (!phone) {
@@ -154,7 +182,8 @@ export default function AddMedicineScreen() {
           })),
         ]);
       })
-      .catch(() => Alert.alert(t('patientUnavailable')));
+      .catch(() => Alert.alert(t('patientUnavailable')))
+      .finally(() => setIsLoadingHospitals(false));
   }, [phone, t]);
 
   useEffect(() => {
@@ -199,8 +228,21 @@ export default function AddMedicineScreen() {
     [hospitalQuery, hospitals],
   );
   const results = useMemo(
-    () => filterMedicineCatalogue(catalogue, query, 1000),
-    [catalogue, query],
+    () =>
+      filterMedicineCatalogue(
+        catalogue.filter(hasMedicineImage),
+        deferredQuery,
+        MAX_VISIBLE_MEDICINE_RESULTS,
+      ),
+    [catalogue, deferredQuery],
+  );
+  const resultImageUrls = useMemo(
+    () =>
+      results
+        .slice(0, MAX_PREFETCHED_MEDICINE_IMAGES)
+        .map((item) => item.imageUrl)
+        .filter((url): url is string => Boolean(url)),
+    [results],
   );
   const selectedMedicines = useMemo(
     () =>
@@ -223,6 +265,16 @@ export default function AddMedicineScreen() {
     startDate,
     previewDurationDays,
   );
+  const courseStartLabel = formatCourseDate(startDate);
+  const courseEndLabel = formatCourseDate(endDate);
+
+  useEffect(() => {
+    if (resultImageUrls.length > 0) {
+      void Image.prefetch(resultImageUrls, 'memory-disk').catch(
+        () => undefined,
+      );
+    }
+  }, [resultImageUrls]);
 
   const submit = async () => {
     if (selectedMedicines.length === 0 || !patientId) return;
@@ -334,6 +386,13 @@ export default function AddMedicineScreen() {
         }
       }
       setSuccess(true);
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => undefined);
+      void successPlayer
+        .seekTo(0)
+        .then(() => successPlayer.play())
+        .catch(() => undefined);
       setTimeout(() => {
         router.replace({
           params: { phone, refresh: Date.now(), selectedDate: startDate },
@@ -470,9 +529,19 @@ export default function AddMedicineScreen() {
               <Text style={styles.heading}>{t('chooseHospital')}</Text>
               <SearchBox
                 accessibilityLabel="Search hospitals"
-                onChange={setHospitalQuery}
-                onClear={() => setHospitalQuery('')}
+                dropdownOpen={hospitalDropdownOpen}
+                onChange={(value) => {
+                  setHospitalQuery(value);
+                  setHospitalDropdownOpen(true);
+                }}
+                onClear={() => {
+                  setHospitalQuery('');
+                  setHospitalDropdownOpen(true);
+                }}
                 onFocus={() => setHospitalDropdownOpen(true)}
+                onToggleDropdown={() =>
+                  setHospitalDropdownOpen((current) => !current)
+                }
                 placeholder="Search hospitals"
                 value={hospitalQuery}
               />
@@ -482,15 +551,32 @@ export default function AddMedicineScreen() {
                   nestedScrollEnabled
                   style={styles.dropdown}
                 >
-                  {hospitalResults.map((hospital) => (
-                    <Choice
-                      key={`${hospital.isCustom ? 'custom' : 'verified'}-${hospital.id}`}
-                      label={hospital.name}
-                      meta={hospital.isCustom ? 'Your hospital' : undefined}
-                      onPress={() => selectHospital(hospital)}
+                  <View style={styles.dropdownHeader}>
+                    <Text style={styles.dropdownTitle}>
+                      {t('selectHospital')}
+                    </Text>
+                    {!isLoadingHospitals ? (
+                      <Text style={styles.dropdownCount}>
+                        {hospitalResults.length}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {isLoadingHospitals ? (
+                    <ActivityIndicator
+                      color={dashboardColors.primary}
+                      style={styles.dropdownLoading}
                     />
-                  ))}
-                  {newHospitalName ? (
+                  ) : (
+                    hospitalResults.map((hospital) => (
+                      <Choice
+                        key={`${hospital.isCustom ? 'custom' : 'verified'}-${hospital.id}`}
+                        label={hospital.name}
+                        meta={hospital.isCustom ? 'Your hospital' : undefined}
+                        onPress={() => selectHospital(hospital)}
+                      />
+                    ))
+                  )}
+                  {!isLoadingHospitals && newHospitalName ? (
                     <Choice
                       icon="add-circle-outline"
                       label={`Add “${newHospitalName}”`}
@@ -498,7 +584,9 @@ export default function AddMedicineScreen() {
                       onPress={() => selectNewHospital(newHospitalName)}
                     />
                   ) : null}
-                  {hospitalResults.length === 0 && !newHospitalName ? (
+                  {!isLoadingHospitals &&
+                  hospitalResults.length === 0 &&
+                  !newHospitalName ? (
                     <Text style={styles.emptyResult}>No hospitals found</Text>
                   ) : null}
                 </ScrollView>
@@ -549,8 +637,16 @@ export default function AddMedicineScreen() {
                               selected && styles.medicineRowSelected,
                             ]}
                           >
-                            <MedicineImage item={item} style={styles.thumb} />
-                            <Text numberOfLines={2} style={styles.choiceText}>
+                            <MedicineImage
+                              hideWhenUnavailable
+                              item={item}
+                              priority="high"
+                              style={styles.thumb}
+                            />
+                            <Text
+                              numberOfLines={2}
+                              style={styles.medicineResultName}
+                            >
                               {item.name}
                             </Text>
                             <Ionicons
@@ -589,8 +685,14 @@ export default function AddMedicineScreen() {
                 onChange={setDays}
                 value={days}
               />
+              <CourseStartDatePicker
+                changeLabel={t('changeDate')}
+                label={t('startDate')}
+                onChange={setStartDate}
+                value={startDate}
+              />
               <Text style={styles.courseRange}>
-                Starts today · ends {endDate}
+                {t('courseEnds')}: {courseEndLabel}
               </Text>
               {selectedMedicines.map((medicine) => {
                 const details = medicineDetails[medicine.id] ?? {
@@ -648,6 +750,7 @@ export default function AddMedicineScreen() {
                       </View>
                       {details.slots.map((slot) => (
                         <SlotTimeEditor
+                          changeLabel={t('changeTime')}
                           hint={t('tapToChooseTime')}
                           key={slot}
                           label={t(slot)}
@@ -756,8 +859,11 @@ export default function AddMedicineScreen() {
               </View>
               <Text style={styles.summary}>{hospitalName}</Text>
               <Text style={styles.summary}>
-                {days} {t('durationDays').toLowerCase()} · {startDate} to{' '}
-                {endDate}
+                {days} {t('durationDays').toLowerCase()}
+              </Text>
+              <Text style={styles.summary}>
+                {t('courseStarts')}: {courseStartLabel} · {t('courseEnds')}:{' '}
+                {courseEndLabel}
               </Text>
               <Text style={styles.summary}>
                 {pattern === 'daily' ? t('everyDay') : t('alternateDays')}
@@ -794,6 +900,9 @@ export default function AddMedicineScreen() {
             />
             <Text style={styles.heading}>{t('reminderCreated')}</Text>
             <Text style={styles.summary}>{t('reminderCreatedMessage')}</Text>
+            <Text style={styles.summary}>
+              {t('courseStarts')}: {courseStartLabel}
+            </Text>
           </Animated.View>
         </View>
       ) : null}
@@ -804,17 +913,21 @@ export default function AddMedicineScreen() {
 function SearchBox({
   accessibilityLabel,
   autoFocus,
+  dropdownOpen,
   onChange,
   onClear,
   onFocus,
+  onToggleDropdown,
   placeholder,
   value,
 }: {
   accessibilityLabel: string;
   autoFocus?: boolean;
+  dropdownOpen?: boolean;
   onChange: (value: string) => void;
   onClear: () => void;
   onFocus?: () => void;
+  onToggleDropdown?: () => void;
   placeholder: string;
   value: string;
 }) {
@@ -846,6 +959,22 @@ function SearchBox({
           <Ionicons
             color={dashboardColors.textFaint}
             name="close-circle"
+            size={20}
+          />
+        </PressableScale>
+      ) : null}
+      {onToggleDropdown ? (
+        <PressableScale
+          accessibilityLabel={
+            dropdownOpen ? 'Hide hospital options' : 'Show hospital options'
+          }
+          accessibilityState={{ expanded: dropdownOpen }}
+          onPress={onToggleDropdown}
+          style={styles.dropdownToggle}
+        >
+          <Ionicons
+            color={dashboardColors.primary}
+            name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
             size={20}
           />
         </PressableScale>
@@ -892,16 +1021,34 @@ function Choice({
 }
 
 function MedicineImage({
+  hideWhenUnavailable = false,
   item,
+  priority = 'normal',
   style,
 }: {
+  hideWhenUnavailable?: boolean;
   item: MedicineCatalogueItem;
+  priority?: 'high' | 'low' | 'normal';
   style: object;
 }) {
-  return item.imageUrl ? (
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [item.imageUrl]);
+
+  if ((!item.imageUrl || failed) && hideWhenUnavailable) {
+    return null;
+  }
+
+  return item.imageUrl && !failed ? (
     <Image
       accessibilityLabel={item.name}
+      cachePolicy="memory-disk"
       contentFit="cover"
+      onError={() => setFailed(true)}
+      priority={priority}
+      recyclingKey={item.id}
       source={{ uri: item.imageUrl }}
       style={style}
       transition={120}
@@ -1120,6 +1267,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 36,
   },
+  dropdownToggle: {
+    alignItems: 'center',
+    borderLeftColor: dashboardColors.track,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    height: 36,
+    justifyContent: 'center',
+    paddingLeft: 10,
+    width: 34,
+  },
   dropdown: {
     backgroundColor: dashboardColors.card,
     borderColor: dashboardColors.track,
@@ -1127,6 +1283,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     maxHeight: 390,
     overflow: 'hidden',
+  },
+  dropdownHeader: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderBottomColor: dashboardColors.track,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  dropdownTitle: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+  },
+  dropdownCount: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
   },
   dropdownLoading: { paddingVertical: 24 },
   emptyResult: {
@@ -1169,6 +1343,11 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   medicineRowSelected: { backgroundColor: dashboardColors.primaryTint },
+  medicineResultName: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    flex: 1,
+  },
   thumb: { borderRadius: 12, height: 58, width: 68 },
   imageFallback: {
     alignItems: 'center',

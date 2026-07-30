@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
+import type {
+  ImagePickerAsset,
+  ImagePickerOptions,
+} from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -33,6 +36,7 @@ import {
   getCachedPatientName,
   saveCachedPatientName,
 } from '../src/lib/session';
+import { isNativeModuleAvailable } from '../src/lib/nativeModuleAvailability';
 import {
   uploadProfilePhoto,
   validateProfilePhoto,
@@ -74,7 +78,7 @@ export default function ProfileScreen() {
   const [patientId, setPatientId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] =
-    useState<ImagePicker.ImagePickerAsset | null>(null);
+    useState<ImagePickerAsset | null>(null);
   const [isAgePickerVisible, setIsAgePickerVisible] = useState(false);
 
   useEffect(() => {
@@ -135,6 +139,15 @@ export default function ProfileScreen() {
 
   const selectProfilePhoto = async (source: 'camera' | 'gallery') => {
     try {
+      if (!isNativeModuleAvailable('ExponentImagePicker')) {
+        Alert.alert(
+          'App update required',
+          'Profile photos require a rebuilt DrJiva development or production app.',
+        );
+        return;
+      }
+
+      const ImagePicker = await import('expo-image-picker');
       if (source === 'camera') {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) {
@@ -146,7 +159,7 @@ export default function ProfileScreen() {
         }
       }
 
-      const options: ImagePicker.ImagePickerOptions = {
+      const options: ImagePickerOptions = {
         allowsEditing: true,
         aspect: [1, 1],
         mediaTypes: ['images'],

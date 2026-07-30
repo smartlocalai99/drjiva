@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import {
   useFocusEffect,
   useLocalSearchParams,
@@ -7,7 +8,6 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +23,7 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
-import { SHOP_PRODUCTS, type ShopProduct } from '../src/data/shopProducts';
+import type { ShopProduct } from '../src/data/shopProducts';
 import { loadAddresses } from '../src/lib/addressStorage';
 import {
   getDefaultAddress,
@@ -31,13 +31,6 @@ import {
 } from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
 import { useLanguage } from '../src/lib/i18n';
-
-const TINTS = {
-  error: { bg: dashboardColors.errorTint, fg: dashboardColors.error },
-  primary: { bg: dashboardColors.primaryTint, fg: dashboardColors.primary },
-  success: { bg: dashboardColors.successTint, fg: dashboardColors.success },
-  warning: { bg: dashboardColors.warningTint, fg: dashboardColors.warning },
-} as const;
 
 type CartLine = {
   product: ShopProduct;
@@ -51,15 +44,16 @@ export default function CartScreen() {
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
-  const { decrement, increment, quantities } = useCart();
+  const { decrement, increment, products, quantities } = useCart();
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
 
   const lines = useMemo<CartLine[]>(() => {
-    return SHOP_PRODUCTS.filter((product) => (quantities[product.id] ?? 0) > 0).map(
-      (product) => ({ product, quantity: quantities[product.id] ?? 0 }),
-    );
-  }, [quantities]);
+    return Object.entries(quantities).flatMap(([id, quantity]) => {
+      const product = products[id];
+      return product && quantity > 0 ? [{ product, quantity }] : [];
+    });
+  }, [products, quantities]);
 
   const itemCount = useMemo(
     () => lines.reduce((sum, line) => sum + line.quantity, 0),
@@ -117,11 +111,7 @@ export default function CartScreen() {
   };
 
   const handleCheckout = () => {
-    if (!deliveryAddress) {
-      router.push({ params: { phone }, pathname: '/address-editor' });
-      return;
-    }
-    Alert.alert(t('checkout'), t('comingSoon'));
+    router.push({ params: { phone }, pathname: '/checkout' });
   };
 
   return (
@@ -175,11 +165,15 @@ export default function CartScreen() {
               onPress={openDeliveryAddresses}
             />
             {lines.map((line) => {
-              const tint = TINTS[line.product.tint];
               return (
                 <View key={line.product.id} style={styles.row}>
-                  <View style={[styles.thumb, { backgroundColor: tint.bg }]}>
-                    <Ionicons color={tint.fg} name={line.product.icon} size={26} />
+                  <View style={styles.thumb}>
+                    <Image
+                      accessibilityLabel={line.product.name}
+                      contentFit="contain"
+                      source={{ uri: line.product.imageUrl }}
+                      style={styles.thumbImage}
+                    />
                   </View>
                   <View style={styles.rowBody}>
                     <Text style={styles.rowName}>{line.product.name}</Text>
@@ -429,10 +423,16 @@ const styles = StyleSheet.create({
   },
   thumb: {
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
     borderRadius: dashboardRadii.card - 8,
     height: 56,
     justifyContent: 'center',
+    overflow: 'hidden',
     width: 56,
+  },
+  thumbImage: {
+    height: '100%',
+    width: '100%',
   },
   rowBody: {
     flex: 1,

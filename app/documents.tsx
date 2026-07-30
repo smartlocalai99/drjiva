@@ -48,12 +48,9 @@ import {
 } from '../src/lib/documentScanner';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
-import {
-  createCustomHospital,
-  fetchPatientCustomHospitals,
-} from '../src/lib/medicineCourses';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
+  createPatientDocumentHospital,
   createPatientReportSignedUrl,
   deletePatientReport,
   fetchHospitals,
@@ -97,7 +94,6 @@ export default function DocumentsScreen() {
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [openingReportId, setOpeningReportId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [extractedText, setExtractedText] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
   const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,14 +125,13 @@ export default function DocumentsScreen() {
       if (!resolvedPatientId) {
         throw new Error('Patient profile is unavailable.');
       }
-      const [verifiedHospitals, customHospitals, nextReports] =
+      const [documentHospitals, nextReports] =
         await Promise.all([
-          fetchHospitals(),
-          fetchPatientCustomHospitals(resolvedPatientId).catch(() => []),
+          fetchHospitals(resolvedPatientId),
           fetchPatientReports(resolvedPatientId),
         ]);
       setPatientId(resolvedPatientId);
-      setHospitals([...verifiedHospitals, ...customHospitals]);
+      setHospitals(documentHospitals);
       setReports(nextReports);
     } catch {
       setErrorMessage(t('unableLoadDocuments'));
@@ -168,8 +163,7 @@ export default function DocumentsScreen() {
   );
   const selectedGroup =
     reportGroups.find(
-      (group) =>
-        (group.hospitalId ?? 'unknown') === selectedHospitalKey,
+      (group) => group.key === selectedHospitalKey,
     ) ?? null;
 
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
@@ -188,21 +182,6 @@ export default function DocumentsScreen() {
     }
     setActiveTab(tab);
     router.replace({ params: { phone }, pathname: route });
-  };
-
-  const handleAddHospital = async (
-    name: string,
-  ): Promise<HospitalOption | null> => {
-    if (!patientId) {
-      return null;
-    }
-    try {
-      const hospital = await createCustomHospital(patientId, name);
-      setHospitals((current) => [...current, hospital]);
-      return hospital;
-    } catch {
-      return null;
-    }
   };
 
   const handleScan = async () => {
@@ -249,7 +228,6 @@ export default function DocumentsScreen() {
       const ocrText = await recognizeFirstPage(pages[0]!).catch(() => '');
       const classification = classifyDocument(ocrText, hospitals);
       setCapturedPages(pages);
-      setExtractedText(ocrText.trim());
       setDetectedHospitalId(classification.hospital?.id ?? null);
       setDetectedReportType(classification.reportType);
       setReviewVisible(true);
@@ -263,8 +241,30 @@ export default function DocumentsScreen() {
     }
   };
 
+  const handleCreateHospital = async (
+    name: string,
+  ): Promise<HospitalOption> => {
+    if (!patientId) {
+      throw new Error('Patient profile is unavailable.');
+    }
+    const createdHospital = await createPatientDocumentHospital(
+      patientId,
+      name,
+    );
+    setHospitals((current) =>
+      current.some(
+        (hospital) =>
+          hospital.id === createdHospital.id &&
+          hospital.source === createdHospital.source,
+      )
+        ? current
+        : [createdHospital, ...current],
+    );
+    return createdHospital;
+  };
+
   const handleSave = async (metadata: {
-    hospitalId: string;
+    hospital: HospitalOption;
     reportType: ReportType;
   }) => {
     if (!patientId || capturedPages.length === 0 || isSaving) {
@@ -279,7 +279,7 @@ export default function DocumentsScreen() {
       );
       pdfUri = await createReportPdf(compressedPages);
       const report = await uploadPatientReport({
-        hospitalId: metadata.hospitalId,
+        hospital: metadata.hospital,
         label: metadata.reportType,
         pageCount: capturedPages.length,
         patientId,
@@ -289,7 +289,6 @@ export default function DocumentsScreen() {
       setReports((current) => [report, ...current]);
       setReviewVisible(false);
       setCapturedPages([]);
-      setExtractedText('');
       Alert.alert(t('documentSaved'), t('pdfAttached'));
     } catch (error) {
       const message =
@@ -492,9 +491,7 @@ export default function DocumentsScreen() {
         ) : (
           <HospitalFolderList
             groups={reportGroups}
-            onOpen={(group) =>
-              setSelectedHospitalKey(group.hospitalId ?? 'unknown')
-            }
+            onOpen={(group) => setSelectedHospitalKey(group.key)}
           />
         )}
       </ScrollView>
@@ -515,17 +512,15 @@ export default function DocumentsScreen() {
       <DocumentReviewSheet
         detectedHospitalId={detectedHospitalId}
         detectedReportType={detectedReportType}
-        extractedText={extractedText}
         hospitals={hospitals}
         isSaving={isSaving}
-        onAddHospital={handleAddHospital}
         onCancel={() => {
           if (!isSaving) {
             setReviewVisible(false);
             setCapturedPages([]);
-            setExtractedText('');
           }
         }}
+        onCreateHospital={handleCreateHospital}
         onSave={(metadata) => void handleSave(metadata)}
         pageCount={capturedPages.length}
         visible={reviewVisible}

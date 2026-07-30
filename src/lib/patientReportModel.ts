@@ -1,15 +1,18 @@
 import type {
   HospitalOption,
+  HospitalSource,
   ReportType,
 } from './documentClassifier';
 
 export type PatientReportRow = {
   created_at: string;
+  document_hospital_id: string | null;
   hospital_id: string | null;
   id: string;
   label: string | null;
   page_count: number;
   patient_id: string;
+  patient_document_hospital_id: string | null;
   report_type: ReportType | null;
   storage_path: string | null;
 };
@@ -17,6 +20,7 @@ export type PatientReportRow = {
 export type PatientReport = {
   createdAt: string;
   hospitalId: string | null;
+  hospitalSource: HospitalSource | null;
   id: string;
   label: string | null;
   pageCount: number;
@@ -26,6 +30,7 @@ export type PatientReport = {
 };
 
 export type PatientReportHospitalGroup = {
+  key: string;
   hospitalId: string | null;
   hospitalName: string;
   reports: PatientReport[];
@@ -34,7 +39,7 @@ export type PatientReportHospitalGroup = {
 const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/;
 
 export function buildPatientReportInsert(input: {
-  hospitalId: string;
+  hospital: Pick<HospitalOption, 'id' | 'source'>;
   label: string;
   ownerUserId: string;
   pageCount: number;
@@ -45,11 +50,14 @@ export function buildPatientReportInsert(input: {
   return {
     file_type: 'pdf',
     file_url: input.storagePath,
-    hospital_id: input.hospitalId,
+    document_hospital_id:
+      input.hospital.source === 'directory' ? input.hospital.id : null,
     label: input.label,
     owner_user_id: input.ownerUserId,
     page_count: input.pageCount,
     patient_id: input.patientId,
+    patient_document_hospital_id:
+      input.hospital.source === 'patient' ? input.hospital.id : null,
     report_type: input.reportType,
     storage_path: input.storagePath,
     uploaded_by: 'patient',
@@ -69,9 +77,18 @@ export function buildReportStoragePath(
 }
 
 export function mapPatientReportRow(row: PatientReportRow): PatientReport {
+  const hospitalId =
+    row.patient_document_hospital_id ??
+    row.document_hospital_id ??
+    row.hospital_id;
   return {
     createdAt: row.created_at,
-    hospitalId: row.hospital_id,
+    hospitalId,
+    hospitalSource: row.patient_document_hospital_id
+      ? 'patient'
+      : row.document_hospital_id
+        ? 'directory'
+        : null,
     id: row.id,
     label: row.label,
     pageCount: row.page_count,
@@ -102,12 +119,26 @@ export function groupPatientReportsByHospital(
   const groups = new Map<string, PatientReportHospitalGroup>();
 
   for (const report of reports) {
-    const key = report.hospitalId ?? 'unknown';
+    const directoryName = report.hospitalId
+      ? hospitalNames.get(report.hospitalId)
+      : null;
+    const hospitalName =
+      directoryName ??
+      (report.hospitalId ? fallbackNames.hospital : fallbackNames.otherHospital);
+    const normalizedName = directoryName
+      ?.normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    const key = normalizedName
+      ? `name:${normalizedName}`
+      : report.hospitalId
+        ? `id:${report.hospitalId}`
+        : 'unknown';
     const group = groups.get(key) ?? {
+      key,
       hospitalId: report.hospitalId,
-      hospitalName: report.hospitalId
-        ? hospitalNames.get(report.hospitalId) ?? fallbackNames.hospital
-        : fallbackNames.otherHospital,
+      hospitalName,
       reports: [],
     };
     group.reports.push(report);

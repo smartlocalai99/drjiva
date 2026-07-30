@@ -26,7 +26,7 @@ describe('buildPatientReportInsert', () => {
   it('uses the database file and uploader values for patient PDFs', () => {
     expect(
       buildPatientReportInsert({
-        hospitalId: 'hospital-1',
+        hospital: { id: 'hospital-1', source: 'directory' },
         label: 'Blood work',
         ownerUserId: 'user-1',
         pageCount: 2,
@@ -36,7 +36,26 @@ describe('buildPatientReportInsert', () => {
       }),
     ).toMatchObject({
       file_type: 'pdf',
+      document_hospital_id: 'hospital-1',
+      patient_document_hospital_id: null,
       uploaded_by: 'patient',
+    });
+  });
+
+  it('uses only the private hospital column for a patient-created hospital', () => {
+    expect(
+      buildPatientReportInsert({
+        hospital: { id: 'custom-hospital-1', source: 'patient' },
+        label: 'Prescription',
+        ownerUserId: 'user-1',
+        pageCount: 1,
+        patientId: 'patient-1',
+        reportType: 'Prescription',
+        storagePath: 'user-1/patient-1/document-1.pdf',
+      }),
+    ).toMatchObject({
+      document_hospital_id: null,
+      patient_document_hospital_id: 'custom-hospital-1',
     });
   });
 });
@@ -46,17 +65,20 @@ describe('mapPatientReportRow', () => {
     expect(
       mapPatientReportRow({
         created_at: '2026-07-28T12:00:00.000Z',
+        document_hospital_id: 'document-hospital-1',
         hospital_id: 'hospital-1',
         id: 'report-1',
         label: 'Blood work',
         page_count: 2,
         patient_id: 'patient-1',
+        patient_document_hospital_id: null,
         report_type: 'Lab Report',
         storage_path: 'user-1/patient-1/document-1.pdf',
       }),
     ).toEqual({
       createdAt: '2026-07-28T12:00:00.000Z',
-      hospitalId: 'hospital-1',
+      hospitalId: 'document-hospital-1',
+      hospitalSource: 'directory',
       id: 'report-1',
       label: 'Blood work',
       pageCount: 2,
@@ -65,12 +87,33 @@ describe('mapPatientReportRow', () => {
       storagePath: 'user-1/patient-1/document-1.pdf',
     });
   });
+
+  it('prefers a patient-created hospital over curated and legacy IDs', () => {
+    expect(
+      mapPatientReportRow({
+        created_at: '2026-07-28T12:00:00.000Z',
+        document_hospital_id: 'directory-hospital',
+        hospital_id: 'legacy-hospital',
+        id: 'report-1',
+        label: 'Prescription',
+        page_count: 1,
+        patient_document_hospital_id: 'patient-hospital',
+        patient_id: 'patient-1',
+        report_type: 'Prescription',
+        storage_path: 'user-1/patient-1/document-1.pdf',
+      }),
+    ).toMatchObject({
+      hospitalId: 'patient-hospital',
+      hospitalSource: 'patient',
+    });
+  });
 });
 
 describe('groupPatientReportsByHospital', () => {
   it('groups reports into named hospital folders with newest first', () => {
     const base = {
       hospitalId: 'hospital-1',
+      hospitalSource: 'directory',
       label: null,
       pageCount: 1,
       patientId: 'patient-1',
@@ -92,10 +135,17 @@ describe('groupPatientReportsByHospital', () => {
             id: 'newer',
           },
         ],
-        [{ id: 'hospital-1', name: 'Medico Hospital' }],
+        [
+          {
+            id: 'hospital-1',
+            name: 'Medico Hospital',
+            source: 'directory',
+          },
+        ],
       ),
     ).toEqual([
       {
+        key: 'name:medico hospital',
         hospitalId: 'hospital-1',
         hospitalName: 'Medico Hospital',
         reports: [
@@ -104,6 +154,44 @@ describe('groupPatientReportsByHospital', () => {
         ],
       },
     ]);
+  });
+
+  it('keeps reports with the same hospital name in one folder even when IDs differ', () => {
+    const report = {
+      createdAt: '2026-07-30T12:00:00.000Z',
+      hospitalSource: 'patient',
+      label: null,
+      pageCount: 1,
+      patientId: 'patient-1',
+      reportType: 'Medical Bill',
+      storagePath: null,
+    } as const;
+
+    const groups = groupPatientReportsByHospital(
+      [
+        { ...report, hospitalId: 'hospital-a', id: 'report-a' },
+        { ...report, hospitalId: 'hospital-b', id: 'report-b' },
+      ],
+      [
+        {
+          id: 'hospital-a',
+          name: 'Palla Hospitals',
+          source: 'directory',
+        },
+        {
+          id: 'hospital-b',
+          name: 'PALLA   HOSPITALS',
+          source: 'patient',
+        },
+      ],
+    );
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      hospitalName: 'Palla Hospitals',
+      key: 'name:palla hospitals',
+      reports: [{ id: 'report-a' }, { id: 'report-b' }],
+    });
   });
 });
 

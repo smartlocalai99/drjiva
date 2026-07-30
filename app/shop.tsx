@@ -1,21 +1,39 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
   Pressable,
-  ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+} from 'react-native-reanimated';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
+import {
+  BottomNav,
+  type NavTabKey,
+} from '../src/components/dashboard/BottomNav';
 import { PressableScale } from '../src/components/PressableScale';
 import {
   dashboardColors,
@@ -24,205 +42,633 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
-import { SHOP_PRODUCTS, type ShopProduct } from '../src/data/shopProducts';
+import {
+  fetchActiveMedicineReminders,
+} from '../src/data/medicines';
+import {
+  fetchShopProducts,
+  type ShopProduct,
+} from '../src/data/shopProducts';
+import {
+  buildReminderMedicineReorders,
+  buildShopSections,
+  getUniqueReminderMedicineNames,
+  type ReminderMedicineReorder,
+  type ShopProductSection,
+} from '../src/data/shopSections';
+import {
+  loadAddresses,
+} from '../src/lib/addressStorage';
+import {
+  getDefaultAddress,
+  type SavedAddress,
+} from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
+import { formatRupees } from '../src/lib/currency';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
-
-const TINTS = {
-  error: { bg: dashboardColors.errorTint, fg: dashboardColors.error },
-  primary: { bg: dashboardColors.primaryTint, fg: dashboardColors.primary },
-  success: { bg: dashboardColors.successTint, fg: dashboardColors.success },
-  warning: { bg: dashboardColors.warningTint, fg: dashboardColors.warning },
-} as const;
+import { getPatientByPhone } from '../src/lib/patients';
+import { getSessionPhone } from '../src/lib/session';
 
 const PLACEHOLDER_QUERIES = [
-  'Dolo 650',
-  'Crocin',
-  'Combiflam',
+  'Dolo-650',
   'Paracetamol',
-  'Cetirizine',
-  'ORS',
-  'Volini',
-  'Digene',
+  'Cold relief',
+  'Pain management',
 ] as const;
-const PLACEHOLDER_ROTATION_MS = 2200;
+const PLACEHOLDER_ROTATION_MS = 2400;
+const DELIVERY_AGENT_IMAGE = require('../assets/shop/delivery-agent.png');
+
+const SECTION_ICONS = {
+  body_pains: 'body-outline',
+  cold: 'snow-outline',
+  fever: 'thermometer-outline',
+  headache: 'happy-outline',
+  search: 'search-outline',
+} as const;
+
+const SECTION_TINTS = {
+  body_pains: {
+    backgroundColor: dashboardColors.primaryTint,
+    color: dashboardColors.primary,
+  },
+  cold: {
+    backgroundColor: '#E9F7F8',
+    color: '#0F8A94',
+  },
+  fever: {
+    backgroundColor: dashboardColors.errorTint,
+    color: dashboardColors.error,
+  },
+  headache: {
+    backgroundColor: dashboardColors.warningTint,
+    color: '#C87906',
+  },
+  search: {
+    backgroundColor: dashboardColors.primaryTint,
+    color: dashboardColors.primary,
+  },
+} as const;
 
 export default function ShopScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { totalItems } = useCart();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
-  const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
-  const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
-
+  const phoneParam = Array.isArray(params.phone)
+    ? params.phone[0]
+    : params.phone;
+  const routePhone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<NavTabKey>('shop');
-  const [query, setQuery] = useState('');
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const cart = useCart();
 
-  const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
-  const scrollBottomPadding = navBottomOffset + dashboardLayout.bottomNavHeight + 24;
+  const [activeTab, setActiveTab] = useState<NavTabKey>('shop');
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [catalogueAttempt, setCatalogueAttempt] = useState(0);
+  const [catalogueError, setCatalogueError] = useState(false);
+  const [isLoadingCatalogue, setIsLoadingCatalogue] = useState(true);
+  const [phone, setPhone] = useState(routePhone);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [products, setProducts] = useState<ShopProduct[]>([]);
+  const [query, setQuery] = useState('');
+  const [reminderNames, setReminderNames] = useState<string[]>([]);
 
   useEffect(() => {
-    if (query.length > 0) {
+    if (routePhone) {
+      setPhone(routePhone);
       return;
     }
 
-    const rotationTimer = setInterval(() => {
-      setPlaceholderIndex((current) => (current + 1) % PLACEHOLDER_QUERIES.length);
-    }, PLACEHOLDER_ROTATION_MS);
-
+    let cancelled = false;
+    void getSessionPhone()
+      .then((sessionPhone) => {
+        if (!cancelled) {
+          setPhone(
+            (sessionPhone ?? '').replace(/\D/g, '').slice(-10),
+          );
+        }
+      })
+      .catch(() => undefined);
     return () => {
-      clearInterval(rotationTimer);
+      cancelled = true;
     };
+  }, [routePhone]);
+
+  useEffect(() => {
+    if (query) {
+      return;
+    }
+    const rotationTimer = setInterval(() => {
+      setPlaceholderIndex(
+        (current) => (current + 1) % PLACEHOLDER_QUERIES.length,
+      );
+    }, PLACEHOLDER_ROTATION_MS);
+    return () => clearInterval(rotationTimer);
   }, [query]);
 
-  const filteredProducts = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed) {
-      return SHOP_PRODUCTS;
-    }
-    return SHOP_PRODUCTS.filter((product) =>
-      product.name.toLowerCase().includes(trimmed),
-    );
-  }, [query]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoadingCatalogue(true);
+    setCatalogueError(false);
+
+    void fetchShopProducts('', controller.signal)
+      .then((nextProducts) => {
+        setProducts(nextProducts);
+        const firstImages = buildShopSections(nextProducts)
+          .flatMap((section) => section.data)
+          .slice(0, 10)
+          .map((product) => product.imageUrl);
+        if (firstImages.length > 0) {
+          void Image.prefetch(firstImages, 'memory-disk').catch(
+            () => undefined,
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        if (
+          !(error instanceof Error && error.name === 'AbortError') &&
+          !controller.signal.aborted
+        ) {
+          setCatalogueError(true);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoadingCatalogue(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [catalogueAttempt]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!phone) {
+        return undefined;
+      }
+
+      let cancelled = false;
+      void Promise.all([
+        loadAddresses(phone).catch(() => []),
+        getPatientByPhone(phone)
+          .then((patient) =>
+            patient
+              ? fetchActiveMedicineReminders(patient.patientId)
+              : [],
+          )
+          .catch(() => []),
+      ]).then(([nextAddresses, reminders]) => {
+        if (cancelled) {
+          return;
+        }
+        setAddresses(nextAddresses);
+        setReminderNames(
+          getUniqueReminderMedicineNames(
+            reminders.map((reminder) => reminder.medicineName),
+          ),
+        );
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [phone]),
+  );
+
+  const sections = useMemo(
+    () => buildShopSections(products, query),
+    [products, query],
+  );
+  const reminderMedicines = useMemo(
+    () => buildReminderMedicineReorders(reminderNames, products),
+    [products, reminderNames],
+  );
+  const isSearching = query.trim().length > 0;
+  const deliveryAddress = useMemo(
+    () => getDefaultAddress(addresses),
+    [addresses],
+  );
+  const cartTotal = useMemo(
+    () =>
+      Object.entries(cart.quantities).reduce((total, [id, quantity]) => {
+        const product = cart.products[id];
+        return total + (product ? product.price * quantity : 0);
+      }, 0),
+    [cart.products, cart.quantities],
+  );
+
+  const navBottomOffset =
+    insets.bottom + dashboardLayout.navBottomGap;
+  const bottomControlHeight =
+    cart.totalItems > 0 ? 68 : dashboardLayout.bottomNavHeight;
+  const listBottomPadding =
+    navBottomOffset + bottomControlHeight + dashboardSpacing.xl;
 
   const handleSelectTab = (tab: NavTabKey) => {
     if (tab === activeTab) {
       return;
     }
-
     const route = getTabRoute(tab);
     if (!route) {
       return;
     }
-
     setActiveTab(tab);
     router.replace({ params: { phone }, pathname: route });
   };
 
-  const handleOpenCart = () => {
-    router.push({ params: { phone }, pathname: '/cart' });
+  const openAddressSheet = () => {
+    router.push({ params: { phone }, pathname: '/shop-address' });
   };
+
+  const renderProduct = useCallback(
+    ({ item }: { item: ShopProduct }) => <ProductRow product={item} />,
+    [],
+  );
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={styles.header}>
-        <View style={styles.headerSide} />
-        <Text style={styles.headerTitle}>{t('shop')}</Text>
+      <View style={styles.topBar}>
         <Pressable
-          accessibilityLabel={t('cart')}
-          hitSlop={8}
-          onPress={handleOpenCart}
-          style={styles.headerSide}
+          accessibilityLabel={
+            deliveryAddress
+              ? 'Change delivery address'
+              : 'Add delivery address'
+          }
+          accessibilityRole="button"
+          onPress={openAddressSheet}
+          style={styles.addressTrigger}
         >
-          <Ionicons color={dashboardColors.text} name="cart-outline" size={24} />
-          {totalItems > 0 ? (
+          <View style={styles.locationIcon}>
+            <Ionicons
+              color={dashboardColors.primary}
+              name="location"
+              size={18}
+            />
+          </View>
+          <View style={styles.addressTriggerCopy}>
+            <Text style={styles.deliverTo}>Deliver to</Text>
+            <View style={styles.addressValueRow}>
+              <Text numberOfLines={1} style={styles.addressValue}>
+                {formatAddressTrigger(deliveryAddress)}
+              </Text>
+              <Ionicons
+                color={dashboardColors.textMuted}
+                name="chevron-down"
+                size={15}
+              />
+            </View>
+          </View>
+        </Pressable>
+
+        <PressableScale
+          accessibilityLabel={`${t('cart')}, ${cart.totalItems} items`}
+          onPress={() =>
+            router.push({ params: { phone }, pathname: '/cart' })
+          }
+          pressedScale={0.94}
+          style={styles.bagButton}
+        >
+          <Ionicons
+            color={dashboardColors.text}
+            name="bag-handle-outline"
+            size={23}
+          />
+          {cart.totalItems > 0 ? (
             <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{totalItems}</Text>
+              <Text style={styles.cartBadgeText}>
+                {cart.totalItems > 99 ? '99+' : cart.totalItems}
+              </Text>
             </View>
           ) : null}
-        </Pressable>
+        </PressableScale>
       </View>
 
-      <View style={styles.searchSection}>
-        <Text style={styles.subtitle}>{t('shopSubtitle')}</Text>
-
+      <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
-          <Ionicons color={dashboardColors.textFaint} name="search-outline" size={18} />
+          <Ionicons
+            color={dashboardColors.textFaint}
+            name="search-outline"
+            size={19}
+          />
           <View style={styles.searchInputWrap}>
             <TextInput
               accessibilityLabel={t('searchMedicine')}
+              autoCorrect={false}
+              clearButtonMode="while-editing"
               onChangeText={setQuery}
+              returnKeyType="search"
               style={styles.searchInput}
               value={query}
             />
-            {query.length === 0 ? (
+            {!query ? (
               <Animated.Text
-                entering={FadeInDown.duration(280)}
-                exiting={FadeOutUp.duration(200)}
+                entering={FadeInDown.duration(220)}
+                exiting={FadeOutUp.duration(160)}
                 key={placeholderIndex}
                 pointerEvents="none"
                 style={styles.searchPlaceholder}
               >
-                {PLACEHOLDER_QUERIES[placeholderIndex]}
+                Search “{PLACEHOLDER_QUERIES[placeholderIndex]}”
               </Animated.Text>
             ) : null}
           </View>
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: scrollBottomPadding },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.grid}>
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+      {isLoadingCatalogue ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator color={dashboardColors.primary} />
+          <Text style={styles.stateText}>Loading the medicine shop…</Text>
         </View>
-      </ScrollView>
+      ) : catalogueError ? (
+        <View style={styles.centerState}>
+          <View style={styles.stateIcon}>
+            <Ionicons
+              color={dashboardColors.primary}
+              name="cloud-offline-outline"
+              size={28}
+            />
+          </View>
+          <Text style={styles.stateTitle}>Shop is unavailable</Text>
+          <Text style={styles.stateText}>
+            Check your connection and try loading again.
+          </Text>
+          <PressableScale
+            onPress={() => setCatalogueAttempt((current) => current + 1)}
+            style={styles.retryButton}
+          >
+            <Text style={styles.retryText}>Try again</Text>
+          </PressableScale>
+        </View>
+      ) : (
+        <SectionList
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: listBottomPadding },
+          ]}
+          initialNumToRender={8}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={<EmptySearch query={query} />}
+          ListHeaderComponent={
+            isSearching ? null : (
+              <ShopListHeader reminderMedicines={reminderMedicines} />
+            )
+          }
+          maxToRenderPerBatch={8}
+          renderItem={renderProduct}
+          renderSectionHeader={({ section }) => (
+            <ShopSectionHeader section={section} />
+          )}
+          sections={sections}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+          windowSize={7}
+        />
+      )}
 
-      <BottomNav
-        activeTab={activeTab}
-        bottomOffset={navBottomOffset}
-        onSelectTab={handleSelectTab}
-      />
+      {cart.totalItems > 0 ? (
+        <CheckoutBar
+          bottomOffset={navBottomOffset}
+          itemCount={cart.totalItems}
+          onPress={() =>
+            router.push({ params: { phone }, pathname: '/checkout' })
+          }
+          total={cartTotal}
+        />
+      ) : (
+        <BottomNav
+          activeTab={activeTab}
+          bottomOffset={navBottomOffset}
+          onSelectTab={handleSelectTab}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
-function ProductCard({ product }: { product: ShopProduct }) {
-  const { t } = useLanguage();
-  const { decrement, getQuantity, increment } = useCart();
+function ShopListHeader({
+  reminderMedicines,
+}: {
+  reminderMedicines: ReminderMedicineReorder[];
+}) {
+  return (
+    <View>
+      <View style={styles.heroRow}>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroEyebrow}>DRJIVA HEALTH SHOP</Text>
+          <Text style={styles.heroTitle}>Everyday care, made simple.</Text>
+        </View>
+        <Image
+          accessibilityLabel="Masked medicine delivery agent"
+          contentFit="contain"
+          source={DELIVERY_AGENT_IMAGE}
+          style={styles.heroAgent}
+        />
+      </View>
+
+      {reminderMedicines.length > 0 ? (
+        <View style={styles.reminderPanel}>
+          <View style={styles.reminderHeadingRow}>
+            <View style={styles.reminderIcon}>
+              <Ionicons
+                color={dashboardColors.primary}
+                name="repeat-outline"
+                size={18}
+              />
+            </View>
+            <View style={styles.reminderHeadingCopy}>
+              <Text style={styles.reminderTitle}>
+                Your reminder medicines
+              </Text>
+              <Text style={styles.reminderSubtitle}>
+                Reorder verified matches from your active routine
+              </Text>
+            </View>
+          </View>
+          <View style={styles.reminderNames}>
+            {reminderMedicines.map((medicine) => (
+              <ReminderMedicineRow
+                key={medicine.key}
+                medicine={medicine}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.guidance}>
+        <Ionicons
+          color={dashboardColors.textMuted}
+          name="shield-checkmark-outline"
+          size={15}
+        />
+        <Text style={styles.guidanceText}>
+          Use medicines only as directed by your clinician.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function ReminderMedicineRow({
+  medicine,
+}: {
+  medicine: ReminderMedicineReorder;
+}) {
+  const { add, getQuantity, increment } = useCart();
+  const product = medicine.product;
   const quantity = getQuantity(product.id);
-  const tint = TINTS[product.tint];
+
+  const reorder = () => {
+    void Haptics.impactAsync(
+      Haptics.ImpactFeedbackStyle.Light,
+    ).catch(() => undefined);
+
+    if (quantity === 0) {
+      add(product);
+    } else {
+      increment(product.id);
+    }
+  };
 
   return (
-    <View style={styles.card}>
-      <View style={[styles.tile, { backgroundColor: tint.bg }]}>
-        <Ionicons color={tint.fg} name={product.icon} size={40} />
-        <View style={styles.packBadge}>
-          <Text style={styles.packBadgeText}>{product.packSize}</Text>
-        </View>
+    <View style={styles.reminderMedicineRow}>
+      <View style={styles.reminderMedicineCopy}>
+        <Text numberOfLines={1} style={styles.reminderMedicineName}>
+          {medicine.medicineName}
+        </Text>
+        <Text numberOfLines={1} style={styles.reminderMedicineMeta}>
+          {product.packSize} · {formatRupees(product.price)}
+          {quantity > 0 ? ` · ${quantity} in bag` : ''}
+        </Text>
       </View>
-      <Text numberOfLines={2} style={styles.cardName}>
-        {product.name}
-      </Text>
-      <Text style={styles.cardPrice}>₹{product.price}</Text>
+
+      <PressableScale
+        accessibilityHint="Adds one more to your shopping bag"
+        accessibilityLabel={`Reorder ${medicine.medicineName}${
+          quantity > 0 ? `, ${quantity} already in bag` : ''
+        }`}
+        onPress={reorder}
+        pressedScale={0.94}
+        style={styles.reorderButton}
+      >
+        <Ionicons
+          color={dashboardColors.primary}
+          name="repeat-outline"
+          size={14}
+        />
+        <Text style={styles.reorderButtonText}>Reorder</Text>
+      </PressableScale>
+    </View>
+  );
+}
+
+function ShopSectionHeader({
+  section,
+}: {
+  section: ShopProductSection;
+}) {
+  const tint = SECTION_TINTS[section.code];
+  return (
+    <View style={styles.sectionHeader}>
+      <View
+        style={[
+          styles.sectionIcon,
+          { backgroundColor: tint.backgroundColor },
+        ]}
+      >
+        <Ionicons
+          color={tint.color}
+          name={SECTION_ICONS[section.code]}
+          size={17}
+        />
+      </View>
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+      <Text style={styles.sectionCount}>{section.data.length}</Text>
+    </View>
+  );
+}
+
+function ProductRow({ product }: { product: ShopProduct }) {
+  const { t } = useLanguage();
+  const { add, decrement, getQuantity, increment } = useCart();
+  const quantity = getQuantity(product.id);
+
+  const addProduct = () => {
+    void Haptics.impactAsync(
+      Haptics.ImpactFeedbackStyle.Light,
+    ).catch(() => undefined);
+    add(product);
+  };
+
+  return (
+    <View style={styles.productCard}>
+      <View style={styles.productImageFrame}>
+        <Image
+          accessibilityLabel={product.name}
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          recyclingKey={product.id}
+          source={{ uri: product.imageUrl }}
+          style={styles.productImage}
+          transition={100}
+        />
+      </View>
+      <View style={styles.productCopy}>
+        <Text numberOfLines={2} style={styles.productName}>
+          {product.name}
+        </Text>
+        <Text numberOfLines={1} style={styles.productMeta}>
+          {product.packSize}
+        </Text>
+        <Text style={styles.productPrice}>
+          {formatRupees(product.price)}
+        </Text>
+      </View>
 
       {quantity === 0 ? (
         <PressableScale
           accessibilityLabel={`${t('addToCart')}: ${product.name}`}
-          onPress={() => increment(product.id)}
-          pressedScale={0.96}
-          style={styles.addButton}
+          onPress={addProduct}
+          pressedScale={0.95}
+          style={styles.addToCartButton}
         >
-          <Text style={styles.addButtonText}>{t('addToCart')}</Text>
+          <Ionicons
+            color={dashboardColors.primary}
+            name="add"
+            size={16}
+          />
+          <Text style={styles.addToCartText}>Add</Text>
         </PressableScale>
       ) : (
-        <View style={styles.stepper}>
+        <View style={styles.quantityControl}>
           <PressableScale
-            accessibilityLabel="Decrease quantity"
+            accessibilityLabel={`Decrease ${product.name} quantity`}
             onPress={() => decrement(product.id)}
-            pressedScale={0.9}
-            style={styles.stepperButton}
+            pressedScale={0.88}
+            style={styles.quantityButton}
           >
-            <Ionicons color={dashboardColors.primary} name="remove" size={16} />
+            <Ionicons
+              color={dashboardColors.primary}
+              name={quantity === 1 ? 'trash-outline' : 'remove'}
+              size={15}
+            />
           </PressableScale>
-          <Text style={styles.stepperValue}>{quantity}</Text>
+          <View style={styles.quantityValueWrap}>
+            <Text style={styles.quantityLabel}>QTY</Text>
+            <Text style={styles.quantityValue}>{quantity}</Text>
+          </View>
           <PressableScale
-            accessibilityLabel="Increase quantity"
+            accessibilityLabel={`Increase ${product.name} quantity`}
             onPress={() => increment(product.id)}
-            pressedScale={0.9}
-            style={styles.stepperButton}
+            pressedScale={0.88}
+            style={styles.quantityButton}
           >
-            <Ionicons color={dashboardColors.primary} name="add" size={16} />
+            <Ionicons
+              color={dashboardColors.primary}
+              name="add"
+              size={15}
+            />
           </PressableScale>
         </View>
       )}
@@ -230,76 +676,180 @@ function ProductCard({ product }: { product: ShopProduct }) {
   );
 }
 
+function CheckoutBar({
+  bottomOffset,
+  itemCount,
+  onPress,
+  total,
+}: {
+  bottomOffset: number;
+  itemCount: number;
+  onPress: () => void;
+  total: number;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={`Checkout ${itemCount} items for ${formatRupees(total)}`}
+      onPress={onPress}
+      pressedScale={0.985}
+      style={[styles.checkoutBar, { bottom: bottomOffset }]}
+    >
+      <View style={styles.checkoutBag}>
+        <Ionicons color="#FFFFFF" name="bag-check-outline" size={21} />
+      </View>
+      <View style={styles.checkoutCopy}>
+        <Text style={styles.checkoutTitle}>Checkout</Text>
+        <Text style={styles.checkoutSubtitle}>
+          {itemCount} {itemCount === 1 ? 'item' : 'items'}
+        </Text>
+      </View>
+      <Text style={styles.checkoutTotal}>{formatRupees(total)}</Text>
+      <Ionicons color="#FFFFFF" name="arrow-forward" size={19} />
+    </PressableScale>
+  );
+}
+
+function EmptySearch({ query }: { query: string }) {
+  return (
+    <View style={styles.emptySearch}>
+      <View style={styles.stateIcon}>
+        <Ionicons
+          color={dashboardColors.primary}
+          name="search-outline"
+          size={28}
+        />
+      </View>
+      <Text style={styles.stateTitle}>
+        {query ? 'No matching medicines' : 'No shop medicines yet'}
+      </Text>
+      <Text style={styles.stateText}>
+        {query
+          ? 'Try a different medicine name or active ingredient.'
+          : 'Products with verified images and prices will appear here.'}
+      </Text>
+    </View>
+  );
+}
+
+function formatAddressTrigger(address: SavedAddress | undefined): string {
+  if (!address) {
+    return 'Add delivery address';
+  }
+  const label =
+    address.label === 'Other'
+      ? address.customLabel || 'Other'
+      : address.label;
+  const detail = [address.building, address.area]
+    .filter(Boolean)
+    .join(', ');
+  return detail ? `${label} · ${detail}` : label;
+}
+
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: dashboardColors.bg,
+    backgroundColor: '#F5F7FB',
     flex: 1,
   },
-  header: {
+  topBar: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.pagePadding,
-    paddingVertical: dashboardSpacing.sm,
+    paddingTop: dashboardSpacing.sm,
   },
-  headerSide: {
+  addressTrigger: {
     alignItems: 'center',
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
+    flex: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    minHeight: 48,
   },
-  headerTitle: {
-    ...dashboardTypography.title,
+  locationIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  addressTriggerCopy: {
+    flex: 1,
+  },
+  deliverTo: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 10,
+  },
+  addressValueRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  addressValue: {
+    ...dashboardTypography.body,
     color: dashboardColors.text,
+    flexShrink: 1,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+  },
+  bagButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderColor: '#E4E8F0',
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
   },
   cartBadge: {
     alignItems: 'center',
     backgroundColor: dashboardColors.error,
-    borderRadius: 8,
-    height: 16,
+    borderColor: '#FFFFFF',
+    borderRadius: 9,
+    borderWidth: 2,
+    height: 19,
     justifyContent: 'center',
-    minWidth: 16,
+    minWidth: 19,
     paddingHorizontal: 3,
     position: 'absolute',
-    right: -4,
-    top: -4,
+    right: -5,
+    top: -5,
   },
   cartBadgeText: {
     color: '#FFFFFF',
     fontFamily: 'Inter_700Bold',
-    fontSize: 10,
+    fontSize: 9,
   },
-  searchSection: {
+  searchWrap: {
+    paddingBottom: dashboardSpacing.sm,
     paddingHorizontal: dashboardSpacing.pagePadding,
-  },
-  subtitle: {
-    ...dashboardTypography.body,
-    color: dashboardColors.textMuted,
+    paddingTop: dashboardSpacing.sm,
   },
   searchBar: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
-    borderRadius: dashboardRadii.pill,
+    borderColor: '#E4E8F0',
+    borderRadius: 18,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: dashboardSpacing.sm,
-    marginTop: dashboardSpacing.gap,
-    marginBottom: dashboardSpacing.md,
-    paddingHorizontal: dashboardSpacing.gap,
-    paddingVertical: 12,
+    height: 50,
+    paddingHorizontal: dashboardSpacing.md,
     shadowColor: dashboardColors.shadow,
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.04,
+    shadowRadius: 14,
   },
   searchInputWrap: {
     flex: 1,
-    height: 20,
+    height: 22,
     justifyContent: 'center',
   },
   searchInput: {
     ...dashboardTypography.body,
     color: dashboardColors.text,
-    fontSize: 15,
+    fontSize: 14,
     height: '100%',
     padding: 0,
     position: 'absolute',
@@ -308,88 +858,350 @@ const styles = StyleSheet.create({
   searchPlaceholder: {
     ...dashboardTypography.body,
     color: dashboardColors.textFaint,
-    fontSize: 15,
+    fontSize: 14,
     left: 0,
     position: 'absolute',
   },
-  content: {
+  listContent: {
     paddingHorizontal: dashboardSpacing.pagePadding,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: dashboardSpacing.gap,
-    marginTop: dashboardSpacing.sm,
-  },
-  card: {
-    width: '47%',
-  },
-  tile: {
+  heroRow: {
     alignItems: 'center',
-    aspectRatio: 1,
-    borderRadius: dashboardRadii.card,
-    justifyContent: 'center',
-    width: '100%',
-  },
-  packBadge: {
-    backgroundColor: dashboardColors.card,
-    borderRadius: dashboardRadii.pill,
-    paddingHorizontal: dashboardSpacing.sm,
-    paddingVertical: 4,
-    position: 'absolute',
-    right: dashboardSpacing.sm,
-    top: dashboardSpacing.sm,
-  },
-  packBadgeText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.text,
-    fontSize: 11,
-  },
-  cardName: {
-    ...dashboardTypography.body,
-    color: dashboardColors.text,
+    backgroundColor: '#102A56',
+    borderRadius: 22,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
     marginTop: dashboardSpacing.sm,
-    textAlign: 'center',
+    minHeight: 176,
+    overflow: 'hidden',
+    paddingHorizontal: dashboardSpacing.gap,
   },
-  cardPrice: {
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroEyebrow: {
+    color: '#9DBCF7',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+    letterSpacing: 1.2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 20,
+    lineHeight: 26,
+    marginTop: 5,
+    maxWidth: 210,
+  },
+  heroAgent: {
+    alignSelf: 'flex-end',
+    flexShrink: 0,
+    height: 168,
+    width: 112,
+  },
+  reminderPanel: {
+    backgroundColor: dashboardColors.card,
+    borderColor: '#E4E8F0',
+    borderRadius: 22,
+    borderWidth: 1,
+    marginTop: dashboardSpacing.gap,
+    padding: dashboardSpacing.md,
+  },
+  reminderHeadingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+  },
+  reminderIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 17,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  reminderHeadingCopy: {
+    flex: 1,
+  },
+  reminderTitle: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
-    marginTop: 2,
-    textAlign: 'center',
+    fontSize: 14,
   },
-  addButton: {
+  reminderSubtitle: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 10,
+    marginTop: 1,
+  },
+  reminderNames: {
+    gap: 8,
+    marginTop: dashboardSpacing.md,
+  },
+  reminderMedicineRow: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.pill,
-    marginTop: dashboardSpacing.sm,
-    paddingVertical: 10,
-  },
-  addButtonText: {
-    ...dashboardTypography.body,
-    color: dashboardColors.primary,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-  },
-  stepper: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.pill,
+    backgroundColor: '#F3F6FC',
+    borderRadius: 14,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: dashboardSpacing.sm,
+    gap: dashboardSpacing.sm,
+    minHeight: 54,
     paddingHorizontal: dashboardSpacing.sm,
     paddingVertical: 8,
   },
-  stepperButton: {
-    alignItems: 'center',
-    height: 22,
-    justifyContent: 'center',
-    width: 22,
+  reminderMedicineCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  stepperValue: {
+  reminderMedicineName: {
     ...dashboardTypography.body,
     color: dashboardColors.text,
     fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+  },
+  reminderMedicineMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 9,
+    marginTop: 2,
+  },
+  reorderButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderColor: '#C9D8FE',
+    borderRadius: dashboardRadii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    minHeight: 34,
+    paddingHorizontal: 10,
+  },
+  reorderButtonText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+  },
+  guidance: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: dashboardSpacing.md,
+    paddingHorizontal: 2,
+  },
+  guidanceText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 10,
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    backgroundColor: '#F5F7FB',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    paddingBottom: dashboardSpacing.sm,
+    paddingTop: dashboardSpacing.xl,
+  },
+  sectionIcon: {
+    alignItems: 'center',
+    borderRadius: 17,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  sectionTitle: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+    flex: 1,
+    fontSize: 18,
+  },
+  sectionCount: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+  },
+  productCard: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderColor: '#E4E8F0',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    marginBottom: dashboardSpacing.md,
+    minHeight: 112,
+    padding: dashboardSpacing.md,
+  },
+  productImageFrame: {
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+    borderRadius: 16,
+    height: 78,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 78,
+  },
+  productImage: {
+    height: '100%',
+    width: '100%',
+  },
+  productCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  productName: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_700Bold',
     fontSize: 14,
+    lineHeight: 18,
+  },
+  productMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 10,
+    marginTop: 4,
+  },
+  productPrice: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+    fontSize: 16,
+    marginTop: 7,
+  },
+  addToCartButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    backgroundColor: dashboardColors.primaryTint,
+    borderColor: '#C9D8FE',
+    borderRadius: dashboardRadii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 3,
+    justifyContent: 'center',
+    minHeight: 38,
+    minWidth: 70,
+    paddingHorizontal: 12,
+  },
+  addToCartText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+  },
+  quantityControl: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 17,
+    flexDirection: 'row',
+    height: 40,
+    overflow: 'hidden',
+  },
+  quantityButton: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+    width: 34,
+  },
+  quantityValueWrap: {
+    alignItems: 'center',
+    minWidth: 30,
+  },
+  quantityLabel: {
+    color: dashboardColors.textMuted,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 7,
+    lineHeight: 9,
+  },
+  quantityValue: {
+    color: dashboardColors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    lineHeight: 15,
+  },
+  checkoutBar: {
+    alignItems: 'center',
+    backgroundColor: '#102A56',
+    borderRadius: 22,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    height: 68,
+    left: dashboardSpacing.pagePadding,
+    paddingHorizontal: dashboardSpacing.md,
+    position: 'absolute',
+    right: dashboardSpacing.pagePadding,
+    shadowColor: dashboardColors.shadow,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+  },
+  checkoutBag: {
+    alignItems: 'center',
+    backgroundColor: '#2563EB',
+    borderRadius: 18,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  checkoutCopy: {
+    flex: 1,
+  },
+  checkoutTitle: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+  },
+  checkoutSubtitle: {
+    color: '#AFC6F4',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 10,
+    marginTop: 1,
+  },
+  checkoutTotal: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+  },
+  centerState: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: dashboardSpacing.xl,
+  },
+  stateIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 28,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
+  },
+  stateTitle: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+    marginTop: dashboardSpacing.md,
+    textAlign: 'center',
+  },
+  stateText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: dashboardSpacing.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.pill,
+    marginTop: dashboardSpacing.gap,
+    paddingHorizontal: dashboardSpacing.xl,
+    paddingVertical: 11,
+  },
+  retryText: {
+    ...dashboardTypography.button,
+    color: '#FFFFFF',
+    fontSize: 13,
+  },
+  emptySearch: {
+    alignItems: 'center',
+    paddingHorizontal: dashboardSpacing.xl,
+    paddingTop: 56,
   },
 });

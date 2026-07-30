@@ -1,5 +1,18 @@
 import type { DoseSlot } from '../lib/medicineSchedule';
+import {
+  addCalendarDays,
+  formatDateOnly,
+  parseDateOnly,
+} from '../lib/medicineCalendar';
 import { formatScheduledTime12Hour } from '../lib/medicineTime';
+
+export type MedicineStreakDay = {
+  completed: boolean;
+  date: string;
+  day: number;
+  scheduled: boolean;
+  weekday: string;
+};
 
 export type Medicine = {
   completed: boolean;
@@ -10,9 +23,16 @@ export type Medicine = {
   imageUrl: string;
   name: string;
   nextReminderTime: string;
+  scheduledFor: string;
   slot: DoseSlot;
+  streakDays: MedicineStreakDay[];
   tabletCount: string;
   timing: string;
+};
+
+export type CourseStreakEvent = {
+  scheduledFor: string;
+  status: string;
 };
 
 export type DoseRow = {
@@ -24,6 +44,7 @@ export type DoseRow = {
   medicineName: string;
   scheduledFor: string;
   slot: string;
+  streakDays?: MedicineStreakDay[];
   tabletsPerDose: number;
 };
 
@@ -31,9 +52,75 @@ function titleCase(value: string): string {
   return value ? `${value[0]!.toUpperCase()}${value.slice(1)}` : value;
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export function buildMedicineStreak(
+  startDate: string,
+  durationDays: number,
+  events: readonly CourseStreakEvent[],
+  asOf: Date | string = new Date(),
+): MedicineStreakDay[] {
+  const firstDate = parseDateOnly(startDate);
+  if (!firstDate || !Number.isInteger(durationDays) || durationDays <= 0) {
+    return [];
+  }
+
+  const courseEndDate = addCalendarDays(startDate, durationDays);
+  const asOfDate =
+    typeof asOf === 'string'
+      ? parseDateOnly(asOf) ?? new Date(asOf)
+      : new Date(asOf);
+  const asOfTime = asOfDate.getTime();
+  const asOfDateKey = Number.isNaN(asOfTime)
+    ? formatDateOnly(new Date())
+    : formatDateOnly(asOfDate);
+  const eventsByDate = new Map<string, CourseStreakEvent[]>();
+  for (const event of events) {
+    const eventDate = new Date(event.scheduledFor);
+    if (Number.isNaN(eventDate.getTime())) {
+      continue;
+    }
+    const dateKey = formatDateOnly(eventDate);
+    if (dateKey < startDate || dateKey >= courseEndDate) {
+      continue;
+    }
+    const dateEvents = eventsByDate.get(dateKey) ?? [];
+    dateEvents.push(event);
+    eventsByDate.set(dateKey, dateEvents);
+  }
+
+  return [...eventsByDate.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, 7)
+    .map(([date, dateEvents]) => {
+      const parsed = parseDateOnly(date)!;
+      const everyDoseTimePassed =
+        !Number.isNaN(asOfTime) &&
+        dateEvents.every((event) => {
+          const scheduledTime = new Date(event.scheduledFor).getTime();
+          return (
+            event.status === 'completed' ||
+            (!Number.isNaN(scheduledTime) && scheduledTime <= asOfTime)
+          );
+        });
+
+      return {
+        completed: date < asOfDateKey || everyDoseTimePassed,
+        date,
+        day: parsed.getDate(),
+        scheduled: true,
+        weekday: WEEKDAYS[parsed.getDay()]!,
+      };
+    });
+}
+
 export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
-  return rows
-    .filter((row) => Boolean(row.imageUrl.trim()))
+  return [...rows]
+    .sort(
+      (left, right) =>
+        new Date(left.scheduledFor).getTime() -
+        new Date(right.scheduledFor).getTime(),
+    )
     .map((row) => ({
       completed: row.completed,
       courseId: row.courseId,
@@ -43,7 +130,9 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
       imageUrl: row.imageUrl.trim(),
       name: row.medicineName,
       nextReminderTime: formatScheduledTime12Hour(row.scheduledFor),
+      scheduledFor: row.scheduledFor,
       slot: row.slot as DoseSlot,
+      streakDays: row.streakDays ?? [],
       tabletCount: `${row.tabletsPerDose} tablet${
         row.tabletsPerDose === 1 ? '' : 's'
       }`,
@@ -51,53 +140,66 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
     }));
 }
 
-export function selectRelevantDoseRows(
-  rows: readonly DoseRow[],
+export function selectNearestMedicine(
+  medicines: readonly Medicine[],
   now: Date,
-  times: Record<'morning' | 'afternoon' | 'night', string>,
-): DoseRow[] {
-  const ordered = [...rows].sort(
+): Medicine | null {
+  if (medicines.length === 0) {
+    return null;
+  }
+
+  const nowTime = now.getTime();
+  const pending = medicines.filter((medicine) => !medicine.completed);
+  const upcoming = pending
+    .filter(
+      (medicine) => new Date(medicine.scheduledFor).getTime() >= nowTime,
+    )
+    .sort(
+      (left, right) =>
+        new Date(left.scheduledFor).getTime() -
+        new Date(right.scheduledFor).getTime(),
+    );
+  if (upcoming[0]) {
+    return upcoming[0];
+  }
+
+  const closestOverdue = pending.sort(
     (left, right) =>
-      new Date(left.scheduledFor).getTime() -
-      new Date(right.scheduledFor).getTime(),
-  );
-  const latestStarted = ordered.findLast(
-    (row) => new Date(row.scheduledFor).getTime() <= now.getTime(),
-  );
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const toMinutes = (value: string) => {
-    const [hour, minute] = value.split(':').map(Number);
-    return hour! * 60 + minute!;
-  };
-  const configuredSlot =
-    minutes >= toMinutes(times.night)
-      ? 'night'
-      : minutes >= toMinutes(times.afternoon)
-        ? 'afternoon'
-        : minutes >= toMinutes(times.morning)
-          ? 'morning'
-          : null;
-  const slotRank = { afternoon: 1, morning: 0, night: 2 };
-  const currentSlot =
-    latestStarted &&
-    (!configuredSlot ||
-      slotRank[latestStarted.slot as keyof typeof slotRank] >
-        slotRank[configuredSlot])
-      ? latestStarted.slot
-      : configuredSlot;
-  const current = currentSlot
-    ? ordered.filter(
-        (row) =>
-          row.slot === currentSlot &&
-          new Date(row.scheduledFor).getTime() <= now.getTime(),
-      )
-    : [];
-  const next = ordered.find(
-    (row) => new Date(row.scheduledFor).getTime() > now.getTime(),
-  );
-  return next && !current.some((row) => row.eventId === next.eventId)
-    ? [...current, next]
-    : current;
+      new Date(right.scheduledFor).getTime() -
+      new Date(left.scheduledFor).getTime(),
+  )[0];
+  if (closestOverdue) {
+    return closestOverdue;
+  }
+
+  return [...medicines].sort(
+    (left, right) =>
+      new Date(right.scheduledFor).getTime() -
+      new Date(left.scheduledFor).getTime(),
+  )[0]!;
+}
+
+export function selectNearestSession(
+  medicines: readonly Medicine[],
+  now: Date,
+): Medicine[] {
+  const nearest = selectNearestMedicine(medicines, now);
+  if (!nearest) {
+    return [];
+  }
+
+  const nearestDate = formatDateOnly(new Date(nearest.scheduledFor));
+  return medicines
+    .filter(
+      (medicine) =>
+        medicine.slot === nearest.slot &&
+        formatDateOnly(new Date(medicine.scheduledFor)) === nearestDate,
+    )
+    .sort(
+      (left, right) =>
+        new Date(left.scheduledFor).getTime() -
+        new Date(right.scheduledFor).getTime(),
+    );
 }
 
 export function shouldCompleteCourse(remainingScheduledDoses: number): boolean {

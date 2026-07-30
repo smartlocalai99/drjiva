@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   filterMedicineCatalogue,
   getNewCatalogueEntryName,
+  hasMedicineImage,
   matchesMedicineSearch,
   normalizeMedicineSearch,
 } from './medicineSearch';
@@ -64,6 +65,18 @@ describe('medicine search', () => {
 
     expect(filterMedicineCatalogue(medicines, '', 20)).toHaveLength(20);
     expect(medicines).toHaveLength(30);
+  });
+
+  it('keeps only medicines that have a usable image', () => {
+    expect(
+      [
+        { imageUrl: 'https://images.test/tablet.jpg', name: 'With image' },
+        { imageUrl: null, name: 'No image' },
+        { imageUrl: '   ', name: 'Blank image' },
+      ]
+        .filter(hasMedicineImage)
+        .map((medicine) => medicine.name),
+    ).toEqual(['With image']);
   });
 
   it('offers a trimmed new entry only when there is no exact match', () => {

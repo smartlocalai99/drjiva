@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -33,13 +33,12 @@ import { PressableScale } from '../PressableScale';
 type DocumentReviewSheetProps = {
   detectedHospitalId: string | null;
   detectedReportType: ReportType | null;
-  extractedText: string;
   hospitals: HospitalOption[];
   isSaving: boolean;
-  onAddHospital: (name: string) => Promise<HospitalOption | null>;
   onCancel: () => void;
+  onCreateHospital: (name: string) => Promise<HospitalOption>;
   onSave: (input: {
-    hospitalId: string;
+    hospital: HospitalOption;
     reportType: ReportType;
   }) => void;
   pageCount: number;
@@ -49,27 +48,33 @@ type DocumentReviewSheetProps = {
 export function DocumentReviewSheet({
   detectedHospitalId,
   detectedReportType,
-  extractedText,
   hospitals,
   isSaving,
-  onAddHospital,
   onCancel,
+  onCreateHospital,
   onSave,
   pageCount,
   visible,
 }: DocumentReviewSheetProps) {
   const { t } = useLanguage();
-  const [hospitalId, setHospitalId] = useState<string | null>(null);
+  const [hospital, setHospital] = useState<HospitalOption | null>(null);
   const [hospitalQuery, setHospitalQuery] = useState('');
-  const [isAddingHospital, setIsAddingHospital] = useState(false);
+  const [hospitalError, setHospitalError] = useState<string | null>(null);
+  const [isCreatingHospital, setIsCreatingHospital] = useState(false);
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [showValidation, setShowValidation] = useState(false);
+  const createRequestIdRef = useRef(0);
 
   useEffect(() => {
+    createRequestIdRef.current += 1;
     if (visible) {
-      setHospitalId(detectedHospitalId);
+      setHospital(
+        hospitals.find((option) => option.id === detectedHospitalId) ?? null,
+      );
       setReportType(detectedReportType);
       setHospitalQuery('');
+      setHospitalError(null);
+      setIsCreatingHospital(false);
       setShowValidation(false);
     }
   }, [detectedHospitalId, detectedReportType, visible]);
@@ -77,35 +82,56 @@ export function DocumentReviewSheet({
   const hospitalResults = filterMedicineCatalogue(hospitals, hospitalQuery, 100);
   const newHospitalName = getNewCatalogueEntryName(hospitals, hospitalQuery);
 
-  const handleAddHospital = async () => {
-    if (!newHospitalName || isAddingHospital) {
-      return;
-    }
-    setIsAddingHospital(true);
-    try {
-      const hospital = await onAddHospital(newHospitalName);
-      if (hospital) {
-        setHospitalId(hospital.id);
-        setHospitalQuery('');
-        setShowValidation(false);
-      }
-    } finally {
-      setIsAddingHospital(false);
-    }
-  };
-
   const handleSave = () => {
-    if (!hospitalId || !reportType) {
+    if (!hospital || !reportType) {
       setShowValidation(true);
       return;
     }
-    onSave({ hospitalId, reportType });
+    onSave({ hospital, reportType });
+  };
+
+  const handleCreateHospital = async () => {
+    if (!newHospitalName || isCreatingHospital || isSaving) {
+      return;
+    }
+
+    const requestId = createRequestIdRef.current + 1;
+    createRequestIdRef.current = requestId;
+    setIsCreatingHospital(true);
+    setHospitalError(null);
+    try {
+      const createdHospital = await onCreateHospital(newHospitalName);
+      if (createRequestIdRef.current !== requestId || !visible) {
+        return;
+      }
+      setHospital(createdHospital);
+      setHospitalQuery(createdHospital.name);
+      setShowValidation(false);
+    } catch {
+      if (createRequestIdRef.current !== requestId || !visible) {
+        return;
+      }
+      setHospitalError(
+        'This hospital could not be added. Check your connection and try again.',
+      );
+    } finally {
+      if (createRequestIdRef.current === requestId) {
+        setIsCreatingHospital(false);
+      }
+    }
+  };
+
+  const handleCancel = () => {
+    createRequestIdRef.current += 1;
+    setIsCreatingHospital(false);
+    setHospitalError(null);
+    onCancel();
   };
 
   return (
     <Modal
       animationType="slide"
-      onRequestClose={isSaving ? undefined : onCancel}
+      onRequestClose={isSaving ? undefined : handleCancel}
       transparent
       visible={visible}
     >
@@ -113,12 +139,16 @@ export function DocumentReviewSheet({
         <Pressable
           accessibilityLabel={t('cancel')}
           disabled={isSaving}
-          onPress={onCancel}
+          onPress={handleCancel}
           style={StyleSheet.absoluteFill}
         />
         <View style={styles.sheet}>
           <View style={styles.handle} />
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.sheetScroll}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.sheetScroll}
+          >
           <View style={styles.titleRow}>
             <View>
               <Text style={styles.title}>{t('reviewScannedDocument')}</Text>
@@ -136,35 +166,19 @@ export function DocumentReviewSheet({
             </View>
           </View>
 
-          {extractedText ? (
-            <View style={styles.extractedCard}>
-              <View style={styles.extractedHeader}>
-                <Ionicons
-                  color={dashboardColors.textMuted}
-                  name="text-outline"
-                  size={14}
-                />
-                <Text style={styles.extractedLabel}>Extracted text</Text>
-              </View>
-              <ScrollView
-                nestedScrollEnabled
-                style={styles.extractedScroll}
-              >
-                <Text style={styles.extractedText}>{extractedText}</Text>
-              </ScrollView>
-            </View>
-          ) : null}
-
           <Text style={styles.label}>{t('hospital')}</Text>
           <View style={styles.searchBox}>
             <Ionicons color={dashboardColors.textFaint} name="search" size={16} />
             <TextInput
-              accessibilityLabel="Search or add a hospital"
+              accessibilityLabel="Search hospital"
+              editable={!isCreatingHospital && !isSaving}
               onChangeText={(value) => {
                 setHospitalQuery(value);
+                setHospital(null);
+                setHospitalError(null);
                 setShowValidation(false);
               }}
-              placeholder="Search or add a hospital"
+              placeholder="Search hospital"
               placeholderTextColor={dashboardColors.textFaint}
               style={styles.searchInput}
               value={hospitalQuery}
@@ -172,67 +186,102 @@ export function DocumentReviewSheet({
           </View>
           <ScrollView
             contentContainerStyle={styles.optionGrid}
+            keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
             style={styles.hospitalList}
           >
-            {hospitalResults.map((hospital) => (
-              <PressableScale
-                key={hospital.id}
-                onPress={() => {
-                  setHospitalId(hospital.id);
-                  setShowValidation(false);
-                }}
-                pressedScale={0.98}
-                style={[
-                  styles.option,
-                  hospitalId === hospital.id && styles.optionSelected,
-                ]}
-              >
-                <Ionicons
-                  color={
-                    hospitalId === hospital.id
-                      ? dashboardColors.primary
-                      : dashboardColors.textMuted
-                  }
-                  name="business-outline"
-                  size={16}
-                />
-                <Text
-                  numberOfLines={2}
+            {hospitalResults.map((option) => {
+              const selected =
+                hospital?.id === option.id &&
+                hospital.source === option.source;
+              return (
+                <PressableScale
+                  accessibilityLabel={`Select ${option.name}`}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    disabled: isCreatingHospital || isSaving,
+                    selected,
+                  }}
+                  disabled={isCreatingHospital || isSaving}
+                  key={`${option.source}:${option.id}`}
+                  onPress={() => {
+                    setHospital(option);
+                    setHospitalQuery(option.name);
+                    setHospitalError(null);
+                    setShowValidation(false);
+                  }}
+                  pressedScale={0.98}
                   style={[
-                    styles.optionText,
-                    hospitalId === hospital.id && styles.optionTextSelected,
+                    styles.option,
+                    selected && styles.optionSelected,
                   ]}
                 >
-                  {hospital.name}
-                </Text>
-              </PressableScale>
-            ))}
+                  <Ionicons
+                    color={
+                      selected
+                        ? dashboardColors.primary
+                        : dashboardColors.textMuted
+                    }
+                    name="business-outline"
+                    size={16}
+                  />
+                  <Text
+                    numberOfLines={2}
+                    style={[
+                      styles.optionText,
+                      selected && styles.optionTextSelected,
+                    ]}
+                  >
+                    {option.name}
+                  </Text>
+                </PressableScale>
+              );
+            })}
             {newHospitalName ? (
               <PressableScale
-                disabled={isAddingHospital}
-                onPress={() => void handleAddHospital()}
+                accessibilityLabel={`Add ${newHospitalName} as a new hospital`}
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled: isCreatingHospital || isSaving,
+                }}
+                disabled={isCreatingHospital || isSaving}
+                onPress={() => void handleCreateHospital()}
                 pressedScale={0.98}
-                style={styles.option}
+                style={[styles.option, styles.addHospitalOption]}
               >
-                {isAddingHospital ? (
-                  <ActivityIndicator color={dashboardColors.primary} size="small" />
+                {isCreatingHospital ? (
+                  <ActivityIndicator
+                    color={dashboardColors.primary}
+                    size="small"
+                  />
                 ) : (
                   <Ionicons
                     color={dashboardColors.primary}
                     name="add-circle-outline"
-                    size={16}
+                    size={18}
                   />
                 )}
-                <Text numberOfLines={1} style={styles.optionText}>
-                  Add “{newHospitalName}”
-                </Text>
+                <View style={styles.addHospitalCopy}>
+                  <Text style={styles.addHospitalTitle}>
+                    Add “{newHospitalName}”
+                  </Text>
+                  <Text style={styles.addHospitalHint}>
+                    Save as a new hospital
+                  </Text>
+                </View>
               </PressableScale>
             ) : null}
             {hospitalResults.length === 0 && !newHospitalName ? (
-              <Text style={styles.emptyHospitals}>No hospitals found</Text>
+              <Text style={styles.emptyHospitals}>
+                Type at least 2 characters to add a hospital
+              </Text>
             ) : null}
           </ScrollView>
+          {hospitalError ? (
+            <Text accessibilityRole="alert" style={styles.hospitalError}>
+              {hospitalError}
+            </Text>
+          ) : null}
 
           <Text style={styles.label}>{t('reportType')}</Text>
           <View style={styles.typeGrid}>
@@ -275,7 +324,7 @@ export function DocumentReviewSheet({
           <View style={styles.actions}>
             <PressableScale
               disabled={isSaving}
-              onPress={onCancel}
+              onPress={handleCancel}
               style={styles.cancelButton}
             >
               <Text style={styles.cancelText}>{t('cancel')}</Text>
@@ -355,32 +404,6 @@ const styles = StyleSheet.create({
     marginBottom: dashboardSpacing.sm,
     marginTop: dashboardSpacing.gap,
   },
-  extractedCard: {
-    backgroundColor: dashboardColors.bg,
-    borderRadius: dashboardRadii.card,
-    marginTop: dashboardSpacing.gap,
-    padding: dashboardSpacing.md,
-  },
-  extractedHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 6,
-  },
-  extractedLabel: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    textTransform: 'uppercase',
-  },
-  extractedScroll: {
-    maxHeight: 90,
-  },
-  extractedText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
-    lineHeight: 17,
-  },
   searchBox: {
     alignItems: 'center',
     backgroundColor: dashboardColors.bg,
@@ -403,6 +426,11 @@ const styles = StyleSheet.create({
     paddingVertical: dashboardSpacing.sm,
     textAlign: 'center',
   },
+  hospitalError: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.error,
+    marginTop: dashboardSpacing.sm,
+  },
   hospitalList: {
     marginTop: dashboardSpacing.sm,
     maxHeight: 145,
@@ -421,6 +449,24 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: dashboardSpacing.md,
     paddingVertical: dashboardSpacing.sm,
+  },
+  addHospitalOption: {
+    backgroundColor: dashboardColors.primaryTint,
+    borderColor: '#C7D7FE',
+  },
+  addHospitalCopy: {
+    flex: 1,
+  },
+  addHospitalTitle: {
+    ...dashboardTypography.body,
+    color: dashboardColors.primaryDark,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  addHospitalHint: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 10,
   },
   optionSelected: {
     backgroundColor: dashboardColors.primaryTint,

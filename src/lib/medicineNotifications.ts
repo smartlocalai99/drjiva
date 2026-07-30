@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { DOSE_SLOT_THEME } from './doseSlotTheme';
+import { requireExpoNotifications } from './expoNotifications';
 import type { DoseSlot } from './medicineSchedule';
 import { formatScheduledTime12Hour } from './medicineTime';
 
@@ -49,7 +50,7 @@ async function ensureMedicineReminderChannel(): Promise<void> {
   if (Platform.OS !== 'android') {
     return;
   }
-  const Notifications = await import('expo-notifications');
+  const Notifications = await requireExpoNotifications();
   const { channelId, sound } = getMedicineReminderSoundConfig();
   await Notifications.setNotificationChannelAsync(channelId, {
     audioAttributes: {
@@ -93,7 +94,7 @@ export async function scheduleDoseNotificationsWithAdapter(
 }
 
 export async function requestMedicineNotificationPermission(): Promise<boolean> {
-  const Notifications = await import('expo-notifications');
+  const Notifications = await requireExpoNotifications();
   await flushPendingNotificationCancellations().catch(() => undefined);
   await ensureMedicineReminderChannel();
   const current = await Notifications.getPermissionsAsync();
@@ -124,7 +125,7 @@ export async function scheduleDoseNotifications(
   events: readonly NotificationEvent[],
   content: NotificationContent,
 ): Promise<Array<{ eventId: string; notificationId: string }>> {
-  const Notifications = await import('expo-notifications');
+  const Notifications = await requireExpoNotifications();
   await ensureMedicineReminderChannel();
   const { channelId, sound } = getMedicineReminderSoundConfig();
   const futureEvents = events.filter(
@@ -163,7 +164,7 @@ export async function scheduleDoseNotifications(
 export async function cancelDoseNotifications(
   identifiers: readonly string[],
 ): Promise<void> {
-  const Notifications = await import('expo-notifications');
+  const Notifications = await requireExpoNotifications();
   await Promise.all(
     identifiers.map(Notifications.cancelScheduledNotificationAsync),
   );
@@ -187,7 +188,7 @@ export async function queueNotificationCancellations(
 export async function flushPendingNotificationCancellations(): Promise<void> {
   const [{ default: AsyncStorage }, Notifications] = await Promise.all([
     import('@react-native-async-storage/async-storage'),
-    import('expo-notifications'),
+    requireExpoNotifications(),
   ]);
   const stored = await AsyncStorage.getItem(PENDING_CANCELLATIONS_KEY);
   if (!stored) return;

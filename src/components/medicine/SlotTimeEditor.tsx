@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from '@react-native-community/datetimepicker';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -21,12 +22,14 @@ import {
 import { PressableScale } from '../PressableScale';
 
 export function SlotTimeEditor({
+  changeLabel,
   hint,
   label,
   onChange,
   slot,
   value,
 }: {
+  changeLabel: string;
   hint: string;
   label: string;
   onChange: (value: string) => void;
@@ -35,6 +38,7 @@ export function SlotTimeEditor({
 }) {
   const theme = DOSE_SLOT_THEME[slot];
   const pickerValue = storedTimeToDate(value);
+  const [showIosPicker, setShowIosPicker] = useState(false);
 
   const setSelectedTime = (date: Date) => {
     onChange(dateToStoredTime(date));
@@ -52,42 +56,80 @@ export function SlotTimeEditor({
     });
   };
 
+  const openPicker = () => {
+    if (process.env.EXPO_OS === 'android') {
+      openAndroidPicker();
+      return;
+    }
+    if (process.env.EXPO_OS === 'ios') {
+      setShowIosPicker((current) => !current);
+    }
+  };
+
   return (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: theme.tint, borderColor: theme.accent },
-      ]}
-    >
-      <View style={[styles.icon, { backgroundColor: dashboardColors.card }]}>
-        <Ionicons color={theme.accent} name={theme.icon} size={21} />
-      </View>
-      <View style={styles.copy}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.hint}>{hint}</Text>
-      </View>
-      {process.env.EXPO_OS === 'ios' ? (
-        <DateTimePicker
-          accentColor={theme.accent}
-          accessibilityLabel={`${label} reminder time`}
-          display="compact"
-          mode="time"
-          onValueChange={(_event, date) => setSelectedTime(date)}
-          themeVariant="light"
-          value={pickerValue}
-        />
-      ) : process.env.EXPO_OS === 'android' ? (
+    <View style={styles.wrap}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.tint, borderColor: theme.accent },
+        ]}
+      >
+        <View style={[styles.icon, { backgroundColor: dashboardColors.card }]}>
+          <Ionicons color={theme.accent} name={theme.icon} size={21} />
+        </View>
+        <View style={styles.copy}>
+          <Text style={styles.label}>{label}</Text>
+          <Text style={styles.hint}>{hint}</Text>
+        </View>
         <PressableScale
           accessibilityLabel={`Choose ${label} reminder time`}
-          onPress={openAndroidPicker}
+          accessibilityHint={hint}
+          onPress={openPicker}
           style={[styles.picker, { backgroundColor: dashboardColors.card }]}
         >
-          <Text style={[styles.time, { color: theme.accent }]}>
-            {formatTime12Hour(value)}
-          </Text>
-          <Ionicons color={theme.accent} name="chevron-down" size={16} />
+          <View style={styles.pickerCopy}>
+            <Text style={[styles.time, { color: theme.accent }]}>
+              {formatTime12Hour(value)}
+            </Text>
+            <Text style={[styles.changeLabel, { color: theme.accent }]}>
+              {changeLabel}
+            </Text>
+          </View>
+          {process.env.EXPO_OS === 'web' ? null : (
+            <Ionicons
+              color={theme.accent}
+              name={showIosPicker ? 'chevron-up' : 'create-outline'}
+              size={17}
+            />
+          )}
         </PressableScale>
-      ) : (
+      </View>
+
+      {process.env.EXPO_OS === 'ios' && showIosPicker ? (
+        <View
+          style={[
+            styles.iosPicker,
+            { backgroundColor: theme.tint, borderColor: theme.accent },
+          ]}
+        >
+          <DateTimePicker
+            accentColor={theme.accent}
+            accessibilityLabel={`${label} reminder time`}
+            display="spinner"
+            mode="time"
+            onValueChange={(_event, date) => setSelectedTime(date)}
+            themeVariant="light"
+            value={pickerValue}
+          />
+          <PressableScale
+            accessibilityLabel={`Finish choosing ${label} reminder time`}
+            onPress={() => setShowIosPicker(false)}
+            style={[styles.done, { backgroundColor: theme.accent }]}
+          >
+            <Ionicons color="#FFFFFF" name="checkmark" size={18} />
+          </PressableScale>
+        </View>
+      ) : process.env.EXPO_OS === 'web' ? (
         <View style={[styles.picker, { backgroundColor: dashboardColors.card }]}>
           <PressableScale
             accessibilityLabel={`Move ${label} time 15 minutes earlier`}
@@ -107,12 +149,15 @@ export function SlotTimeEditor({
             <Ionicons color={theme.accent} name="add" size={18} />
           </PressableScale>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    gap: dashboardSpacing.sm,
+  },
   card: {
     alignItems: 'center',
     borderRadius: dashboardRadii.card,
@@ -147,6 +192,30 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 10,
   },
+  pickerCopy: {
+    alignItems: 'center',
+  },
+  changeLabel: {
+    ...dashboardTypography.caption,
+    fontSize: 9,
+    lineHeight: 11,
+    textTransform: 'uppercase',
+  },
+  iosPicker: {
+    borderRadius: dashboardRadii.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingBottom: dashboardSpacing.sm,
+    paddingHorizontal: dashboardSpacing.sm,
+  },
+  done: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    borderRadius: dashboardRadii.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 52,
+  },
   step: {
     alignItems: 'center',
     height: 40,
@@ -155,7 +224,7 @@ const styles = StyleSheet.create({
   },
   time: {
     ...dashboardTypography.button,
-    minWidth: 76,
+    minWidth: 72,
     textAlign: 'center',
   },
 });

@@ -3,12 +3,30 @@ import { StyleSheet, View } from 'react-native';
 
 const DOCTOR_PLACEHOLDER = require('../../assets/branding/doctor-placeholder.jpg');
 
-export function DoctorAvatar({ size = 20 }: { size?: number }) {
+export function DoctorAvatar({
+  roundedSquare = false,
+  size = 20,
+}: {
+  roundedSquare?: boolean;
+  size?: number;
+}) {
   return (
     <View
-      style={[styles.wrap, { borderRadius: size / 2, height: size, width: size }]}
+      style={[
+        styles.wrap,
+        {
+          borderRadius: roundedSquare ? Math.max(10, size * 0.2) : size / 2,
+          height: size,
+          width: size,
+        },
+      ]}
     >
-      <Image contentFit="cover" source={DOCTOR_PLACEHOLDER} style={styles.image} />
+      <Image
+        cachePolicy="memory"
+        contentFit="cover"
+        source={DOCTOR_PLACEHOLDER}
+        style={styles.image}
+      />
     </View>
   );
 }

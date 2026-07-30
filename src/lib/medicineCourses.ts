@@ -97,15 +97,20 @@ export async function saveNotificationSettings(
   settings: NotificationSettings,
 ): Promise<void> {
   const ownerUserId = await ensureSecureReportSession();
-  const { error } = await supabase.from('patient_notification_settings').upsert({
-    afternoon_time: settings.afternoonTime,
-    morning_time: settings.morningTime,
-    night_time: settings.nightTime,
-    owner_user_id: ownerUserId,
-    patient_id: patientId,
-    timezone: settings.timezone,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase
+    .from('patient_notification_settings')
+    .upsert(
+      {
+        afternoon_time: settings.afternoonTime,
+        morning_time: settings.morningTime,
+        night_time: settings.nightTime,
+        owner_user_id: ownerUserId,
+        patient_id: patientId,
+        timezone: settings.timezone,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'patient_id,owner_user_id' },
+    );
   if (error) throw error;
 }
 
@@ -216,6 +221,7 @@ export async function createMedicineCourse(input: {
 export async function saveNotificationIds(
   identifiers: readonly { eventId: string; notificationId: string }[],
 ): Promise<void> {
+  await ensureSecureReportSession();
   for (const item of identifiers) {
     const { error } = await supabase
       .from('patient_medicine_dose_events')
@@ -260,6 +266,7 @@ export type FutureDoseReminder = {
 export async function fetchScheduledDoseRemindersFromToday(
   patientId: string,
 ): Promise<FutureDoseReminder[]> {
+  await ensureSecureReportSession();
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const { data, error } = await supabase
@@ -311,6 +318,7 @@ export async function updateDoseReminderSchedule(
     scheduledFor: string;
   }[],
 ): Promise<void> {
+  await ensureSecureReportSession();
   for (const update of updates) {
     const { error } = await supabase
       .from('patient_medicine_dose_events')
@@ -333,6 +341,7 @@ export async function replaceNotificationSchedule(
     scheduledFor: string;
   }[],
 ): Promise<void> {
+  await ensureSecureReportSession();
   const { error } = await supabase.rpc(
     'replace_patient_notification_schedule',
     {
@@ -348,5 +357,21 @@ export async function replaceNotificationSchedule(
       })),
     },
   );
-  if (error) throw error;
+  if (!error) {
+    return;
+  }
+
+  const missingFunction =
+    error.code === '42883' ||
+    error.code === 'PGRST202' ||
+    error.message.toLowerCase().includes('could not find the function');
+  if (!missingFunction) {
+    throw error;
+  }
+
+  // Keep reminder-time edits working while the atomic RPC migration is being
+  // rolled out to an older environment. RLS still restricts every update to
+  // the signed-in anonymous patient's owner_user_id.
+  await updateDoseReminderSchedule(updates);
+  await saveNotificationSettings(patientId, settings);
 }

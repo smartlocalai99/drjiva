@@ -8,6 +8,7 @@ const REPORT_TYPE_TRANSLATION_KEYS: Record<
   'Discharge Summary': 'dischargeSummary',
   Imaging: 'imaging',
   'Lab Report': 'labReport',
+  'Medical Bill': 'medicalBill',
   'OP Consultation': 'opConsultation',
   Other: 'other',
   Prescription: 'prescription',

@@ -27,6 +27,7 @@ import {
   dashboardTypography,
 } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
+import { clearDashboardPreload } from '../src/lib/dashboardPreload';
 import { useLanguage } from '../src/lib/i18n';
 import { getAccountMenuItems } from '../src/lib/moreMenu';
 import { getPatientByPhone } from '../src/lib/patients';
@@ -145,6 +146,7 @@ export default function MoreScreen() {
       { style: 'cancel', text: t('cancel') },
       {
         onPress: () => {
+          clearDashboardPreload();
           void clearSessionPhone().catch(() => undefined);
           router.replace('/');
         },

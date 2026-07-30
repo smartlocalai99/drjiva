@@ -1,63 +1,76 @@
-import { Ionicons } from '@expo/vector-icons';
+import { ensureSecureReportSession } from '../lib/reportAuth';
+import { supabase } from '../lib/supabase';
+import {
+  mapMedicineRowsToShopProducts,
+  type ShopMedicineRow,
+  type ShopProduct,
+} from './shopProductModel';
 
-export type ShopTint = 'primary' | 'success' | 'warning' | 'error';
+export type { ShopProduct } from './shopProductModel';
 
-export type ShopProduct = {
-  icon: keyof typeof Ionicons.glyphMap;
-  id: string;
-  name: string;
-  packSize: string;
-  price: number;
-  tint: ShopTint;
-};
+const DATABASE_PAGE_SIZE = 1000;
+const CATALOGUE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export const SHOP_PRODUCTS: ShopProduct[] = [
-  {
-    icon: 'medkit-outline',
-    id: 'dolo-650',
-    name: 'Dolo 650',
-    packSize: '15 tablets',
-    price: 32,
-    tint: 'primary',
-  },
-  {
-    icon: 'thermometer-outline',
-    id: 'crocin-advance',
-    name: 'Crocin Advance',
-    packSize: '15 tablets',
-    price: 28,
-    tint: 'warning',
-  },
-  {
-    icon: 'bandage-outline',
-    id: 'combiflam',
-    name: 'Combiflam',
-    packSize: '20 tablets',
-    price: 35,
-    tint: 'error',
-  },
-  {
-    icon: 'fitness-outline',
-    id: 'volini-gel',
-    name: 'Volini Gel',
-    packSize: '30g tube',
-    price: 110,
-    tint: 'success',
-  },
-  {
-    icon: 'water-outline',
-    id: 'ors-powder',
-    name: 'ORS Powder',
-    packSize: '1 sachet',
-    price: 20,
-    tint: 'primary',
-  },
-  {
-    icon: 'leaf-outline',
-    id: 'cetirizine',
-    name: 'Cetirizine',
-    packSize: '10 tablets',
-    price: 18,
-    tint: 'success',
-  },
-];
+let catalogueCache:
+  | { expiresAt: number; products: ShopProduct[] }
+  | undefined;
+
+export async function fetchShopProducts(
+  query = '',
+  signal?: AbortSignal,
+): Promise<ShopProduct[]> {
+  await ensureSecureReportSession();
+  const rows: ShopMedicineRow[] = [];
+  const search = query.trim().replace(/[%_]/g, '');
+  if (
+    !search &&
+    catalogueCache &&
+    catalogueCache.expiresAt > Date.now()
+  ) {
+    return catalogueCache.products;
+  }
+
+  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
+    let request = supabase
+      .from('medicines')
+      .select(
+        'id, name, image_url, hospital_name, category, composition, dosage_form, price, shop_product_section_items(section_code, sort_order)',
+      )
+      .not('image_url', 'is', null)
+      .neq('image_url', '')
+      .gt('price', 0)
+      .order('name')
+      .order('id')
+      .range(from, from + DATABASE_PAGE_SIZE - 1);
+
+    if (search) {
+      request = request.ilike('name', `%${search}%`);
+    }
+    if (signal) {
+      request = request.abortSignal(signal);
+    }
+
+    const { data, error } = await request;
+    if (error) {
+      if (signal?.aborted) {
+        throw new DOMException('Shop request cancelled', 'AbortError');
+      }
+      throw error;
+    }
+
+    const page = (data ?? []) as ShopMedicineRow[];
+    rows.push(...page);
+    if (page.length < DATABASE_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  const products = mapMedicineRowsToShopProducts(rows);
+  if (!search) {
+    catalogueCache = {
+      expiresAt: Date.now() + CATALOGUE_CACHE_TTL_MS,
+      products,
+    };
+  }
+  return products;
+}

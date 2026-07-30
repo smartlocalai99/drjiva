@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabase';
 import { deleteMedicineReminderWithAdapter } from '../lib/deleteMedicineReminder';
-import { formatDateOnly } from '../lib/medicineCalendar';
+import {
+  addCalendarDays,
+  formatDateOnly,
+  parseDateOnly,
+} from '../lib/medicineCalendar';
 import { deleteMedicineCourse } from '../lib/medicineCourses';
 import {
   cancelDoseNotifications,
@@ -9,8 +13,9 @@ import {
 import { ensureSecureReportSession } from '../lib/reportAuth';
 import type { DoseSlot } from '../lib/medicineSchedule';
 import {
+  buildMedicineStreak,
   mapDoseRows,
-  selectRelevantDoseRows,
+  type CourseStreakEvent,
   type DoseRow,
   type Medicine,
 } from './medicineCourse';
@@ -21,71 +26,112 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
+type RawDoseCourse = {
+  duration_days: number;
+  hospitals: { name: string } | Array<{ name: string }> | null;
+  id: string;
+  medicines:
+    | { image_url: string | null; name: string; hospital_name: string }
+    | Array<{ image_url: string | null; name: string; hospital_name: string }>;
+  patient_custom_hospitals:
+    | { name: string }
+    | Array<{ name: string }>
+    | null;
+  start_date: string;
+  tablets_per_dose: number;
+};
+
 type RawDose = {
   id: string;
+  patient_medicine_courses: RawDoseCourse | RawDoseCourse[];
   scheduled_for: string;
   slot: string;
   status: string;
-  patient_medicine_courses:
-    | {
-        id: string;
-        tablets_per_dose: number;
-        hospitals: { name: string } | Array<{ name: string }> | null;
-        patient_custom_hospitals:
-          | { name: string }
-          | Array<{ name: string }>
-          | null;
-        medicines:
-          | { image_url: string | null; name: string; hospital_name: string }
-          | Array<{ image_url: string | null; name: string; hospital_name: string }>;
-      }
-    | Array<{
-        id: string;
-        tablets_per_dose: number;
-        hospitals: { name: string } | Array<{ name: string }> | null;
-        patient_custom_hospitals:
-          | { name: string }
-          | Array<{ name: string }>
-          | null;
-        medicines:
-          | { image_url: string | null; name: string; hospital_name: string }
-          | Array<{ image_url: string | null; name: string; hospital_name: string }>;
-      }>;
+};
+
+type RawStreakEvent = {
+  course_id: string;
+  scheduled_for: string;
+  status: string;
 };
 
 export async function fetchMedicinesForDate(
   patientId: string,
   date: Date,
-  now = new Date(),
-  options: { showAll?: boolean } = {},
 ): Promise<Medicine[]> {
+  await ensureSecureReportSession();
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-  const [{ data, error }, settingsResult] = await Promise.all([
-    supabase
-      .from('patient_medicine_dose_events')
-      .select(
-        'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
-      )
-      .eq('patient_id', patientId)
-      .gte('scheduled_for', start.toISOString())
-      .lt('scheduled_for', end.toISOString())
-      .neq('status', 'cancelled')
-      .order('scheduled_for'),
-    supabase
-      .from('patient_notification_settings')
-      .select('morning_time, afternoon_time, night_time')
-      .eq('patient_id', patientId)
-      .maybeSingle(),
-  ]);
+  const { data, error } = await supabase
+    .from('patient_medicine_dose_events')
+    .select(
+      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
+    )
+    .eq('patient_id', patientId)
+    .gte('scheduled_for', start.toISOString())
+    .lt('scheduled_for', end.toISOString())
+    .neq('status', 'cancelled')
+    .order('scheduled_for');
   if (error) throw error;
 
-  const rows = ((data ?? []) as unknown as RawDose[]).flatMap((event) => {
+  const rawDoses = (data ?? []) as unknown as RawDose[];
+  const courseDetails = new Map<string, RawDoseCourse>();
+  for (const event of rawDoses) {
+    const course = one(event.patient_medicine_courses);
+    if (course) {
+      courseDetails.set(course.id, course);
+    }
+  }
+
+  const streakEventsByCourse = new Map<string, CourseStreakEvent[]>();
+  const courses = [...courseDetails.values()];
+  if (courses.length > 0) {
+    const firstStartDate = courses
+      .map((course) => course.start_date)
+      .sort()[0]!;
+    const lastStreakDate = courses
+      .map((course) =>
+        addCalendarDays(
+          course.start_date,
+          Math.min(Math.max(course.duration_days, 1), 13),
+        ),
+      )
+      .sort()
+      .at(-1)!;
+    const streakStart = parseDateOnly(firstStartDate);
+    const streakEnd = parseDateOnly(lastStreakDate);
+
+    if (streakStart && streakEnd) {
+      const { data: streakData, error: streakError } = await supabase
+        .from('patient_medicine_dose_events')
+        .select('course_id, scheduled_for, status')
+        .in(
+          'course_id',
+          courses.map((course) => course.id),
+        )
+        .gte('scheduled_for', streakStart.toISOString())
+        .lt('scheduled_for', streakEnd.toISOString())
+        .neq('status', 'cancelled')
+        .order('scheduled_for');
+      if (streakError) throw streakError;
+
+      for (const event of (streakData ?? []) as RawStreakEvent[]) {
+        const courseEvents = streakEventsByCourse.get(event.course_id) ?? [];
+        courseEvents.push({
+          scheduledFor: event.scheduled_for,
+          status: event.status,
+        });
+        streakEventsByCourse.set(event.course_id, courseEvents);
+      }
+    }
+  }
+
+  const rows = rawDoses.flatMap((event) => {
     const course = one(event.patient_medicine_courses);
     const medicine = course ? one(course.medicines) : null;
-    if (!course || !medicine?.image_url) return [];
+    if (!course || !medicine) return [];
     const hospital =
       one(course.hospitals)?.name ??
       one(course.patient_custom_hospitals)?.name ??
@@ -95,24 +141,20 @@ export async function fetchMedicinesForDate(
       courseId: course.id,
       eventId: event.id,
       hospitalName: hospital,
-      imageUrl: medicine.image_url,
+      imageUrl: medicine.image_url ?? '',
       medicineName: medicine.name,
       scheduledFor: event.scheduled_for,
       slot: event.slot,
+      streakDays: buildMedicineStreak(
+        course.start_date,
+        course.duration_days,
+        streakEventsByCourse.get(course.id) ?? [],
+      ),
       tabletsPerDose: Number(course.tablets_per_dose),
     } satisfies DoseRow];
   });
 
-  const isToday = start.toDateString() === now.toDateString();
-  if (!isToday || options.showAll) return mapDoseRows(rows);
-  const settings = settingsResult.data;
-  return mapDoseRows(
-    selectRelevantDoseRows(rows, now, {
-      afternoon: String(settings?.afternoon_time ?? '13:00').slice(0, 5),
-      morning: String(settings?.morning_time ?? '08:00').slice(0, 5),
-      night: String(settings?.night_time ?? '20:00').slice(0, 5),
-    }),
-  );
+  return mapDoseRows(rows);
 }
 
 export async function fetchReminderDatesInRange(
@@ -177,7 +219,7 @@ export async function fetchActiveMedicineReminders(
 
   return ((data ?? []) as unknown as RawCourse[]).flatMap((row) => {
     const medicine = one(row.medicines);
-    if (!medicine?.image_url) return [];
+    if (!medicine) return [];
     const hospitalName =
       one(row.hospitals)?.name ?? one(row.patient_custom_hospitals)?.name ?? '';
     return [
@@ -185,7 +227,7 @@ export async function fetchActiveMedicineReminders(
         courseId: row.id,
         durationDays: row.duration_days,
         hospitalName,
-        imageUrl: medicine.image_url,
+        imageUrl: medicine.image_url ?? '',
         medicineName: medicine.name,
         slots: row.patient_medicine_course_slots.map(
           (item) => item.slot as DoseSlot,

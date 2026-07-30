@@ -1,5 +1,4 @@
 import { File, Paths } from 'expo-file-system';
-import * as Print from 'expo-print';
 import {
   PermissionsAndroid,
   Platform,
@@ -15,6 +14,7 @@ import {
   requestDocumentCameraPermission,
   type CameraPermissionResult,
 } from './documentPermission';
+import { isNativeModuleAvailable } from './nativeModuleAvailability';
 
 const nativeScanner: DocumentScannerAdapter = {
   async scanDocument(options) {
@@ -87,6 +87,13 @@ export async function recognizeFirstPage(base64Page: string): Promise<string> {
 }
 
 export async function createReportPdf(base64Pages: string[]): Promise<string> {
+  if (!isNativeModuleAvailable('ExpoPrint')) {
+    throw new Error(
+      'PDF creation requires a rebuilt DrJiva development or production app.',
+    );
+  }
+
+  const Print = await import('expo-print');
   const result = await Print.printToFileAsync({
     height: 842,
     html: buildReportPdfHtml(base64Pages),

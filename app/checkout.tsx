@@ -1,0 +1,831 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { PressableScale } from '../src/components/PressableScale';
+import {
+  dashboardColors,
+  dashboardRadii,
+  dashboardSpacing,
+  dashboardTypography,
+} from '../src/dashboardTheme';
+import { loadAddresses } from '../src/lib/addressStorage';
+import {
+  getDefaultAddress,
+  type SavedAddress,
+} from '../src/lib/addresses';
+import { useCart } from '../src/lib/cart';
+import { formatRupees } from '../src/lib/currency';
+
+export default function CheckoutScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ phone?: string | string[] }>();
+  const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
+  const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
+  const cart = useCart();
+
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>();
+  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+
+  const lines = useMemo(
+    () =>
+      Object.entries(cart.quantities).flatMap(([id, quantity]) => {
+        const product = cart.products[id];
+        return product && quantity > 0 ? [{ product, quantity }] : [];
+      }),
+    [cart.products, cart.quantities],
+  );
+  const itemCount = useMemo(
+    () => lines.reduce((sum, line) => sum + line.quantity, 0),
+    [lines],
+  );
+  const subtotal = useMemo(
+    () =>
+      lines.reduce(
+        (sum, line) => sum + line.product.price * line.quantity,
+        0,
+      ),
+    [lines],
+  );
+  const selectedAddress = useMemo(
+    () =>
+      addresses.find((address) => address.id === selectedAddressId) ??
+      getDefaultAddress(addresses),
+    [addresses, selectedAddressId],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoadingAddress(true);
+      void loadAddresses(phone)
+        .then((nextAddresses) => {
+          if (cancelled) {
+            return;
+          }
+          setAddresses(nextAddresses);
+          setSelectedAddressId((current) => {
+            if (current && nextAddresses.some((item) => item.id === current)) {
+              return current;
+            }
+            return getDefaultAddress(nextAddresses)?.id;
+          });
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAddresses([]);
+            setSelectedAddressId(undefined);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsLoadingAddress(false);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [phone]),
+  );
+
+  const placeOrder = () => {
+    if (!selectedAddress) {
+      router.push({ params: { phone }, pathname: '/address-editor' });
+      return;
+    }
+    Alert.alert(
+      'Ordering is coming soon',
+      'Your cart and delivery details are ready. Online ordering will be available in an upcoming update.',
+    );
+  };
+
+  return (
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <View style={styles.header}>
+        <Pressable
+          accessibilityLabel="Back"
+          hitSlop={12}
+          onPress={() => router.back()}
+          style={styles.headerSide}
+        >
+          <Ionicons color={dashboardColors.text} name="chevron-back" size={24} />
+        </Pressable>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>Checkout</Text>
+          {itemCount > 0 ? (
+            <Text style={styles.headerSubtitle}>
+              {itemCount} {itemCount === 1 ? 'item' : 'items'}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.headerSide} />
+      </View>
+
+      {lines.length === 0 ? (
+        <View style={styles.empty}>
+          <Ionicons
+            color={dashboardColors.textFaint}
+            name="bag-handle-outline"
+            size={44}
+          />
+          <Text style={styles.emptyTitle}>Your cart is empty</Text>
+          <PressableScale
+            onPress={() =>
+              router.replace({ params: { phone }, pathname: '/shop' })
+            }
+            style={styles.shopButton}
+          >
+            <Text style={styles.shopButtonText}>Browse medicines</Text>
+          </PressableScale>
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: insets.bottom + 132 },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.progressRow}>
+              <ProgressStep active icon="cart" label="Cart" />
+              <View style={styles.progressLine} />
+              <ProgressStep active icon="location" label="Address" />
+              <View style={styles.progressLine} />
+              <ProgressStep icon="card" label="Payment" />
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Delivery address</Text>
+              {addresses.length > 0 ? (
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    router.push({
+                      params: { phone },
+                      pathname: '/saved-addresses',
+                    })
+                  }
+                >
+                  <Text style={styles.sectionAction}>Manage</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {isLoadingAddress ? (
+              <View style={styles.loadingCard}>
+                <ActivityIndicator color={dashboardColors.primary} />
+              </View>
+            ) : addresses.length === 0 ? (
+              <PressableScale
+                onPress={() =>
+                  router.push({
+                    params: { phone },
+                    pathname: '/address-editor',
+                  })
+                }
+                style={styles.addAddressCard}
+              >
+                <View style={styles.addAddressIcon}>
+                  <Ionicons
+                    color={dashboardColors.primary}
+                    name="add"
+                    size={24}
+                  />
+                </View>
+                <View style={styles.addAddressCopy}>
+                  <Text style={styles.addAddressTitle}>Add delivery address</Text>
+                  <Text style={styles.addAddressText}>
+                    Add an address to continue with your order.
+                  </Text>
+                </View>
+                <Ionicons
+                  color={dashboardColors.textFaint}
+                  name="chevron-forward"
+                  size={20}
+                />
+              </PressableScale>
+            ) : (
+              <View style={styles.addressList}>
+                {addresses.map((address) => (
+                  <CheckoutAddress
+                    address={address}
+                    key={address.id}
+                    onSelect={() => setSelectedAddressId(address.id)}
+                    selected={selectedAddress?.id === address.id}
+                  />
+                ))}
+              </View>
+            )}
+
+            <Text style={styles.sectionTitle}>Order summary</Text>
+            <View style={styles.orderCard}>
+              {lines.map((line, index) => (
+                <View key={line.product.id}>
+                  {index > 0 ? <View style={styles.divider} /> : null}
+                  <View style={styles.orderRow}>
+                    <View style={styles.productThumb}>
+                      <Image
+                        accessibilityLabel={line.product.name}
+                        contentFit="contain"
+                        source={{ uri: line.product.imageUrl }}
+                        style={styles.productImage}
+                      />
+                    </View>
+                    <View style={styles.productCopy}>
+                      <Text numberOfLines={2} style={styles.productName}>
+                        {line.product.name}
+                      </Text>
+                      <Text style={styles.productMeta}>
+                        {line.product.packSize}
+                      </Text>
+                    </View>
+                    <View style={styles.productTrailing}>
+                      <Text style={styles.productPrice}>
+                        {formatRupees(line.product.price * line.quantity)}
+                      </Text>
+                      <View
+                        accessibilityLabel={`Quantity for ${line.product.name}`}
+                        style={styles.quantityControl}
+                      >
+                        <PressableScale
+                          accessibilityHint={
+                            line.quantity === 1
+                              ? 'Removes this medicine from your order'
+                              : 'Reduces the quantity by one'
+                          }
+                          accessibilityLabel={
+                            line.quantity === 1
+                              ? `Remove ${line.product.name}`
+                              : `Decrease ${line.product.name} quantity`
+                          }
+                          hitSlop={4}
+                          onPress={() => cart.decrement(line.product.id)}
+                          pressedScale={0.88}
+                          style={[
+                            styles.quantityButton,
+                            line.quantity === 1 &&
+                              styles.quantityRemoveButton,
+                          ]}
+                        >
+                          <Ionicons
+                            color={
+                              line.quantity === 1
+                                ? dashboardColors.error
+                                : dashboardColors.primary
+                            }
+                            name={
+                              line.quantity === 1
+                                ? 'trash-outline'
+                                : 'remove'
+                            }
+                            size={16}
+                          />
+                        </PressableScale>
+                        <Text
+                          accessibilityLabel={`Quantity ${line.quantity}`}
+                          style={styles.quantityValue}
+                        >
+                          {line.quantity}
+                        </Text>
+                        <PressableScale
+                          accessibilityHint="Increases the quantity by one"
+                          accessibilityLabel={`Increase ${line.product.name} quantity`}
+                          hitSlop={4}
+                          onPress={() => cart.increment(line.product.id)}
+                          pressedScale={0.88}
+                          style={styles.quantityButton}
+                        >
+                          <Ionicons
+                            color={dashboardColors.primary}
+                            name="add"
+                            size={16}
+                          />
+                        </PressableScale>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>Payment details</Text>
+            <View style={styles.paymentCard}>
+              <PriceRow label="Item total" value={formatRupees(subtotal)} />
+              <PriceRow label="Delivery" value="FREE" valueSuccess />
+              <View style={styles.paymentDivider} />
+              <PriceRow
+                bold
+                label="Amount to pay"
+                value={formatRupees(subtotal)}
+              />
+            </View>
+          </ScrollView>
+
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: insets.bottom + dashboardSpacing.sm },
+            ]}
+          >
+            <View>
+              <Text style={styles.footerLabel}>Total</Text>
+              <Text style={styles.footerTotal}>
+                {formatRupees(subtotal)}
+              </Text>
+            </View>
+            <PressableScale
+              accessibilityLabel={
+                selectedAddress ? 'Place order' : 'Add delivery address'
+              }
+              onPress={placeOrder}
+              style={styles.placeOrderButton}
+            >
+              <Text style={styles.placeOrderText}>
+                {selectedAddress ? 'Place order' : 'Add address'}
+              </Text>
+              <Ionicons color="#FFFFFF" name="arrow-forward" size={18} />
+            </PressableScale>
+          </View>
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function ProgressStep({
+  active = false,
+  icon,
+  label,
+}: {
+  active?: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+}) {
+  return (
+    <View style={styles.progressStep}>
+      <View style={[styles.progressIcon, active && styles.progressIconActive]}>
+        <Ionicons
+          color={active ? '#FFFFFF' : dashboardColors.textFaint}
+          name={icon}
+          size={15}
+        />
+      </View>
+      <Text style={[styles.progressLabel, active && styles.progressLabelActive]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function CheckoutAddress({
+  address,
+  onSelect,
+  selected,
+}: {
+  address: SavedAddress;
+  onSelect: () => void;
+  selected: boolean;
+}) {
+  const label =
+    address.label === 'Other'
+      ? address.customLabel || 'Other'
+      : address.label;
+  const location = [
+    address.building,
+    address.area,
+    address.city,
+    address.state,
+    address.pinCode,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  return (
+    <PressableScale
+      accessibilityState={{ selected }}
+      onPress={onSelect}
+      style={[styles.addressCard, selected && styles.addressCardSelected]}
+    >
+      <View style={[styles.radio, selected && styles.radioSelected]}>
+        {selected ? <View style={styles.radioDot} /> : null}
+      </View>
+      <View style={styles.addressCopy}>
+        <View style={styles.addressLabelRow}>
+          <Text style={styles.addressLabel}>{label}</Text>
+          {address.isDefault ? (
+            <View style={styles.defaultBadge}>
+              <Text style={styles.defaultBadgeText}>DEFAULT</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.recipient}>
+          {address.recipientName} · +91 {address.phone}
+        </Text>
+        <Text numberOfLines={2} style={styles.addressLine}>
+          {location}
+        </Text>
+      </View>
+    </PressableScale>
+  );
+}
+
+function PriceRow({
+  bold = false,
+  label,
+  value,
+  valueSuccess = false,
+}: {
+  bold?: boolean;
+  label: string;
+  value: string;
+  valueSuccess?: boolean;
+}) {
+  return (
+    <View style={styles.priceRow}>
+      <Text style={[styles.priceLabel, bold && styles.priceBold]}>{label}</Text>
+      <Text
+        style={[
+          styles.priceValue,
+          bold && styles.priceBold,
+          valueSuccess && styles.priceSuccess,
+        ]}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: dashboardColors.bg,
+    flex: 1,
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: dashboardSpacing.pagePadding,
+    paddingVertical: dashboardSpacing.sm,
+  },
+  headerSide: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  headerTitleWrap: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+  },
+  headerSubtitle: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+  },
+  content: {
+    gap: dashboardSpacing.gap,
+    padding: dashboardSpacing.pagePadding,
+  },
+  progressRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: dashboardSpacing.sm,
+  },
+  progressStep: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  progressIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.track,
+    borderRadius: 15,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  progressIconActive: {
+    backgroundColor: dashboardColors.primary,
+  },
+  progressLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    fontSize: 10,
+  },
+  progressLabelActive: {
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  progressLine: {
+    backgroundColor: dashboardColors.primary,
+    height: 2,
+    marginHorizontal: 6,
+    marginTop: 14,
+    width: 52,
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+  },
+  sectionAction: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  loadingCard: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: dashboardRadii.card,
+    minHeight: 92,
+    justifyContent: 'center',
+  },
+  addAddressCard: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.card,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    padding: dashboardSpacing.md,
+  },
+  addAddressIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  addAddressCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  addAddressTitle: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+  },
+  addAddressText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+  },
+  addressList: {
+    gap: dashboardSpacing.sm,
+  },
+  addressCard: {
+    alignItems: 'flex-start',
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.track,
+    borderRadius: dashboardRadii.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    padding: dashboardSpacing.md,
+  },
+  addressCardSelected: {
+    borderColor: dashboardColors.primary,
+    borderWidth: 2,
+  },
+  radio: {
+    alignItems: 'center',
+    borderColor: dashboardColors.textFaint,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    height: 20,
+    justifyContent: 'center',
+    marginTop: 2,
+    width: 20,
+  },
+  radioSelected: {
+    borderColor: dashboardColors.primary,
+  },
+  radioDot: {
+    backgroundColor: dashboardColors.primary,
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  addressCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  addressLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+  },
+  addressLabel: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+  },
+  defaultBadge: {
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.pill,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  defaultBadgeText: {
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+  },
+  recipient: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+  addressLine: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    lineHeight: 18,
+  },
+  orderCard: {
+    backgroundColor: dashboardColors.card,
+    borderRadius: dashboardRadii.card,
+    padding: dashboardSpacing.md,
+  },
+  orderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+  },
+  divider: {
+    backgroundColor: dashboardColors.track,
+    height: StyleSheet.hairlineWidth,
+    marginVertical: dashboardSpacing.md,
+  },
+  productThumb: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    height: 54,
+    overflow: 'hidden',
+    width: 54,
+  },
+  productImage: {
+    height: '100%',
+    width: '100%',
+  },
+  productCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  productName: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  productMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+  },
+  productPrice: {
+    ...dashboardTypography.cardTitle,
+    color: dashboardColors.text,
+    fontSize: 15,
+    fontVariant: ['tabular-nums'],
+  },
+  productTrailing: {
+    alignItems: 'flex-end',
+    gap: dashboardSpacing.sm,
+  },
+  quantityControl: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    minHeight: 44,
+    paddingHorizontal: 3,
+  },
+  quantityButton: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  quantityRemoveButton: {
+    backgroundColor: dashboardColors.errorTint,
+  },
+  quantityValue: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_700Bold',
+    fontVariant: ['tabular-nums'],
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  paymentCard: {
+    backgroundColor: dashboardColors.card,
+    borderRadius: dashboardRadii.card,
+    gap: dashboardSpacing.sm,
+    padding: dashboardSpacing.md,
+  },
+  priceRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  priceLabel: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+  },
+  priceValue: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  priceBold: {
+    color: dashboardColors.text,
+    fontFamily: 'Inter_700Bold',
+  },
+  priceSuccess: {
+    color: dashboardColors.success,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  paymentDivider: {
+    backgroundColor: dashboardColors.track,
+    height: StyleSheet.hairlineWidth,
+  },
+  footer: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderTopColor: dashboardColors.track,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: dashboardSpacing.pagePadding,
+    paddingTop: dashboardSpacing.sm,
+  },
+  footerLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+  },
+  footerTotal: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  placeOrderButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.button,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    minHeight: 52,
+    paddingHorizontal: dashboardSpacing.xl,
+  },
+  placeOrderText: {
+    ...dashboardTypography.button,
+    color: '#FFFFFF',
+  },
+  empty: {
+    alignItems: 'center',
+    flex: 1,
+    gap: dashboardSpacing.md,
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+  },
+  shopButton: {
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.button,
+    paddingHorizontal: dashboardSpacing.xl,
+    paddingVertical: dashboardSpacing.md,
+  },
+  shopButtonText: {
+    ...dashboardTypography.button,
+    color: '#FFFFFF',
+  },
+});

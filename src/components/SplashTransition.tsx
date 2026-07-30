@@ -23,7 +23,7 @@ import Animated, {
 
 import { colors, layout } from '../theme';
 
-const logoSource = require('../../assets/logo.png');
+const logoSource = require('../../assets/splash-logo.png');
 
 const ZOOM_HOLD_MS = 100;
 const ZOOM_DURATION_MS = 620;
@@ -76,7 +76,7 @@ export function SplashTransitionProvider({
     const readinessFallback = setTimeout(() => {
       setReduceMotion((current) => current ?? false);
       setIsLogoReady(true);
-    }, 2500);
+    }, 800);
 
     return () => {
       clearTimeout(readinessFallback);

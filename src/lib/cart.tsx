@@ -7,10 +7,14 @@ import {
   type ReactNode,
 } from 'react';
 
+import type { ShopProduct } from '../data/shopProducts';
+
 type CartContextValue = {
+  add: (product: ShopProduct) => void;
   decrement: (id: string) => void;
   getQuantity: (id: string) => number;
   increment: (id: string) => void;
+  products: Record<string, ShopProduct>;
   quantities: Record<string, number>;
   totalItems: number;
 };
@@ -19,6 +23,15 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [products, setProducts] = useState<Record<string, ShopProduct>>({});
+
+  const add = useCallback((product: ShopProduct) => {
+    setProducts((current) => ({ ...current, [product.id]: product }));
+    setQuantities((current) => ({
+      ...current,
+      [product.id]: (current[product.id] ?? 0) + 1,
+    }));
+  }, []);
 
   const increment = useCallback((id: string) => {
     setQuantities((current) => ({ ...current, [id]: (current[id] ?? 0) + 1 }));
@@ -52,8 +65,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ decrement, getQuantity, increment, quantities, totalItems }),
-    [decrement, getQuantity, increment, quantities, totalItems],
+    () => ({
+      add,
+      decrement,
+      getQuantity,
+      increment,
+      products,
+      quantities,
+      totalItems,
+    }),
+    [add, decrement, getQuantity, increment, products, quantities, totalItems],
   );
 
   return (

@@ -28,7 +28,7 @@ export function HospitalFolderList({
       {groups.map((group) => (
         <PressableScale
           accessibilityLabel={group.hospitalName}
-          key={group.hospitalId ?? 'unknown'}
+          key={group.key}
           onPress={() => onOpen(group)}
           pressedScale={0.97}
           style={styles.card}

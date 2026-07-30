@@ -34,6 +34,11 @@ import {
   type SavedAddress,
 } from '../src/lib/addresses';
 import { fetchCurrentLocationAddress } from '../src/lib/expoAddressLocation';
+import { getPatientByPhone } from '../src/lib/patients';
+import {
+  getCachedPatientName,
+  saveCachedPatientName,
+} from '../src/lib/session';
 
 const LABELS: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -124,6 +129,45 @@ export default function AddressEditorScreen() {
     };
   }, [addressId, phone, router]);
 
+  useEffect(() => {
+    if (!phone || addressId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const applyName = (name: string | null | undefined) => {
+      const recipientName = name?.trim();
+      if (!cancelled && recipientName) {
+        setDraft((current) =>
+          current.recipientName.trim()
+            ? current
+            : { ...current, recipientName },
+        );
+      }
+    };
+
+    const loadProfileName = async () => {
+      applyName(await getCachedPatientName(phone).catch(() => null));
+      try {
+        const patient = await getPatientByPhone(phone);
+        if (patient) {
+          applyName(patient.name);
+          void saveCachedPatientName(phone, patient.name).catch(
+            () => undefined,
+          );
+        }
+      } catch {
+        // The cached profile name remains available when offline.
+      }
+    };
+
+    void loadProfileName();
+    return () => {
+      cancelled = true;
+    };
+  }, [addressId, phone]);
+
   const updateField = <Key extends keyof AddressDraft>(
     key: Key,
     value: AddressDraft[Key],
@@ -168,10 +212,18 @@ export default function AddressEditorScreen() {
         return;
       }
 
-      setDraft((current) => ({ ...current, ...result.fields }));
+      setDraft((current) => ({
+        ...current,
+        area: result.fields.area || current.area,
+        building: result.fields.building || current.building,
+        city: result.fields.city || current.city,
+        pinCode: result.fields.pinCode || current.pinCode,
+        state: result.fields.state || current.state,
+      }));
       setErrors((current) => ({
         ...current,
         area: undefined,
+        building: undefined,
         city: undefined,
         pinCode: undefined,
         state: undefined,

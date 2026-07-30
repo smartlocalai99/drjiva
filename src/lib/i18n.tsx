@@ -21,20 +21,24 @@ const translations = {
     addDocument: 'Add document',
     addMedicine: 'Add Medicine',
     chooseHospital: 'Choose hospital',
+    selectHospital: 'Select a hospital',
     addNewHospital: 'Add a new hospital',
     hospitalName: 'Hospital name',
     findMedicine: 'Find medicine',
     courseDetails: 'Course details',
     tabletsPerDose: 'Tablets per dose',
     durationDays: 'Number of days',
-    startDate: 'Start date (YYYY-MM-DD)',
+    startDate: 'Course start date',
+    changeDate: 'Change',
+    courseStarts: 'Course starts',
+    courseEnds: 'Course ends',
     everyDay: 'Every day',
     alternateDays: 'Alternate days',
     reviewReminder: 'Review reminder',
     createReminder: 'Create reminder',
-    reminderCreated: 'Reminder created',
+    reminderCreated: 'Reminder added',
     reminderCreatedMessage:
-      'Your medicine course is saved and will appear on the dashboard.',
+      'Your medicine reminders are ready.',
     phoneAlertsDisabled:
       'The course is saved. Enable notifications in Settings for phone alerts.',
     addToCart: 'Add to cart',
@@ -84,6 +88,7 @@ const translations = {
     hospital: 'Hospital',
     imaging: 'Imaging',
     labReport: 'Lab Report',
+    medicalBill: 'Medical Bill',
     medicalDocument: 'Medical document',
     noScannedDocuments: 'No scanned documents',
     noScannedDocumentsSubtitle:
@@ -129,6 +134,7 @@ const translations = {
     chooseReminderTimes: 'Choose your reminder times',
     notificationTimingsHelp:
       'Choose the exact time for each part of your day.',
+    changeTime: 'Change',
     tapToChooseTime: 'Tap the time to change',
     timingsSynced:
       'Notification alerts and medicine cards will use these same times.',
@@ -139,8 +145,12 @@ const translations = {
     night: 'Night',
     saveTimings: 'Save timings',
     timingsSaved: 'Notification timings saved',
+    timingsSavedAlertsPending:
+      'The times are saved, but phone alerts could not be refreshed. Please save again when your connection is available.',
     oldAlertsCleanupPending:
       'Timings were saved. Old alerts will be cleaned up automatically.',
+    unableToSaveNotificationTimings:
+      'Unable to save notification timings',
     invalidTimings: 'Keep Morning before Afternoon before Night.',
     preferences: 'Preferences',
     recent: 'Recent',
@@ -163,20 +173,24 @@ const translations = {
     addDocument: 'పత్రం జోడించు',
     addMedicine: 'మందు జోడించు',
     chooseHospital: 'ఆసుపత్రిని ఎంచుకోండి',
+    selectHospital: 'ఆసుపత్రిని ఎంచుకోండి',
     addNewHospital: 'కొత్త ఆసుపత్రిని జోడించండి',
     hospitalName: 'ఆసుపత్రి పేరు',
     findMedicine: 'మందును వెతకండి',
     courseDetails: 'కోర్స్ వివరాలు',
     tabletsPerDose: 'ఒక్కోసారి మాత్రలు',
     durationDays: 'రోజుల సంఖ్య',
-    startDate: 'ప్రారంభ తేదీ (YYYY-MM-DD)',
+    startDate: 'కోర్స్ ప్రారంభ తేదీ',
+    changeDate: 'మార్చండి',
+    courseStarts: 'కోర్స్ ప్రారంభం',
+    courseEnds: 'కోర్స్ ముగింపు',
     everyDay: 'ప్రతి రోజు',
     alternateDays: 'ఒక రోజు విడిచి ఒక రోజు',
     reviewReminder: 'రిమైండర్‌ను పరిశీలించండి',
     createReminder: 'రిమైండర్ సృష్టించండి',
-    reminderCreated: 'రిమైండర్ సృష్టించబడింది',
+    reminderCreated: 'రిమైండర్ జోడించబడింది',
     reminderCreatedMessage:
-      'మీ మందుల కోర్స్ సేవ్ అయింది మరియు డ్యాష్‌బోర్డ్‌లో కనిపిస్తుంది.',
+      'మీ మందుల రిమైండర్లు సిద్ధంగా ఉన్నాయి.',
     phoneAlertsDisabled:
       'కోర్స్ సేవ్ అయింది. ఫోన్ అలర్ట్‌ల కోసం సెట్టింగ్‌లలో నోటిఫికేషన్‌లను ఆన్ చేయండి.',
     addToCart: 'కార్ట్‌కు జోడించు',
@@ -226,6 +240,7 @@ const translations = {
     hospital: 'ఆసుపత్రి',
     imaging: 'ఇమేజింగ్',
     labReport: 'ల్యాబ్ రిపోర్ట్',
+    medicalBill: 'మెడికల్ బిల్',
     medicalDocument: 'వైద్య పత్రం',
     noScannedDocuments: 'స్కాన్ చేసిన పత్రాలు లేవు',
     noScannedDocumentsSubtitle:
@@ -272,6 +287,7 @@ const translations = {
     chooseReminderTimes: 'మీ రిమైండర్ సమయాలను ఎంచుకోండి',
     notificationTimingsHelp:
       'రోజులో ప్రతి భాగానికి ఖచ్చితమైన సమయాన్ని ఎంచుకోండి.',
+    changeTime: 'మార్చండి',
     tapToChooseTime: 'సమయాన్ని మార్చడానికి నొక్కండి',
     timingsSynced:
       'నోటిఫికేషన్ అలర్ట్‌లు మరియు మందుల కార్డులు ఇవే సమయాలను ఉపయోగిస్తాయి.',
@@ -282,8 +298,12 @@ const translations = {
     night: 'రాత్రి',
     saveTimings: 'సమయాలను సేవ్ చేయండి',
     timingsSaved: 'నోటిఫికేషన్ సమయాలు సేవ్ అయ్యాయి',
+    timingsSavedAlertsPending:
+      'సమయాలు సేవ్ అయ్యాయి, కానీ ఫోన్ అలర్ట్‌లను అప్‌డేట్ చేయలేకపోయాము. కనెక్షన్ అందుబాటులో ఉన్నప్పుడు మళ్లీ సేవ్ చేయండి.',
     oldAlertsCleanupPending:
       'సమయాలు సేవ్ అయ్యాయి. పాత అలర్ట్‌లు ఆటోమేటిక్‌గా తొలగించబడతాయి.',
+    unableToSaveNotificationTimings:
+      'నోటిఫికేషన్ సమయాలను సేవ్ చేయలేకపోయాము',
     invalidTimings:
       'ఉదయం, మధ్యాహ్నం, రాత్రి సమయాలను అదే క్రమంలో ఉంచండి.',
     preferences: 'ప్రాధాన్యతలు',
