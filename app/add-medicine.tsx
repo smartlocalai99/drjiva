@@ -1045,7 +1045,7 @@ function MedicineImage({
     <Image
       accessibilityLabel={item.name}
       cachePolicy="memory-disk"
-      contentFit="cover"
+      contentFit="contain"
       onError={() => setFailed(true)}
       priority={priority}
       recyclingKey={item.id}

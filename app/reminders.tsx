@@ -265,7 +265,7 @@ function ReminderCard({
     <View style={styles.card}>
       <Image
         accessibilityLabel={medicine.name}
-        contentFit={medicine.imageUrl ? 'cover' : 'contain'}
+        contentFit="contain"
         source={
           medicine.imageUrl
             ? { uri: medicine.imageUrl }
