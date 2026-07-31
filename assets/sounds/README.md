@@ -1,7 +1,10 @@
-The bundled custom medicine reminder recording is:
+The bundled custom medicine reminder recordings are:
 
-`reminder.caf`
+`reminder.caf` (iOS) and `rec.wav` (Android)
 
-Keep the spoken reminder at 30 seconds or less. The Expo config detects this
-exact filename at build time and bundles it automatically. Rebuild and
-reinstall the native app after replacing it.
+Keep each under 30 seconds. `app.config.js` detects these exact
+filenames at build time and bundles them automatically — iOS plays
+`reminder.caf` by filename, Android plays `rec.wav` by its res/raw
+resource name ("rec"). Both currently play the same clip back-to-back
+with a short gap, so the reminder sound is heard twice. Rebuild and
+reinstall the native app after replacing either file.

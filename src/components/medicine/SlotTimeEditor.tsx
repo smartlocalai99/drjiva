@@ -38,6 +38,12 @@ export function SlotTimeEditor({
   const pickerValue = storedTimeToDate(value);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const [hours24Str, minutesStr] = value.split(':');
+  const hours24 = Number(hours24Str);
+  const isAM = hours24 < 12;
+  const displayHour = hours24 % 12 || 12;
+  const displayMinute = minutesStr ?? '00';
+
   const setSelectedTime = (date: Date) => {
     onChange(dateToStoredTime(date));
   };
@@ -122,23 +128,65 @@ export function SlotTimeEditor({
             { backgroundColor: theme.tint, borderColor: theme.accent },
           ]}
         >
-          <View style={[styles.picker, { backgroundColor: dashboardColors.card }]}>
+          <View style={styles.androidRow}>
+            <View style={styles.androidField}>
+              <Text style={[styles.androidFieldLabel, { color: theme.accent }]}>
+                Hour
+              </Text>
+              <View style={[styles.picker, { backgroundColor: dashboardColors.card }]}>
+                <PressableScale
+                  accessibilityLabel={`Move ${label} hour back by one`}
+                  onPress={() => onChange(adjustTime(value, -60))}
+                  style={styles.step}
+                >
+                  <Ionicons color={theme.accent} name="remove" size={18} />
+                </PressableScale>
+                <Text style={[styles.time, { color: theme.accent }]}>
+                  {displayHour}
+                </Text>
+                <PressableScale
+                  accessibilityLabel={`Move ${label} hour forward by one`}
+                  onPress={() => onChange(adjustTime(value, 60))}
+                  style={styles.step}
+                >
+                  <Ionicons color={theme.accent} name="add" size={18} />
+                </PressableScale>
+              </View>
+            </View>
+
+            <View style={styles.androidField}>
+              <Text style={[styles.androidFieldLabel, { color: theme.accent }]}>
+                Minute
+              </Text>
+              <View style={[styles.picker, { backgroundColor: dashboardColors.card }]}>
+                <PressableScale
+                  accessibilityLabel={`Move ${label} minute back by five`}
+                  onPress={() => onChange(adjustTime(value, -5))}
+                  style={styles.step}
+                >
+                  <Ionicons color={theme.accent} name="remove" size={18} />
+                </PressableScale>
+                <Text style={[styles.time, { color: theme.accent }]}>
+                  {displayMinute}
+                </Text>
+                <PressableScale
+                  accessibilityLabel={`Move ${label} minute forward by five`}
+                  onPress={() => onChange(adjustTime(value, 5))}
+                  style={styles.step}
+                >
+                  <Ionicons color={theme.accent} name="add" size={18} />
+                </PressableScale>
+              </View>
+            </View>
+
             <PressableScale
-              accessibilityLabel={`Move ${label} time 15 minutes earlier`}
-              onPress={() => onChange(adjustTime(value, -15))}
-              style={styles.step}
+              accessibilityLabel={`Switch ${label} to ${isAM ? 'PM' : 'AM'}`}
+              onPress={() => onChange(adjustTime(value, isAM ? 12 * 60 : -12 * 60))}
+              style={[styles.ampmToggle, { borderColor: theme.accent }]}
             >
-              <Ionicons color={theme.accent} name="remove" size={18} />
-            </PressableScale>
-            <Text style={[styles.time, { color: theme.accent }]}>
-              {formatTime12Hour(value)}
-            </Text>
-            <PressableScale
-              accessibilityLabel={`Move ${label} time 15 minutes later`}
-              onPress={() => onChange(adjustTime(value, 15))}
-              style={styles.step}
-            >
-              <Ionicons color={theme.accent} name="add" size={18} />
+              <Text style={[styles.ampmText, { color: theme.accent }]}>
+                {isAM ? 'AM' : 'PM'}
+              </Text>
             </PressableScale>
           </View>
           <PressableScale
@@ -241,6 +289,35 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 34,
+  },
+  androidRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    justifyContent: 'center',
+    paddingTop: dashboardSpacing.sm,
+  },
+  androidField: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  androidFieldLabel: {
+    ...dashboardTypography.caption,
+    fontSize: 9,
+    textTransform: 'uppercase',
+  },
+  ampmToggle: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    borderRadius: dashboardRadii.pill,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  ampmText: {
+    ...dashboardTypography.button,
+    fontSize: 12,
   },
   time: {
     ...dashboardTypography.button,

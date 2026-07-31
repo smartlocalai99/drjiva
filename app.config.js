@@ -8,7 +8,7 @@ const MEDICINE_REMINDER_SOUND_CHANNEL = 'medicine-reminders-voice-v1';
 // filename minus its extension.
 const IOS_SOUND_PATH = './assets/sounds/reminder.caf';
 const IOS_SOUND_FILE = 'reminder.caf';
-const ANDROID_SOUND_PATH = './assets/sounds/rec.mp3';
+const ANDROID_SOUND_PATH = './assets/sounds/rec.wav';
 const ANDROID_SOUND_RESOURCE = 'rec';
 
 /** @param {import('expo/config').ConfigContext} context */

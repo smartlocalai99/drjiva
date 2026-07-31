@@ -19,7 +19,7 @@ describe('app config medicine reminder sound', () => {
       './assets/sounds/reminder.caf',
     );
     expect(notificationsPlugin?.[1]?.sounds).toContain(
-      './assets/sounds/rec.mp3',
+      './assets/sounds/rec.wav',
     );
   });
 });
