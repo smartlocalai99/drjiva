@@ -1,9 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker, {
-  DateTimePickerAndroid,
-} from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   dashboardColors,
@@ -38,38 +36,19 @@ export function SlotTimeEditor({
 }) {
   const theme = DOSE_SLOT_THEME[slot];
   const pickerValue = storedTimeToDate(value);
-  const [showIosPicker, setShowIosPicker] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const setSelectedTime = (date: Date) => {
     onChange(dateToStoredTime(date));
   };
 
-  const openAndroidPicker = () => {
-    try {
-      DateTimePickerAndroid.open({
-        design: 'material',
-        initialInputMode: 'default',
-        is24Hour: false,
-        mode: 'time',
-        onValueChange: (_event, date) => setSelectedTime(date),
-        title: label,
-        value: pickerValue,
-      });
-    } catch {
-      Alert.alert(
-        "Can't open the time picker",
-        'Please close and reopen the app, then try again.',
-      );
-    }
-  };
-
   const openPicker = () => {
-    if (process.env.EXPO_OS === 'android') {
-      openAndroidPicker();
-      return;
-    }
-    if (process.env.EXPO_OS === 'ios') {
-      setShowIosPicker((current) => !current);
+    // Android's imperative native time picker (DateTimePickerAndroid.open)
+    // has crashed on-device here, with no JS-catchable error to guard
+    // against — so Android uses the same dependency-free step buttons as
+    // web instead of that native picker.
+    if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
+      setIsExpanded((current) => !current);
     }
   };
 
@@ -105,14 +84,14 @@ export function SlotTimeEditor({
           {process.env.EXPO_OS === 'web' ? null : (
             <Ionicons
               color={theme.accent}
-              name={showIosPicker ? 'chevron-up' : 'create-outline'}
+              name={isExpanded ? 'chevron-up' : 'create-outline'}
               size={17}
             />
           )}
         </PressableScale>
       </View>
 
-      {process.env.EXPO_OS === 'ios' && showIosPicker ? (
+      {process.env.EXPO_OS === 'ios' && isExpanded ? (
         <View
           style={[
             styles.iosPicker,
@@ -130,7 +109,41 @@ export function SlotTimeEditor({
           />
           <PressableScale
             accessibilityLabel={`Finish choosing ${label} reminder time`}
-            onPress={() => setShowIosPicker(false)}
+            onPress={() => setIsExpanded(false)}
+            style={[styles.done, { backgroundColor: theme.accent }]}
+          >
+            <Ionicons color="#FFFFFF" name="checkmark" size={18} />
+          </PressableScale>
+        </View>
+      ) : process.env.EXPO_OS === 'android' && isExpanded ? (
+        <View
+          style={[
+            styles.iosPicker,
+            { backgroundColor: theme.tint, borderColor: theme.accent },
+          ]}
+        >
+          <View style={[styles.picker, { backgroundColor: dashboardColors.card }]}>
+            <PressableScale
+              accessibilityLabel={`Move ${label} time 15 minutes earlier`}
+              onPress={() => onChange(adjustTime(value, -15))}
+              style={styles.step}
+            >
+              <Ionicons color={theme.accent} name="remove" size={18} />
+            </PressableScale>
+            <Text style={[styles.time, { color: theme.accent }]}>
+              {formatTime12Hour(value)}
+            </Text>
+            <PressableScale
+              accessibilityLabel={`Move ${label} time 15 minutes later`}
+              onPress={() => onChange(adjustTime(value, 15))}
+              style={styles.step}
+            >
+              <Ionicons color={theme.accent} name="add" size={18} />
+            </PressableScale>
+          </View>
+          <PressableScale
+            accessibilityLabel={`Finish choosing ${label} reminder time`}
+            onPress={() => setIsExpanded(false)}
             style={[styles.done, { backgroundColor: theme.accent }]}
           >
             <Ionicons color="#FFFFFF" name="checkmark" size={18} />
