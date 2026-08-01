@@ -1,8 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
+  InputAccessoryView,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +20,8 @@ import {
   dashboardTypography,
 } from '../../dashboardTheme';
 import {
+  CUSTOM_DURATION_ACCESSORY_ID,
+  getCourseDurationKeyboardConfig,
   getCourseDurationPickerSelection,
   PRESET_COURSE_DAYS,
 } from '../../lib/courseDurationPicker';
@@ -26,6 +32,9 @@ import {
   type CourseDuration,
 } from '../../lib/medicineSchedule';
 import { PressableScale } from '../PressableScale';
+
+const isIOS = process.env.EXPO_OS === 'ios';
+const keyboardConfig = getCourseDurationKeyboardConfig(isIOS);
 
 export function durationLabel(value: CourseDuration): string {
   if (value.mode === 'ongoing') return 'Everyday';
@@ -45,6 +54,7 @@ export function DurationPicker({
   const [customError, setCustomError] = useState(false);
 
   const closePicker = () => {
+    Keyboard.dismiss();
     setVisible(false);
     setCustomError(false);
   };
@@ -89,154 +99,192 @@ export function DurationPicker({
         transparent
         visible={visible}
       >
-        <Pressable onPress={closePicker} style={styles.backdrop}>
-          <Pressable
-            onPress={(event) => event.stopPropagation()}
-            style={styles.sheet}
-          >
-            <Text style={styles.title}>How long is this course?</Text>
-            <Text style={styles.subtitle}>
-              Choose up to {MAX_COURSE_DAYS} days, or select Everyday until
-              stopped.
-            </Text>
-            <View style={styles.options}>
-              {PRESET_COURSE_DAYS.map((days) => {
-                const selected =
-                  !customSelected &&
-                  value.mode === 'finite' &&
-                  value.days === days;
-                return (
+        <KeyboardAvoidingView
+          behavior={keyboardConfig.behavior}
+          style={styles.modalRoot}
+        >
+          <Pressable onPress={closePicker} style={styles.backdrop}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={styles.sheet}
+            >
+              <ScrollView
+                bounces={false}
+                contentContainerStyle={styles.sheetContent}
+                keyboardDismissMode={keyboardConfig.dismissMode}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.title}>How long is this course?</Text>
+                <Text style={styles.subtitle}>
+                  Choose up to {MAX_COURSE_DAYS} days, or select Everyday until
+                  stopped.
+                </Text>
+                <View style={styles.options}>
+                  {PRESET_COURSE_DAYS.map((days) => {
+                    const selected =
+                      !customSelected &&
+                      value.mode === 'finite' &&
+                      value.days === days;
+                    return (
+                      <PressableScale
+                        accessibilityState={{ selected }}
+                        key={days}
+                        onPress={() => {
+                          onChange({ days, mode: 'finite' });
+                          closePicker();
+                        }}
+                        style={[
+                          styles.option,
+                          selected && styles.optionSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selected && styles.optionTextSelected,
+                          ]}
+                        >
+                          {days} {days === 1 ? 'day' : 'days'}
+                        </Text>
+                        {selected ? (
+                          <Ionicons
+                            color={dashboardColors.primary}
+                            name="checkmark-circle"
+                            size={22}
+                          />
+                        ) : null}
+                      </PressableScale>
+                    );
+                  })}
                   <PressableScale
-                    accessibilityState={{ selected }}
-                    key={days}
+                    accessibilityState={{ selected: customSelected }}
                     onPress={() => {
-                      onChange({ days, mode: 'finite' });
-                      closePicker();
+                      setCustomSelected(true);
+                      setCustomError(false);
+                      if (!customDays && value.mode === 'finite') {
+                        setCustomDays(String(value.days));
+                      }
                     }}
-                    style={[styles.option, selected && styles.optionSelected]}
+                    style={[
+                      styles.option,
+                      customSelected && styles.optionSelected,
+                    ]}
                   >
                     <Text
                       style={[
                         styles.optionText,
-                        selected && styles.optionTextSelected,
+                        customSelected && styles.optionTextSelected,
                       ]}
                     >
-                      {days} {days === 1 ? 'day' : 'days'}
+                      Custom
                     </Text>
-                    {selected ? (
+                    {customSelected ? (
                       <Ionicons
                         color={dashboardColors.primary}
-                        name="checkmark-circle"
+                        name="create-outline"
+                        size={20}
+                      />
+                    ) : null}
+                  </PressableScale>
+                  <PressableScale
+                    accessibilityState={{ selected: ongoingSelected }}
+                    onPress={() => {
+                      onChange({ mode: 'ongoing' });
+                      closePicker();
+                    }}
+                    style={[
+                      styles.option,
+                      ongoingSelected && styles.optionSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        ongoingSelected && styles.optionTextSelected,
+                      ]}
+                    >
+                      Everyday
+                    </Text>
+                    {ongoingSelected ? (
+                      <Ionicons
+                        color={dashboardColors.primary}
+                        name="infinite-outline"
                         size={22}
                       />
                     ) : null}
                   </PressableScale>
-                );
-              })}
-              <PressableScale
-                accessibilityState={{ selected: customSelected }}
-                onPress={() => {
-                  setCustomSelected(true);
-                  setCustomError(false);
-                  if (!customDays && value.mode === 'finite') {
-                    setCustomDays(String(value.days));
-                  }
-                }}
-                style={[
-                  styles.option,
-                  customSelected && styles.optionSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    customSelected && styles.optionTextSelected,
-                  ]}
-                >
-                  Custom
-                </Text>
-                {customSelected ? (
-                  <Ionicons
-                    color={dashboardColors.primary}
-                    name="create-outline"
-                    size={20}
-                  />
-                ) : null}
-              </PressableScale>
-              <PressableScale
-                accessibilityState={{ selected: ongoingSelected }}
-                onPress={() => {
-                  onChange({ mode: 'ongoing' });
-                  closePicker();
-                }}
-                style={[
-                  styles.option,
-                  ongoingSelected && styles.optionSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    ongoingSelected && styles.optionTextSelected,
-                  ]}
-                >
-                  Everyday
-                </Text>
-                {ongoingSelected ? (
-                  <Ionicons
-                    color={dashboardColors.primary}
-                    name="infinite-outline"
-                    size={22}
-                  />
-                ) : null}
-              </PressableScale>
-            </View>
-
-            {customSelected ? (
-              <View style={styles.customPanel}>
-                <Text style={styles.customLabel}>Enter number of days</Text>
-                <View style={styles.customRow}>
-                  <TextInput
-                    accessibilityLabel="Custom number of course days"
-                    autoFocus
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    onChangeText={(next) => {
-                      setCustomDays(next);
-                      setCustomError(false);
-                    }}
-                    onSubmitEditing={applyCustomDays}
-                    placeholder="30"
-                    placeholderTextColor={dashboardColors.textFaint}
-                    returnKeyType="done"
-                    selectTextOnFocus
-                    style={[
-                      styles.customInput,
-                      customError && styles.customInputError,
-                    ]}
-                    value={customDays}
-                  />
-                  <Text style={styles.daysSuffix}>days</Text>
-                  <PressableScale
-                    accessibilityLabel="Apply custom course days"
-                    onPress={applyCustomDays}
-                    style={styles.applyButton}
-                  >
-                    <Text style={styles.applyButtonText}>Apply</Text>
-                  </PressableScale>
                 </View>
-                <Text
-                  accessibilityLiveRegion="polite"
-                  style={[styles.customHint, customError && styles.errorText]}
-                >
-                  {customError
-                    ? `Enter a whole number from ${MIN_COURSE_DAYS} to ${MAX_COURSE_DAYS} days.`
-                    : `Whole numbers from ${MIN_COURSE_DAYS} to ${MAX_COURSE_DAYS}.`}
-                </Text>
-              </View>
-            ) : null}
+
+                {customSelected ? (
+                  <View style={styles.customPanel}>
+                    <Text style={styles.customLabel}>Enter number of days</Text>
+                    <View style={styles.customRow}>
+                      <TextInput
+                        accessibilityLabel="Custom number of course days"
+                        autoFocus
+                        inputAccessoryViewID={
+                          keyboardConfig.inputAccessoryViewID
+                        }
+                        keyboardType="number-pad"
+                        maxLength={3}
+                        onChangeText={(next) => {
+                          setCustomDays(next);
+                          setCustomError(false);
+                        }}
+                        onSubmitEditing={applyCustomDays}
+                        placeholder="30"
+                        placeholderTextColor={dashboardColors.textFaint}
+                        returnKeyType="done"
+                        selectTextOnFocus
+                        style={[
+                          styles.customInput,
+                          customError && styles.customInputError,
+                        ]}
+                        value={customDays}
+                      />
+                      <Text style={styles.daysSuffix}>days</Text>
+                      <PressableScale
+                        accessibilityLabel="Apply custom course days"
+                        onPress={applyCustomDays}
+                        style={styles.applyButton}
+                      >
+                        <Text style={styles.applyButtonText}>Apply</Text>
+                      </PressableScale>
+                    </View>
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={[
+                        styles.customHint,
+                        customError && styles.errorText,
+                      ]}
+                    >
+                      {customError
+                        ? `Enter a whole number from ${MIN_COURSE_DAYS} to ${MAX_COURSE_DAYS} days.`
+                        : `Whole numbers from ${MIN_COURSE_DAYS} to ${MAX_COURSE_DAYS}.`}
+                    </Text>
+                  </View>
+                ) : null}
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
+        {isIOS && customSelected ? (
+          <InputAccessoryView nativeID={CUSTOM_DURATION_ACCESSORY_ID}>
+            <View style={styles.keyboardToolbar}>
+              <Text style={styles.keyboardToolbarLabel}>Custom duration</Text>
+              <Pressable
+                accessibilityLabel="Dismiss custom duration keyboard"
+                accessibilityRole="button"
+                hitSlop={10}
+                onPress={Keyboard.dismiss}
+                style={styles.keyboardDone}
+              >
+                <Text style={styles.keyboardDoneText}>Done</Text>
+              </Pressable>
+            </View>
+          </InputAccessoryView>
+        ) : null}
       </Modal>
     </>
   );
@@ -260,6 +308,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   triggerText: { ...dashboardTypography.button, color: dashboardColors.text },
+  modalRoot: {
+    flex: 1,
+  },
   backdrop: {
     backgroundColor: 'rgba(15,23,42,0.5)',
     flex: 1,
@@ -269,6 +320,10 @@ const styles = StyleSheet.create({
     backgroundColor: dashboardColors.card,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+    maxHeight: '92%',
+    overflow: 'hidden',
+  },
+  sheetContent: {
     padding: dashboardSpacing.pagePadding,
     paddingBottom: 34,
   },
@@ -361,5 +416,28 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#B91C1C',
+  },
+  keyboardToolbar: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.track,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingHorizontal: dashboardSpacing.pagePadding,
+  },
+  keyboardToolbarLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+  },
+  keyboardDone: {
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 8,
+  },
+  keyboardDoneText: {
+    ...dashboardTypography.button,
+    color: dashboardColors.primary,
   },
 });

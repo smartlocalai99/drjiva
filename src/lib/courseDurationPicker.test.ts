@@ -16,4 +16,19 @@ describe('course duration picker selection', () => {
       'ongoing',
     );
   });
+
+  it('uses keyboard-safe iOS sheet behavior and an input accessory', async () => {
+    const module = await import('./courseDurationPicker');
+
+    expect(module.getCourseDurationKeyboardConfig(true)).toEqual({
+      behavior: 'padding',
+      dismissMode: 'interactive',
+      inputAccessoryViewID: module.CUSTOM_DURATION_ACCESSORY_ID,
+    });
+    expect(module.getCourseDurationKeyboardConfig(false)).toEqual({
+      behavior: undefined,
+      dismissMode: 'on-drag',
+      inputAccessoryViewID: undefined,
+    });
+  });
 });
