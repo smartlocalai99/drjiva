@@ -5,18 +5,37 @@ import {
   expandDoseEvents,
   generateCourseDates,
   getActiveDose,
+  parseCustomCourseDays,
   replaceEventSlotTime,
   validateMedicineCourseInput,
   validateCourseDuration,
 } from './medicineSchedule';
 
 describe('course duration', () => {
-  it('accepts one to seven finite days and open-ended Everyday', () => {
+  it('accepts finite courses through 365 days and open-ended Everyday', () => {
     expect(validateCourseDuration({ days: 7, mode: 'finite' })).toBeNull();
-    expect(validateCourseDuration({ mode: 'ongoing' })).toBeNull();
     expect(
       validateCourseDuration({ days: 8, mode: 'finite' } as never),
+    ).toBeNull();
+    expect(
+      validateCourseDuration({ days: 365, mode: 'finite' } as never),
+    ).toBeNull();
+    expect(validateCourseDuration({ mode: 'ongoing' })).toBeNull();
+    expect(
+      validateCourseDuration({ days: 366, mode: 'finite' } as never),
     ).toBe('invalidCourseDuration');
+  });
+
+  it('parses only whole custom day values from 1 through 365', () => {
+    expect(parseCustomCourseDays(' 30 ')).toBe(30);
+    expect(parseCustomCourseDays('365')).toBe(365);
+    expect(parseCustomCourseDays('')).toBeNull();
+    expect(parseCustomCourseDays('   ')).toBeNull();
+    expect(parseCustomCourseDays('1.5')).toBeNull();
+    expect(parseCustomCourseDays('0')).toBeNull();
+    expect(parseCustomCourseDays('-1')).toBeNull();
+    expect(parseCustomCourseDays('366')).toBeNull();
+    expect(parseCustomCourseDays('30days')).toBeNull();
   });
 });
 
@@ -57,6 +76,9 @@ describe('medicine course validation', () => {
     expect(validateMedicineCourseInput({ ...validInput, durationDays: 366 })).toBe(
       'invalidCourseDuration',
     );
+    expect(
+      validateMedicineCourseInput({ ...validInput, durationDays: 365 }),
+    ).toBeNull();
     expect(validateMedicineCourseInput({ ...validInput, tabletsPerDose: 10 })).toBe(
       null,
     );
