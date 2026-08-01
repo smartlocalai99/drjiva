@@ -32,7 +32,7 @@
 - Produces: `list_patient_orders(uuid) -> jsonb` and `get_patient_order(uuid, uuid) -> jsonb`
 - Produces: order JSON fields `riderName`, `riderPhone`, and `assignedAt`
 
-- [ ] **Step 1: Extend the live verifier with dispatch assertions before adding the migration**
+- [x] **Step 1: Extend the live verifier with dispatch assertions before adding the migration**
 
 ```js
 const assigned = await supabase.rpc('assign_order_rider', {
@@ -55,13 +55,13 @@ assert.ok(patientOrders.data.some((order) => order.id === first.data.id));
 Before assignment, transition the test order to `shared` with
 `update_hospital_order_status`; assignment from `placed` must be rejected.
 
-- [ ] **Step 2: Run the verifier to confirm the new RPC is missing**
+- [x] **Step 2: Run the verifier to confirm the new RPC is missing**
 
 Run: `set -a; source .env.local; test -n "$ORDER_DASHBOARD_ACCESS_CODE" && node scripts/verify-order-backend.mjs`
 
 Expected: FAIL with `Could not find the function public.assign_order_rider`.
 
-- [ ] **Step 3: Add the migration**
+- [x] **Step 3: Add the migration**
 
 The migration must:
 
@@ -78,7 +78,7 @@ alter table public.orders
 
 Normalize rider phone to the last ten digits, reject blank rider names/invalid phones, migrate `confirmed` to `shared` and `preparing` to `collected`, replace the status constraint, update order JSON construction, and make assignment plus status change one transaction. Patient RPCs must require `auth.uid() = orders.owner_user_id` and the requested patient id.
 
-- [ ] **Step 4: Apply the migration and rerun security/integration verification**
+- [x] **Step 4: Apply the migration and rerun security/integration verification**
 
 Run: `npx supabase db push`
 
