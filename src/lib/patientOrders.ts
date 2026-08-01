@@ -141,10 +141,10 @@ export function mapPatientOrder(value: unknown): PatientOrder {
     createdAt: stringValue(row.createdAt, 'created time'),
     deliveryFee: numberValue(row.deliveryFee, 'delivery fee'),
     hospital: {
-      address: stringValue(hospital.address, 'hospital address'),
+      address: nullableString(hospital.address, 'hospital address') ?? '',
       id: stringValue(hospital.id, 'hospital id'),
       name: stringValue(hospital.name, 'hospital name'),
-      phone: stringValue(hospital.phone, 'hospital phone'),
+      phone: nullableString(hospital.phone, 'hospital phone') ?? '',
     },
     id: stringValue(row.id, 'order id'),
     items: row.items.map(mapOrderItem),

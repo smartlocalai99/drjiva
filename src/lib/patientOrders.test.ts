@@ -91,6 +91,27 @@ describe('patient order normalization', () => {
       ]),
     ).toBe(2);
   });
+
+  it('keeps an order visible while hospital contact details are pending', () => {
+    expect(
+      mapPatientOrder({
+        ...orderRow,
+        hospital: {
+          ...orderRow.hospital,
+          address: null,
+          phone: null,
+        },
+      }),
+    ).toMatchObject({
+      hospital: {
+        address: '',
+        name: 'Dr Jiva Hospital',
+        phone: '',
+      },
+      id: 'order-1',
+      status: 'assigned',
+    });
+  });
 });
 
 describe('patient order RPCs', () => {

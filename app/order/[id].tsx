@@ -161,7 +161,11 @@ export default function OrderDetailScreen() {
 
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Delivery details</Text>
-            <Detail icon="business-outline" title={order.hospital.name} text={order.hospital.address} />
+            <Detail
+              icon="business-outline"
+              text={order.hospital.address || 'Hospital pickup details pending'}
+              title={order.hospital.name}
+            />
             <View style={styles.detailDivider} />
             <Detail icon="location-outline" title={`${order.address.label} address`} text={order.address.formatted} />
           </View>
