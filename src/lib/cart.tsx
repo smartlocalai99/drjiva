@@ -11,6 +11,7 @@ import type { ShopProduct } from '../data/shopProducts';
 
 type CartContextValue = {
   add: (product: ShopProduct) => void;
+  clear: () => void;
   decrement: (id: string) => void;
   getQuantity: (id: string) => number;
   increment: (id: string) => void;
@@ -31,6 +32,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ...current,
       [product.id]: (current[product.id] ?? 0) + 1,
     }));
+  }, []);
+
+  const clear = useCallback(() => {
+    setProducts({});
+    setQuantities({});
   }, []);
 
   const increment = useCallback((id: string) => {
@@ -67,6 +73,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       add,
+      clear,
       decrement,
       getQuantity,
       increment,
@@ -74,7 +81,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       quantities,
       totalItems,
     }),
-    [add, decrement, getQuantity, increment, products, quantities, totalItems],
+    [
+      add,
+      clear,
+      decrement,
+      getQuantity,
+      increment,
+      products,
+      quantities,
+      totalItems,
+    ],
   );
 
   return (

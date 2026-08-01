@@ -5,7 +5,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,12 @@ import {
 } from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
 import { formatRupees, resolveShopProductPrice } from '../src/lib/currency';
+import {
+  createOrderRequestId,
+  placeCodOrder,
+  type PlacedOrder,
+} from '../src/lib/orders';
+import { getPatientByPhone } from '../src/lib/patients';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -43,6 +49,9 @@ export default function CheckoutScreen() {
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>();
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState<PlacedOrder>();
+  const requestIdRef = useRef<string | undefined>(undefined);
 
   const lines = useMemo(
     () =>
@@ -106,15 +115,45 @@ export default function CheckoutScreen() {
     }, [phone]),
   );
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     if (!selectedAddress) {
       router.push({ params: { phone }, pathname: '/address-editor' });
       return;
     }
-    Alert.alert(
-      'Ordering is coming soon',
-      'Your cart and delivery details are ready. Online ordering will be available in an upcoming update.',
-    );
+    if (isPlacingOrder) {
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    const clientRequestId = requestIdRef.current ?? createOrderRequestId();
+    requestIdRef.current = clientRequestId;
+    try {
+      const patient = await getPatientByPhone(phone);
+      if (!patient) {
+        throw new Error('Complete your patient profile before placing an order.');
+      }
+      const order = await placeCodOrder({
+        address: selectedAddress,
+        clientRequestId,
+        items: lines.map((line) => ({
+          medicineId: line.product.id,
+          quantity: line.quantity,
+        })),
+        patientId: patient.patientId,
+      });
+      setPlacedOrder(order);
+      requestIdRef.current = undefined;
+      cart.clear();
+    } catch (cause) {
+      Alert.alert(
+        'Order not placed',
+        cause instanceof Error
+          ? cause.message
+          : 'We could not place your order. Please try again.',
+      );
+    } finally {
+      setIsPlacingOrder(false);
+    }
   };
 
   return (
@@ -139,7 +178,15 @@ export default function CheckoutScreen() {
         <View style={styles.headerSide} />
       </View>
 
-      {lines.length === 0 ? (
+      {placedOrder && selectedAddress ? (
+        <OrderSuccess
+          address={selectedAddress}
+          onContinue={() =>
+            router.replace({ params: { phone }, pathname: '/shop' })
+          }
+          order={placedOrder}
+        />
+      ) : lines.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons
             color={dashboardColors.textFaint}
@@ -170,7 +217,7 @@ export default function CheckoutScreen() {
               <View style={styles.progressLine} />
               <ProgressStep active icon="location" label="Address" />
               <View style={styles.progressLine} />
-              <ProgressStep icon="card" label="Payment" />
+              <ProgressStep active icon="cash" label="COD" />
             </View>
 
             <View style={styles.sectionHeader}>
@@ -321,6 +368,7 @@ export default function CheckoutScreen() {
             <View style={styles.paymentCard}>
               <PriceRow label="Item total" value={formatRupees(subtotal)} />
               <PriceRow label="Delivery" value="FREE" valueSuccess />
+              <PriceRow label="Payment" value="Cash on delivery" />
               <View style={styles.paymentDivider} />
               <PriceRow bold label="Amount to pay" value={formatRupees(subtotal)} />
             </View>
@@ -338,20 +386,101 @@ export default function CheckoutScreen() {
             </View>
             <PressableScale
               accessibilityLabel={
-                selectedAddress ? 'Place order' : 'Add delivery address'
+                selectedAddress ? 'Place cash on delivery order' : 'Add delivery address'
               }
-              onPress={placeOrder}
-              style={styles.placeOrderButton}
+              accessibilityState={{ disabled: isPlacingOrder }}
+              disabled={isPlacingOrder}
+              onPress={() => void placeOrder()}
+              style={[
+                styles.placeOrderButton,
+                isPlacingOrder && styles.placeOrderButtonDisabled,
+              ]}
             >
-              <Text style={styles.placeOrderText}>
-                {selectedAddress ? 'Place order' : 'Add address'}
-              </Text>
-              <Ionicons color="#FFFFFF" name="arrow-forward" size={18} />
+              {isPlacingOrder ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.placeOrderText}>
+                    {selectedAddress ? 'Place COD order' : 'Add address'}
+                  </Text>
+                  <Ionicons color="#FFFFFF" name="arrow-forward" size={18} />
+                </>
+              )}
             </PressableScale>
           </View>
         </>
       )}
     </SafeAreaView>
+  );
+}
+
+function OrderSuccess({
+  address,
+  onContinue,
+  order,
+}: {
+  address: SavedAddress;
+  onContinue: () => void;
+  order: PlacedOrder;
+}) {
+  const deliveryAddress = [
+    address.building,
+    address.area,
+    address.landmark,
+    address.city,
+    address.state,
+    address.pinCode,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.successContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.successIcon}>
+        <Ionicons color="#FFFFFF" name="checkmark" size={38} />
+      </View>
+      <View style={styles.successHeading}>
+        <Text style={styles.successTitle}>Order placed</Text>
+        <Text style={styles.successMessage}>
+          The hospital has received your cash-on-delivery order.
+        </Text>
+      </View>
+      <View style={styles.receiptCard}>
+        <View style={styles.receiptTopRow}>
+          <View>
+            <Text style={styles.receiptLabel}>ORDER NUMBER</Text>
+            <Text style={styles.receiptNumber}>ORD-{order.orderNumber}</Text>
+          </View>
+          <View style={styles.codBadge}>
+            <Ionicons color={dashboardColors.primary} name="cash" size={16} />
+            <Text style={styles.codBadgeText}>COD</Text>
+          </View>
+        </View>
+        <View style={styles.paymentDivider} />
+        <PriceRow bold label="Amount to pay" value={formatRupees(order.total)} />
+        <View style={styles.paymentDivider} />
+        <View style={styles.successAddressRow}>
+          <Ionicons
+            color={dashboardColors.primary}
+            name="location"
+            size={20}
+          />
+          <View style={styles.successAddressCopy}>
+            <Text style={styles.successAddressName}>
+              {address.recipientName} · +91 {address.phone}
+            </Text>
+            <Text style={styles.successAddress}>{deliveryAddress}</Text>
+          </View>
+        </View>
+      </View>
+      <PressableScale onPress={onContinue} style={styles.continueButton}>
+        <Text style={styles.placeOrderText}>Continue shopping</Text>
+        <Ionicons color="#FFFFFF" name="arrow-forward" size={18} />
+      </PressableScale>
+    </ScrollView>
   );
 }
 
@@ -785,6 +914,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: dashboardSpacing.xl,
   },
+  placeOrderButtonDisabled: {
+    opacity: 0.65,
+  },
   placeOrderText: {
     ...dashboardTypography.button,
     color: '#FFFFFF',
@@ -808,5 +940,99 @@ const styles = StyleSheet.create({
   shopButtonText: {
     ...dashboardTypography.button,
     color: '#FFFFFF',
+  },
+  successContent: {
+    alignItems: 'center',
+    flexGrow: 1,
+    gap: dashboardSpacing.gap,
+    justifyContent: 'center',
+    padding: dashboardSpacing.pagePadding,
+  },
+  successIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.success,
+    borderRadius: 34,
+    height: 68,
+    justifyContent: 'center',
+    width: 68,
+  },
+  successHeading: {
+    alignItems: 'center',
+    gap: dashboardSpacing.sm,
+  },
+  successTitle: {
+    ...dashboardTypography.largeTitle,
+    color: dashboardColors.text,
+  },
+  successMessage: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+    maxWidth: 320,
+    textAlign: 'center',
+  },
+  receiptCard: {
+    backgroundColor: dashboardColors.card,
+    borderRadius: dashboardRadii.card,
+    gap: dashboardSpacing.md,
+    padding: dashboardSpacing.xl,
+    width: '100%',
+  },
+  receiptTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  receiptLabel: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textFaint,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  receiptNumber: {
+    ...dashboardTypography.title,
+    color: dashboardColors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  codBadge: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: dashboardSpacing.sm,
+    paddingVertical: 6,
+  },
+  codBadgeText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+  },
+  successAddressRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+  },
+  successAddressCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  successAddressName: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  successAddress: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    lineHeight: 18,
+  },
+  continueButton: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.button,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    justifyContent: 'center',
+    minHeight: 52,
+    width: '100%',
   },
 });
