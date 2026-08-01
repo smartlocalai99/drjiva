@@ -160,25 +160,13 @@ export default function MedicineDetailScreen() {
                 <Text style={styles.addToCartText}>Add to cart</Text>
               </PressableScale>
             ) : (
-              <>
-                <ProductQuantityControl
-                  onAdd={() => cart.add(product)}
-                  onDecrement={() => cart.decrement(product.id)}
-                  onIncrement={() => cart.increment(product.id)}
-                  productName={product.name}
-                  quantity={quantity}
-                />
-                <PressableScale
-                  accessibilityLabel="Go to cart"
-                  onPress={() =>
-                    router.push({ params: { phone }, pathname: '/cart' })
-                  }
-                  pressedScale={0.97}
-                  style={styles.goToCartButton}
-                >
-                  <Text style={styles.addToCartText}>Go to cart</Text>
-                </PressableScale>
-              </>
+              <ProductQuantityControl
+                onAdd={() => cart.add(product)}
+                onDecrement={() => cart.decrement(product.id)}
+                onIncrement={() => cart.increment(product.id)}
+                productName={product.name}
+                quantity={quantity}
+              />
             )}
           </View>
 
@@ -248,7 +236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     height: 60,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     left: dashboardSpacing.pagePadding,
     paddingHorizontal: dashboardSpacing.sm,
     position: 'absolute',
@@ -261,14 +249,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 46,
     justifyContent: 'center',
-  },
-  goToCartButton: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primary,
-    borderRadius: dashboardRadii.pill,
-    height: 46,
-    justifyContent: 'center',
-    paddingHorizontal: dashboardSpacing.md,
   },
   addToCartText: {
     ...dashboardTypography.button,

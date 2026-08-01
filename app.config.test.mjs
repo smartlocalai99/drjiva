@@ -22,4 +22,18 @@ describe('app config medicine reminder sound', () => {
       './assets/sounds/rec.wav',
     );
   });
+
+  it('bundles the order success sound and exposes its channel settings', () => {
+    const config = createConfig({ config: appJson.expo });
+    const notificationsPlugin = config.plugins.find(
+      (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-notifications',
+    );
+
+    expect(config.extra.orderSuccessChannel).toBe('order-success-v1');
+    expect(config.extra.orderSuccessSoundAndroid).toBe('success');
+    expect(config.extra.orderSuccessSoundIOS).toBe('success.wav');
+    expect(notificationsPlugin?.[1]?.sounds).toContain(
+      './assets/sounds/success.wav',
+    );
+  });
 });

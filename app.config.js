@@ -2,7 +2,10 @@ const { existsSync } = require('node:fs');
 const { join } = require('node:path');
 
 const MEDICINE_REMINDER_CHANNEL = 'medicine-reminders';
-const MEDICINE_REMINDER_SOUND_CHANNEL = 'medicine-reminders-voice-v1';
+// Android notification channels keep their original sound forever. A new id
+// makes devices that already created the old channel adopt the bundled sound.
+const MEDICINE_REMINDER_SOUND_CHANNEL = 'medicine-reminders-voice-v2';
+const ORDER_SUCCESS_CHANNEL = 'order-success-v1';
 // iOS plays the bundled sound file by its exact filename; Android plays it by
 // the res/raw resource name the expo-notifications plugin derives from the
 // filename minus its extension.
@@ -10,17 +13,24 @@ const IOS_SOUND_PATH = './assets/sounds/reminder.caf';
 const IOS_SOUND_FILE = 'reminder.caf';
 const ANDROID_SOUND_PATH = './assets/sounds/rec.wav';
 const ANDROID_SOUND_RESOURCE = 'rec';
+const ORDER_SUCCESS_SOUND_PATH = './assets/sounds/success.wav';
+const ORDER_SUCCESS_SOUND_FILE = 'success.wav';
+const ORDER_SUCCESS_SOUND_RESOURCE = 'success';
 
 /** @param {import('expo/config').ConfigContext} context */
 module.exports = ({ config }) => {
   const hasIOSSound = existsSync(join(__dirname, IOS_SOUND_PATH));
   const hasAndroidSound = existsSync(join(__dirname, ANDROID_SOUND_PATH));
+  const hasOrderSuccessSound = existsSync(
+    join(__dirname, ORDER_SUCCESS_SOUND_PATH),
+  );
   const defaultChannel = hasAndroidSound
     ? MEDICINE_REMINDER_SOUND_CHANNEL
     : MEDICINE_REMINDER_CHANNEL;
   const soundPaths = [
     ...(hasIOSSound ? [IOS_SOUND_PATH] : []),
     ...(hasAndroidSound ? [ANDROID_SOUND_PATH] : []),
+    ...(hasOrderSuccessSound ? [ORDER_SUCCESS_SOUND_PATH] : []),
   ];
   const plugins = (config.plugins ?? []).map((plugin) => {
     const pluginName = Array.isArray(plugin) ? plugin[0] : plugin;
@@ -89,6 +99,13 @@ module.exports = ({ config }) => {
         ? ANDROID_SOUND_RESOURCE
         : false,
       medicineReminderSoundIOS: hasIOSSound ? IOS_SOUND_FILE : false,
+      orderSuccessChannel: ORDER_SUCCESS_CHANNEL,
+      orderSuccessSoundAndroid: hasOrderSuccessSound
+        ? ORDER_SUCCESS_SOUND_RESOURCE
+        : false,
+      orderSuccessSoundIOS: hasOrderSuccessSound
+        ? ORDER_SUCCESS_SOUND_FILE
+        : false,
     },
     plugins,
   };

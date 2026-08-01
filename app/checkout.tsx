@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import {
   useFocusEffect,
@@ -31,12 +33,16 @@ import {
 } from '../src/lib/addresses';
 import { useCart } from '../src/lib/cart';
 import { formatRupees, resolveShopProductPrice } from '../src/lib/currency';
+import { confirmPlacedOrder } from '../src/lib/orderConfirmation';
+import { showOrderReceiptNotification } from '../src/lib/orderReceiptNotification';
 import {
   createOrderRequestId,
   placeCodOrder,
   type PlacedOrder,
 } from '../src/lib/orders';
 import { getPatientByPhone } from '../src/lib/patients';
+
+const ORDER_SUCCESS_SOUND = require('../assets/sounds/success.wav');
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -45,6 +51,7 @@ export default function CheckoutScreen() {
   const phoneParam = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
   const cart = useCart();
+  const successPlayer = useAudioPlayer(ORDER_SUCCESS_SOUND);
 
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>();
@@ -144,6 +151,19 @@ export default function CheckoutScreen() {
       setPlacedOrder(order);
       requestIdRef.current = undefined;
       cart.clear();
+      void confirmPlacedOrder(
+        {
+          notify: showOrderReceiptNotification,
+          play: async () => {
+            await successPlayer.seekTo(0);
+            successPlayer.play();
+            await Haptics.notificationAsync(
+              Haptics.NotificationFeedbackType.Success,
+            );
+          },
+        },
+        order,
+      );
     } catch (cause) {
       Alert.alert(
         'Order not placed',
@@ -445,7 +465,8 @@ function OrderSuccess({
       <View style={styles.successHeading}>
         <Text style={styles.successTitle}>Order placed</Text>
         <Text style={styles.successMessage}>
-          The hospital has received your cash-on-delivery order.
+          We received your cash-on-delivery order. Rider updates will appear
+          in Orders.
         </Text>
       </View>
       <View style={styles.receiptCard}>
