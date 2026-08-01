@@ -69,6 +69,10 @@ import { useCart } from '../src/lib/cart';
 import { formatRupees, resolveShopProductPrice } from '../src/lib/currency';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { useLanguage } from '../src/lib/i18n';
+import {
+  countActiveOrders,
+  listPatientOrders,
+} from '../src/lib/patientOrders';
 import { getPatientByPhone } from '../src/lib/patients';
 import { getSessionPhone } from '../src/lib/session';
 
@@ -154,6 +158,7 @@ export default function ShopScreen() {
   const cart = useCart();
 
   const [activeTab, setActiveTab] = useState<NavTabKey>('shop');
+  const [activeOrderCount, setActiveOrderCount] = useState(0);
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [catalogueAttempt, setCatalogueAttempt] = useState(0);
   const [catalogueError, setCatalogueError] = useState(false);
@@ -242,20 +247,29 @@ export default function ShopScreen() {
       void Promise.all([
         loadAddresses(phone).catch(() => []),
         getPatientByPhone(phone)
-          .then((patient) =>
-            patient
-              ? fetchActiveMedicineReminders(patient.patientId)
-              : [],
-          )
-          .catch(() => []),
-      ]).then(([nextAddresses, reminders]) => {
+          .then(async (patient) => {
+            if (!patient) {
+              return { activeOrders: 0, reminders: [] };
+            }
+            const [reminders, orders] = await Promise.all([
+              fetchActiveMedicineReminders(patient.patientId).catch(() => []),
+              listPatientOrders(patient.patientId).catch(() => []),
+            ]);
+            return {
+              activeOrders: countActiveOrders(orders),
+              reminders,
+            };
+          })
+          .catch(() => ({ activeOrders: 0, reminders: [] })),
+      ]).then(([nextAddresses, patientData]) => {
         if (cancelled) {
           return;
         }
         setAddresses(nextAddresses);
+        setActiveOrderCount(patientData.activeOrders);
         setReminderNames(
           getUniqueReminderMedicineNames(
-            reminders.map((reminder) => reminder.medicineName),
+            patientData.reminders.map((reminder) => reminder.medicineName),
           ),
         );
       });
@@ -365,22 +379,22 @@ export default function ShopScreen() {
         </Pressable>
 
         <PressableScale
-          accessibilityLabel={`${t('cart')}, ${cart.totalItems} items`}
+          accessibilityLabel={`Orders, ${activeOrderCount} active`}
           onPress={() =>
-            router.push({ params: { phone }, pathname: '/cart' })
+            router.push({ params: { phone }, pathname: '/orders' })
           }
           pressedScale={0.94}
           style={styles.bagButton}
         >
           <Ionicons
             color={dashboardColors.text}
-            name="bag-handle-outline"
+            name="receipt-outline"
             size={23}
           />
-          {cart.totalItems > 0 ? (
+          {activeOrderCount > 0 ? (
             <View style={styles.cartBadge}>
               <Text style={styles.cartBadgeText}>
-                {cart.totalItems > 99 ? '99+' : cart.totalItems}
+                {activeOrderCount > 99 ? '99+' : activeOrderCount}
               </Text>
             </View>
           ) : null}
