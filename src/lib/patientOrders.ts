@@ -133,7 +133,7 @@ export function mapPatientOrder(value: unknown): PatientOrder {
       city: stringValue(address.city, 'address city'),
       formatted: stringValue(address.formatted, 'formatted address'),
       label: stringValue(address.label, 'address label'),
-      landmark: stringValue(address.landmark, 'address landmark'),
+      landmark: nullableString(address.landmark, 'address landmark') ?? '',
       pinCode: stringValue(address.pinCode, 'address pin code'),
       state: stringValue(address.state, 'address state'),
     },

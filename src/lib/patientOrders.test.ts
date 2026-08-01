@@ -112,6 +112,18 @@ describe('patient order normalization', () => {
       status: 'assigned',
     });
   });
+
+  it('keeps an order visible when its optional landmark is missing', () => {
+    expect(
+      mapPatientOrder({
+        ...orderRow,
+        address: { ...orderRow.address, landmark: null },
+      }),
+    ).toMatchObject({
+      address: { landmark: '' },
+      id: 'order-1',
+    });
+  });
 });
 
 describe('patient order RPCs', () => {
