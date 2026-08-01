@@ -16,6 +16,7 @@ import {
   formatDateOnly,
   parseDateOnly,
 } from '../../lib/medicineCalendar';
+import { buildAndroidCourseDatePickerOptions } from '../../lib/courseStartDatePicker';
 import { PressableScale } from '../PressableScale';
 
 function formatDisplayDate(date: Date): string {
@@ -55,16 +56,14 @@ export function CourseStartDatePicker({
 
   const openPicker = () => {
     if (process.env.EXPO_OS === 'android') {
-      DateTimePickerAndroid.open({
-        design: 'material',
-        initialInputMode: 'default',
-        maximumDate,
-        minimumDate,
-        mode: 'date',
-        onValueChange: (_event, date) => setSelectedDate(date),
-        title: label,
-        value: pickerValue,
-      });
+      DateTimePickerAndroid.open(
+        buildAndroidCourseDatePickerOptions({
+          maximumDate,
+          minimumDate,
+          onSelectedDate: setSelectedDate,
+          value: pickerValue,
+        }),
+      );
       return;
     }
     if (process.env.EXPO_OS === 'ios') {
