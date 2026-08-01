@@ -16,9 +16,9 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Allow DrJiva to take your profile photo.",
+        "NSCameraUsageDescription": "Allow DrJiva to take profile, tablet, and medical document photos.",
         "NSLocationWhenInUseUsageDescription": "Allow DrJiva to use your current location to fill in your delivery address.",
-        "NSPhotoLibraryUsageDescription": "Allow DrJiva to choose your profile photo."
+        "NSPhotoLibraryUsageDescription": "Allow DrJiva to choose profile and tablet photos."
       }
     },
     "android": {
@@ -48,8 +48,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow DrJiva to choose your profile photo.",
-          "cameraPermission": "Allow DrJiva to take your profile photo.",
+          "photosPermission": "Allow DrJiva to choose profile and tablet photos.",
+          "cameraPermission": "Allow DrJiva to take profile, tablet, and medical document photos.",
           "microphonePermission": false
         }
       ],

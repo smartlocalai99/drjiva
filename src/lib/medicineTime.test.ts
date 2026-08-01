@@ -5,9 +5,19 @@ import {
   areSelectedSlotTimesOrdered,
   dateToStoredTime,
   formatTime12Hour,
+  fromTimeParts,
   isStoredTime,
   storedTimeToDate,
+  toTimeParts,
 } from './medicineTime';
+
+describe('direct time parts', () => {
+  it('converts midnight, noon, and exact minutes without rounding', () => {
+    expect(toTimeParts('00:08')).toEqual({ hour: 12, minute: 8, period: 'AM' });
+    expect(toTimeParts('12:59')).toEqual({ hour: 12, minute: 59, period: 'PM' });
+    expect(fromTimeParts({ hour: 1, minute: 8, period: 'PM' })).toBe('13:08');
+  });
+});
 
 describe('medicine time helpers', () => {
   it('shows stored times in 12-hour format', () => {

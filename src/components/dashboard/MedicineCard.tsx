@@ -125,7 +125,11 @@ export function MedicineCard({
           {medicine.streakDays.length > 0 ? (
             <View style={styles.streakSection}>
               <View style={styles.streakHeading}>
-                <Text style={styles.streakTitle}>Course streak</Text>
+                <Text style={styles.streakTitle}>
+                  {medicine.scheduleMode === 'ongoing'
+                    ? 'This week'
+                    : 'Course streak'}
+                </Text>
               </View>
               <View style={styles.streakDays}>
                 {medicine.streakDays.map((day) => {

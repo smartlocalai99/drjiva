@@ -18,6 +18,7 @@ import {
   storedTimeToDate,
 } from '../../lib/medicineTime';
 import { PressableScale } from '../PressableScale';
+import { TimePickerModal } from './TimePickerModal';
 
 export function SlotTimeEditor({
   changeLabel,
@@ -121,7 +122,7 @@ export function SlotTimeEditor({
             <Ionicons color="#FFFFFF" name="checkmark" size={18} />
           </PressableScale>
         </View>
-      ) : process.env.EXPO_OS === 'android' && isExpanded ? (
+      ) : false && process.env.EXPO_OS === 'android' && isExpanded ? (
         <View
           style={[
             styles.iosPicker,
@@ -217,6 +218,19 @@ export function SlotTimeEditor({
             <Ionicons color={theme.accent} name="add" size={18} />
           </PressableScale>
         </View>
+      ) : null}
+      {process.env.EXPO_OS === 'android' ? (
+        <TimePickerModal
+          accent={theme.accent}
+          label={label}
+          onCancel={() => setIsExpanded(false)}
+          onSave={(nextValue) => {
+            onChange(nextValue);
+            setIsExpanded(false);
+          }}
+          value={value}
+          visible={isExpanded}
+        />
       ) : null}
     </View>
   );

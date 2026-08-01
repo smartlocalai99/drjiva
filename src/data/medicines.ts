@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { deleteMedicineReminderWithAdapter } from '../lib/deleteMedicineReminder';
+import { getCustomMedicineImageUrl } from '../lib/customMedicines';
 import {
   addCalendarDays,
   formatDateOnly,
@@ -14,6 +15,7 @@ import { ensureSecureReportSession } from '../lib/reportAuth';
 import type { DoseSlot } from '../lib/medicineSchedule';
 import {
   buildMedicineStreak,
+  buildCurrentWeekMedicineStreak,
   mapDoseRows,
   type CourseStreakEvent,
   type DoseRow,
@@ -27,17 +29,23 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 }
 
 type RawDoseCourse = {
-  duration_days: number;
+  duration_days: number | null;
   hospitals: { name: string } | Array<{ name: string }> | null;
   id: string;
   medicines:
     | { image_url: string | null; name: string; hospital_name: string }
-    | Array<{ image_url: string | null; name: string; hospital_name: string }>;
+    | Array<{ image_url: string | null; name: string; hospital_name: string }>
+    | null;
+  patient_custom_medicines:
+    | { image_path: string; name: string }
+    | Array<{ image_path: string; name: string }>
+    | null;
   patient_custom_hospitals:
     | { name: string }
     | Array<{ name: string }>
     | null;
   start_date: string;
+  schedule_mode: 'finite' | 'ongoing';
   tablets_per_dose: number;
 };
 
@@ -67,7 +75,7 @@ export async function fetchMedicinesForDate(
   const { data, error } = await supabase
     .from('patient_medicine_dose_events')
     .select(
-      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, hospitals(name), patient_custom_hospitals(name), medicines!inner(name,image_url,hospital_name))',
+      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name), patient_custom_medicines(name,image_path))',
     )
     .eq('patient_id', patientId)
     .gte('scheduled_for', start.toISOString())
@@ -88,15 +96,17 @@ export async function fetchMedicinesForDate(
   const streakEventsByCourse = new Map<string, CourseStreakEvent[]>();
   const courses = [...courseDetails.values()];
   if (courses.length > 0) {
+    const currentWeekStart = new Date(date);
+    currentWeekStart.setDate(currentWeekStart.getDate() - ((currentWeekStart.getDay() + 6) % 7));
+    const currentWeekStartKey = formatDateOnly(currentWeekStart);
     const firstStartDate = courses
-      .map((course) => course.start_date)
+      .map((course) => course.schedule_mode === 'ongoing' ? currentWeekStartKey : course.start_date)
       .sort()[0]!;
     const lastStreakDate = courses
       .map((course) =>
-        addCalendarDays(
-          course.start_date,
-          Math.min(Math.max(course.duration_days, 1), 13),
-        ),
+        course.schedule_mode === 'ongoing'
+          ? addCalendarDays(currentWeekStartKey, 7)
+          : addCalendarDays(course.start_date, Math.min(Math.max(course.duration_days ?? 7, 1), 13)),
       )
       .sort()
       .at(-1)!;
@@ -128,31 +138,44 @@ export async function fetchMedicinesForDate(
     }
   }
 
-  const rows = rawDoses.flatMap((event) => {
+  const rowGroups = await Promise.all(rawDoses.map(async (event) => {
     const course = one(event.patient_medicine_courses);
     const medicine = course ? one(course.medicines) : null;
-    if (!course || !medicine) return [];
+    const customMedicine = course ? one(course.patient_custom_medicines) : null;
+    if (!course || (!medicine && !customMedicine)) return [];
     const hospital =
       one(course.hospitals)?.name ??
       one(course.patient_custom_hospitals)?.name ??
-      medicine.hospital_name;
+      medicine?.hospital_name ?? '';
+    const imageUrl = customMedicine
+      ? await getCustomMedicineImageUrl(customMedicine.image_path).catch(() => '')
+      : medicine?.image_url ?? '';
     return [{
       completed: event.status === 'completed',
       courseId: course.id,
       eventId: event.id,
       hospitalName: hospital,
-      imageUrl: medicine.image_url ?? '',
-      medicineName: medicine.name,
+      imageUrl,
+      medicineName: customMedicine?.name ?? medicine!.name,
       scheduledFor: event.scheduled_for,
       slot: event.slot,
-      streakDays: buildMedicineStreak(
-        course.start_date,
-        course.duration_days,
-        streakEventsByCourse.get(course.id) ?? [],
-      ),
+      scheduleMode: course.schedule_mode,
+      streakDays:
+        course.schedule_mode === 'ongoing'
+          ? buildCurrentWeekMedicineStreak(
+              course.start_date,
+              streakEventsByCourse.get(course.id) ?? [],
+              date,
+            )
+          : buildMedicineStreak(
+              course.start_date,
+              course.duration_days ?? 7,
+              streakEventsByCourse.get(course.id) ?? [],
+            ),
       tabletsPerDose: Number(course.tablets_per_dose),
     } satisfies DoseRow];
-  });
+  }));
+  const rows = rowGroups.flat();
 
   return mapDoseRows(rows);
 }
@@ -181,7 +204,7 @@ export async function fetchReminderDatesInRange(
 
 export type MedicineReminder = {
   courseId: string;
-  durationDays: number;
+  durationDays: number | null;
   hospitalName: string;
   imageUrl: string;
   medicineName: string;
@@ -191,12 +214,17 @@ export type MedicineReminder = {
 };
 
 type RawCourse = {
-  duration_days: number;
+  duration_days: number | null;
   hospitals: { name: string } | Array<{ name: string }> | null;
   id: string;
   medicines:
     | { image_url: string | null; name: string }
-    | Array<{ image_url: string | null; name: string }>;
+    | Array<{ image_url: string | null; name: string }>
+    | null;
+  patient_custom_medicines:
+    | { image_path: string; name: string }
+    | Array<{ image_path: string; name: string }>
+    | null;
   patient_custom_hospitals: { name: string } | Array<{ name: string }> | null;
   patient_medicine_course_slots: Array<{ slot: string }>;
   start_date: string;
@@ -210,16 +238,17 @@ export async function fetchActiveMedicineReminders(
   const { data, error } = await supabase
     .from('patient_medicine_courses')
     .select(
-      'id, tablets_per_dose, start_date, duration_days, hospitals(name), patient_custom_hospitals(name), medicines!inner(name, image_url), patient_medicine_course_slots(slot)',
+      'id, tablets_per_dose, start_date, duration_days, hospitals(name), patient_custom_hospitals(name), medicines(name, image_url), patient_custom_medicines(name, image_path), patient_medicine_course_slots(slot)',
     )
     .eq('patient_id', patientId)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
   if (error) throw error;
 
-  return ((data ?? []) as unknown as RawCourse[]).flatMap((row) => {
+  const groups = await Promise.all(((data ?? []) as unknown as RawCourse[]).map(async (row) => {
     const medicine = one(row.medicines);
-    if (!medicine) return [];
+    const customMedicine = one(row.patient_custom_medicines);
+    if (!medicine && !customMedicine) return [];
     const hospitalName =
       one(row.hospitals)?.name ?? one(row.patient_custom_hospitals)?.name ?? '';
     return [
@@ -227,8 +256,10 @@ export async function fetchActiveMedicineReminders(
         courseId: row.id,
         durationDays: row.duration_days,
         hospitalName,
-        imageUrl: medicine.image_url ?? '',
-        medicineName: medicine.name,
+        imageUrl: customMedicine
+          ? await getCustomMedicineImageUrl(customMedicine.image_path).catch(() => '')
+          : medicine?.image_url ?? '',
+        medicineName: customMedicine?.name ?? medicine!.name,
         slots: row.patient_medicine_course_slots.map(
           (item) => item.slot as DoseSlot,
         ),
@@ -236,7 +267,8 @@ export async function fetchActiveMedicineReminders(
         tabletsPerDose: Number(row.tablets_per_dose),
       } satisfies MedicineReminder,
     ];
-  });
+  }));
+  return groups.flat();
 }
 
 export async function deleteMedicineReminder(courseId: string): Promise<void> {
@@ -265,7 +297,7 @@ export async function completeDoseEvent(
 ): Promise<void> {
   const { data: event, error: eventError } = await supabase
     .from('patient_medicine_dose_events')
-    .select('course_id, notification_id')
+    .select('course_id, notification_id, patient_medicine_courses!inner(schedule_mode)')
     .eq('id', eventId)
     .single();
   if (eventError) throw eventError;
@@ -289,10 +321,20 @@ export async function completeDoseEvent(
     .eq('course_id', event.course_id)
     .eq('status', 'scheduled');
   if (countError) throw countError;
+  const courseRelation = one(
+    event.patient_medicine_courses as
+      | { schedule_mode: string }
+      | Array<{ schedule_mode: string }>,
+  );
   const { error: courseError } = await supabase
     .from('patient_medicine_courses')
     .update({
-      status: completed && (count ?? 0) === 0 ? 'completed' : 'active',
+      status:
+        courseRelation?.schedule_mode !== 'ongoing' &&
+        completed &&
+        (count ?? 0) === 0
+          ? 'completed'
+          : 'active',
       updated_at: new Date().toISOString(),
     })
     .eq('id', event.course_id);

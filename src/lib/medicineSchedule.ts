@@ -1,5 +1,9 @@
 export type DoseSlot = 'morning' | 'afternoon' | 'night';
 export type DayPattern = 'daily' | 'alternate';
+export type FiniteCourseDays = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type CourseDuration =
+  | { days: FiniteCourseDays; mode: 'finite' }
+  | { mode: 'ongoing' };
 
 export type MedicineCourseInput = {
   durationDays: number;
@@ -23,6 +27,15 @@ const DEFAULT_SLOT_TIMES: Record<DoseSlot, string> = {
 export const MIN_TABLETS_PER_DOSE = 1;
 export const MAX_TABLETS_PER_DOSE = 10;
 export const TABLET_STEP = 1;
+
+export function validateCourseDuration(
+  duration: CourseDuration,
+): string | null {
+  if (duration.mode === 'ongoing') return null;
+  return Number.isInteger(duration.days) && duration.days >= 1 && duration.days <= 7
+    ? null
+    : 'invalidCourseDuration';
+}
 
 export function adjustTabletCount(value: string, steps: number): string {
   const current = Number.parseFloat(value);
@@ -62,7 +75,7 @@ export function validateMedicineCourseInput(
   if (
     !Number.isInteger(input.durationDays) ||
     input.durationDays < 1 ||
-    input.durationDays > 365
+    input.durationDays > 7
   ) {
     return 'invalidCourseDuration';
   }

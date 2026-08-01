@@ -25,6 +25,7 @@ export type Medicine = {
   nextReminderTime: string;
   scheduledFor: string;
   slot: DoseSlot;
+  scheduleMode?: 'finite' | 'ongoing';
   streakDays: MedicineStreakDay[];
   tabletCount: string;
   timing: string;
@@ -44,6 +45,7 @@ export type DoseRow = {
   medicineName: string;
   scheduledFor: string;
   slot: string;
+  scheduleMode?: 'finite' | 'ongoing';
   streakDays?: MedicineStreakDay[];
   tabletsPerDose: number;
 };
@@ -114,6 +116,42 @@ export function buildMedicineStreak(
     });
 }
 
+export function buildCurrentWeekMedicineStreak(
+  startDate: string,
+  events: readonly CourseStreakEvent[],
+  asOf: Date | string = new Date(),
+): MedicineStreakDay[] {
+  const asOfDate = typeof asOf === 'string' ? parseDateOnly(asOf) : new Date(asOf);
+  const courseStart = parseDateOnly(startDate);
+  if (!asOfDate || !courseStart) return [];
+  const mondayOffset = (asOfDate.getDay() + 6) % 7;
+  const weekStart = new Date(asOfDate);
+  weekStart.setDate(asOfDate.getDate() - mondayOffset);
+  const eventsByDate = new Map<string, CourseStreakEvent[]>();
+  for (const event of events) {
+    const date = new Date(event.scheduledFor);
+    if (Number.isNaN(date.getTime())) continue;
+    const key = formatDateOnly(date);
+    const group = eventsByDate.get(key) ?? [];
+    group.push(event);
+    eventsByDate.set(key, group);
+  }
+  return Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + offset);
+    const key = formatDateOnly(date);
+    const dateEvents = eventsByDate.get(key) ?? [];
+    const scheduled = key >= startDate && dateEvents.length > 0;
+    return {
+      completed: scheduled && dateEvents.every((event) => event.status === 'completed'),
+      date: key,
+      day: date.getDate(),
+      scheduled,
+      weekday: WEEKDAYS[date.getDay()]!,
+    };
+  });
+}
+
 export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
   return [...rows]
     .sort(
@@ -132,6 +170,7 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
       nextReminderTime: formatScheduledTime12Hour(row.scheduledFor),
       scheduledFor: row.scheduledFor,
       slot: row.slot as DoseSlot,
+      scheduleMode: row.scheduleMode ?? 'finite',
       streakDays: row.streakDays ?? [],
       tabletCount: `${row.tabletsPerDose} tablet${
         row.tabletsPerDose === 1 ? '' : 's'

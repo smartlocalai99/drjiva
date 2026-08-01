@@ -2,6 +2,38 @@ import type { DoseSlot } from './medicineSchedule';
 
 const VALID_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+export type TimeParts = {
+  hour: number;
+  minute: number;
+  period: 'AM' | 'PM';
+};
+
+export function toTimeParts(value: string): TimeParts {
+  const minutes = timeToMinutes(value);
+  const safeMinutes = Number.isFinite(minutes) ? minutes : 8 * 60;
+  const hours24 = Math.floor(safeMinutes / 60);
+  return {
+    hour: hours24 % 12 || 12,
+    minute: safeMinutes % 60,
+    period: hours24 >= 12 ? 'PM' : 'AM',
+  };
+}
+
+export function fromTimeParts(parts: TimeParts): string {
+  if (
+    !Number.isInteger(parts.hour) ||
+    parts.hour < 1 ||
+    parts.hour > 12 ||
+    !Number.isInteger(parts.minute) ||
+    parts.minute < 0 ||
+    parts.minute > 59
+  ) {
+    throw new Error('Invalid reminder time.');
+  }
+  const hour24 = (parts.hour % 12) + (parts.period === 'PM' ? 12 : 0);
+  return `${String(hour24).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+}
+
 export function isStoredTime(value: string): boolean {
   return VALID_TIME.test(value);
 }

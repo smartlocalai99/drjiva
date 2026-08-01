@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildMedicineStreak,
+  buildCurrentWeekMedicineStreak,
   mapDoseRows,
   selectNearestMedicine,
   selectNearestSession,
@@ -13,6 +14,19 @@ function localScheduledFor(day: number, hour: number): string {
 }
 
 describe('buildMedicineStreak', () => {
+  it('groups ongoing adherence into the current Monday-to-Sunday week', () => {
+    const week = buildCurrentWeekMedicineStreak(
+      '2026-07-20',
+      [
+        { scheduledFor: '2026-07-27T08:00:00.000Z', status: 'completed' },
+        { scheduledFor: '2026-07-28T08:00:00.000Z', status: 'scheduled' },
+      ],
+      '2026-08-01',
+    );
+    expect(week).toHaveLength(7);
+    expect(week[0]).toMatchObject({ date: '2026-07-27', completed: true });
+    expect(week[1]).toMatchObject({ date: '2026-07-28', completed: false });
+  });
   it('shows scheduled dates only and checks only fully completed days', () => {
     const streak = buildMedicineStreak(
       '2026-07-28',

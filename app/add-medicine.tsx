@@ -27,6 +27,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../src/components/PressableScale';
 import { CourseStartDatePicker } from '../src/components/medicine/course-start-date-picker';
+import { CustomMedicineSheet } from '../src/components/medicine/CustomMedicineSheet';
+import {
+  DurationPicker,
+  durationLabel,
+} from '../src/components/medicine/DurationPicker';
 import { SlotTimeEditor } from '../src/components/medicine/SlotTimeEditor';
 import {
   dashboardColors,
@@ -35,6 +40,10 @@ import {
   dashboardTypography,
 } from '../src/dashboardTheme';
 import { useLanguage } from '../src/lib/i18n';
+import {
+  createCustomMedicine,
+  loadCustomMedicines,
+} from '../src/lib/customMedicines';
 import {
   formatDateOnly,
   getCourseEndDate,
@@ -64,6 +73,7 @@ import {
   adjustTabletCount,
   expandDoseEvents,
   validateMedicineCourseInput,
+  type CourseDuration,
   type DayPattern,
   type DoseSlot,
 } from '../src/lib/medicineSchedule';
@@ -133,7 +143,13 @@ export default function AddMedicineScreen() {
   const [medicineDropdownOpen, setMedicineDropdownOpen] = useState(false);
   const [catalogue, setCatalogue] = useState<MedicineCatalogueItem[]>([]);
   const [isLoadingCatalogue, setIsLoadingCatalogue] = useState(false);
-  const [days, setDays] = useState('7');
+  const [duration, setDuration] = useState<CourseDuration>({
+    days: 7,
+    mode: 'finite',
+  });
+  const [customMedicineOpen, setCustomMedicineOpen] = useState(false);
+  const [isSavingCustomMedicine, setIsSavingCustomMedicine] = useState(false);
+  const [selectedCustomHospitalId, setSelectedCustomHospitalId] = useState('');
   const [startDate, setStartDate] = useState(todayString);
   const [defaultSlotTimes, setDefaultSlotTimes] = useState<
     Record<DoseSlot, string>
@@ -195,12 +211,24 @@ export default function AddMedicineScreen() {
     setCatalogue([]);
     setIsLoadingCatalogue(true);
 
-    void fetchMedicineCatalogue(
-      isCustomHospital ? undefined : workflow.hospitalId,
-    )
-      .then((items) => {
+    const hospitalSource = isCustomHospital
+      ? selectedCustomHospitalId
+        ? { customHospitalId: selectedCustomHospitalId }
+        : null
+      : workflow.hospitalId
+        ? { hospitalId: workflow.hospitalId }
+        : null;
+    void Promise.all([
+      isCustomHospital
+        ? Promise.resolve([])
+        : fetchMedicineCatalogue(workflow.hospitalId),
+      patientId && hospitalSource
+        ? loadCustomMedicines(patientId, hospitalSource).catch(() => [])
+        : Promise.resolve([]),
+    ])
+      .then(([verified, custom]) => {
         if (!cancelled) {
-          setCatalogue(items);
+          setCatalogue([...custom, ...verified]);
         }
       })
       .catch(() => {
@@ -217,7 +245,13 @@ export default function AddMedicineScreen() {
     return () => {
       cancelled = true;
     };
-  }, [isCustomHospital, workflow.hospitalId, workflow.step]);
+  }, [
+    isCustomHospital,
+    patientId,
+    selectedCustomHospitalId,
+    workflow.hospitalId,
+    workflow.step,
+  ]);
 
   const hospitalResults = useMemo(
     () => filterMedicineCatalogue(hospitals, hospitalQuery, 100),
@@ -258,15 +292,18 @@ export default function AddMedicineScreen() {
         : hospitals.find((item) => item.id === workflow.hospitalId)?.name ?? '',
     [customHospitalName, hospitals, isCustomHospital, workflow.hospitalId],
   );
-  const durationDays = Number(days);
-  const previewDurationDays =
-    Number.isInteger(durationDays) && durationDays > 0 ? durationDays : 1;
+  const durationDays = duration.mode === 'finite' ? duration.days : 14;
+  const previewDurationDays = duration.mode === 'finite' ? duration.days : 14;
   const endDate = getCourseEndDate(
     startDate,
     previewDurationDays,
   );
   const courseStartLabel = formatCourseDate(startDate);
   const courseEndLabel = formatCourseDate(endDate);
+
+  useEffect(() => {
+    if (duration.mode === 'ongoing') setPattern('daily');
+  }, [duration.mode]);
 
   useEffect(() => {
     if (resultImageUrls.length > 0) {
@@ -283,7 +320,7 @@ export default function AddMedicineScreen() {
       const validation =
         !details ||
         validateMedicineCourseInput({
-          durationDays,
+          durationDays: duration.mode === 'finite' ? duration.days : 1,
           hospitalId: workflow.hospitalId || customHospitalName,
           medicineId: medicine.id,
           slots: details.slots,
@@ -317,20 +354,22 @@ export default function AddMedicineScreen() {
         const details = medicineDetails[medicine.id]!;
         const tabletsPerDose = Number(details.tablets);
         const drafts = expandDoseEvents({
-          dayPattern: pattern,
+          dayPattern: duration.mode === 'ongoing' ? 'daily' : pattern,
           durationDays,
           slotTimes: details.slotTimes,
           slots: details.slots,
           startDate,
         });
         const created = await createMedicineCourse({
+          customMedicineId: medicine.isCustom ? medicine.id : undefined,
           customHospitalId: customHospital?.id,
-          dayPattern: pattern,
-          durationDays,
+          dayPattern: duration.mode === 'ongoing' ? 'daily' : pattern,
+          durationDays: duration.mode === 'finite' ? duration.days : null,
           events: drafts,
           hospitalId: isCustomHospital ? undefined : workflow.hospitalId,
-          medicineId: medicine.id,
+          medicineId: medicine.isCustom ? undefined : medicine.id,
           patientId,
+          scheduleMode: duration.mode,
           slots: details.slots,
           startDate,
           tabletsPerDose,
@@ -452,7 +491,7 @@ export default function AddMedicineScreen() {
       if (
         !details ||
         validateMedicineCourseInput({
-          durationDays,
+          durationDays: duration.mode === 'finite' ? duration.days : 1,
           hospitalId: workflow.hospitalId || customHospitalName,
           medicineId: medicine.id,
           slots: details.slots,
@@ -471,6 +510,7 @@ export default function AddMedicineScreen() {
 
   const selectHospital = (hospital: HospitalOption) => {
     setIsCustomHospital(hospital.isCustom);
+    setSelectedCustomHospitalId(hospital.isCustom ? hospital.id : '');
     setCustomHospitalName(hospital.isCustom ? hospital.name : '');
     setHospitalQuery(hospital.name);
     setHospitalDropdownOpen(false);
@@ -487,11 +527,49 @@ export default function AddMedicineScreen() {
       { id: `draft:${name}`, isCustom: true, name },
     ]);
     setIsCustomHospital(true);
+    setSelectedCustomHospitalId('');
     setCustomHospitalName(name);
     setHospitalQuery(name);
     setHospitalDropdownOpen(false);
     setQuery('');
     dispatch({ hospitalId: 'custom', type: 'selectHospital' });
+  };
+
+  const saveCustomTablet = async (input: {
+    imageUri: string;
+    name: string;
+  }) => {
+    if (!patientId) return;
+    setIsSavingCustomMedicine(true);
+    try {
+      let customHospitalId = selectedCustomHospitalId;
+      if (isCustomHospital && !customHospitalId) {
+        const hospital = await createCustomHospital(patientId, customHospitalName);
+        customHospitalId = hospital.id;
+        setSelectedCustomHospitalId(hospital.id);
+      }
+      const medicine = await createCustomMedicine({
+        hospital: isCustomHospital
+          ? { customHospitalId }
+          : { hospitalId: workflow.hospitalId },
+        imageUri: input.imageUri,
+        name: input.name,
+        patientId,
+      });
+      setCatalogue((current) => [
+        medicine,
+        ...current.filter((item) => item.id !== medicine.id),
+      ]);
+      selectMedicine(medicine);
+      setCustomMedicineOpen(false);
+    } catch (cause) {
+      Alert.alert(
+        'Tablet not saved',
+        cause instanceof Error ? cause.message : 'Please try again.',
+      );
+    } finally {
+      setIsSavingCustomMedicine(false);
+    }
   };
 
   return (
@@ -618,6 +696,30 @@ export default function AddMedicineScreen() {
                   nestedScrollEnabled
                   style={styles.dropdown}
                 >
+                  <PressableScale
+                    accessibilityLabel="Add a new tablet with photo"
+                    onPress={() => setCustomMedicineOpen(true)}
+                    style={styles.addTabletRow}
+                  >
+                    <View style={styles.addTabletIcon}>
+                      <Ionicons
+                        color={dashboardColors.primary}
+                        name="camera-outline"
+                        size={22}
+                      />
+                    </View>
+                    <View style={styles.addTabletCopy}>
+                      <Text style={styles.addTabletTitle}>Add new tablet</Text>
+                      <Text style={styles.addTabletMeta}>
+                        Name it and add your own photo
+                      </Text>
+                    </View>
+                    <Ionicons
+                      color={dashboardColors.primary}
+                      name="add-circle"
+                      size={24}
+                    />
+                  </PressableScale>
                   {isLoadingCatalogue ? (
                     <ActivityIndicator
                       color={dashboardColors.primary}
@@ -680,11 +782,7 @@ export default function AddMedicineScreen() {
 
           {workflow.step === 'details' ? (
             <Animated.View entering={FadeIn} style={styles.stack}>
-              <LabelInput
-                label={t('durationDays')}
-                onChange={setDays}
-                value={days}
-              />
+              <DurationPicker onChange={setDuration} value={duration} />
               <CourseStartDatePicker
                 changeLabel={t('changeDate')}
                 label={t('startDate')}
@@ -692,7 +790,9 @@ export default function AddMedicineScreen() {
                 value={startDate}
               />
               <Text style={styles.courseRange}>
-                {t('courseEnds')}: {courseEndLabel}
+                {duration.mode === 'ongoing'
+                  ? 'Continues everyday until you stop it'
+                  : `${t('courseEnds')}: ${courseEndLabel}`}
               </Text>
               {selectedMedicines.map((medicine) => {
                 const details = medicineDetails[medicine.id] ?? {
@@ -771,19 +871,23 @@ export default function AddMedicineScreen() {
                   </View>
                 );
               })}
-              <Text style={styles.sectionLabel}>Repeat</Text>
-              <View style={styles.chips}>
-                <Chip
-                  active={pattern === 'daily'}
-                  label={t('everyDay')}
-                  onPress={() => setPattern('daily')}
-                />
-                <Chip
-                  active={pattern === 'alternate'}
-                  label={t('alternateDays')}
-                  onPress={() => setPattern('alternate')}
-                />
-              </View>
+              {duration.mode === 'finite' ? (
+                <>
+                  <Text style={styles.sectionLabel}>Repeat</Text>
+                  <View style={styles.chips}>
+                    <Chip
+                      active={pattern === 'daily'}
+                      label={t('everyDay')}
+                      onPress={() => setPattern('daily')}
+                    />
+                    <Chip
+                      active={pattern === 'alternate'}
+                      label={t('alternateDays')}
+                      onPress={() => setPattern('alternate')}
+                    />
+                  </View>
+                </>
+              ) : null}
               <Primary
                 label={t('reviewReminder')}
                 onPress={reviewReminder}
@@ -859,11 +963,12 @@ export default function AddMedicineScreen() {
               </View>
               <Text style={styles.summary}>{hospitalName}</Text>
               <Text style={styles.summary}>
-                {days} {t('durationDays').toLowerCase()}
+                {durationLabel(duration)}
               </Text>
               <Text style={styles.summary}>
-                {t('courseStarts')}: {courseStartLabel} · {t('courseEnds')}:{' '}
-                {courseEndLabel}
+                {duration.mode === 'ongoing'
+                  ? `${t('courseStarts')}: ${courseStartLabel} · Continues until stopped`
+                  : `${t('courseStarts')}: ${courseStartLabel} · ${t('courseEnds')}: ${courseEndLabel}`}
               </Text>
               <Text style={styles.summary}>
                 {pattern === 'daily' ? t('everyDay') : t('alternateDays')}
@@ -906,6 +1011,12 @@ export default function AddMedicineScreen() {
           </Animated.View>
         </View>
       ) : null}
+      <CustomMedicineSheet
+        busy={isSavingCustomMedicine}
+        onClose={() => setCustomMedicineOpen(false)}
+        onCreate={(input) => void saveCustomTablet(input)}
+        visible={customMedicineOpen}
+      />
     </SafeAreaView>
   );
 }
@@ -1343,6 +1454,34 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   medicineRowSelected: { backgroundColor: dashboardColors.primaryTint },
+  addTabletRow: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderBottomColor: dashboardColors.track,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 13,
+  },
+  addTabletIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: 15,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  addTabletCopy: { flex: 1 },
+  addTabletTitle: {
+    ...dashboardTypography.body,
+    color: dashboardColors.primary,
+    fontFamily: 'Inter_700Bold',
+  },
+  addTabletMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: 2,
+  },
   medicineResultName: {
     ...dashboardTypography.body,
     color: dashboardColors.text,

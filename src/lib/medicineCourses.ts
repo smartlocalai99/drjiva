@@ -5,10 +5,12 @@ import { ensureSecureReportSession } from './reportAuth';
 import { supabase } from './supabase';
 
 export type MedicineCatalogueItem = {
+  customHospitalId?: string | null;
   hospitalId: string | null;
   hospitalName: string;
   id: string;
   imageUrl: string | null;
+  isCustom?: boolean;
   name: string;
 };
 
@@ -138,16 +140,18 @@ export async function createCustomHospital(
 }
 
 export async function createMedicineCourse(input: {
+  customMedicineId?: string;
   customHospitalId?: string;
   dayPattern: DayPattern;
   events: readonly DraftDoseEvent[];
   hospitalId?: string;
-  medicineId: string;
+  medicineId?: string;
   patientId: string;
+  scheduleMode?: 'finite' | 'ongoing';
   slots: readonly DoseSlot[];
   startDate: string;
   tabletsPerDose: number;
-  durationDays: number;
+  durationDays: number | null;
 }): Promise<{ courseId: string; eventIds: string[] }> {
   const ownerUserId = await ensureSecureReportSession();
   const eventIds: string[] = [];
@@ -203,12 +207,14 @@ export async function createMedicineCourse(input: {
   const courseId = await createCourseWithRepository(repository, {
     course: {
       custom_hospital_id: input.customHospitalId ?? null,
+      custom_medicine_id: input.customMedicineId ?? null,
       day_pattern: input.dayPattern,
       duration_days: input.durationDays,
       hospital_id: input.hospitalId ?? null,
-      medicine_id: input.medicineId,
+      medicine_id: input.medicineId ?? null,
       owner_user_id: ownerUserId,
       patient_id: input.patientId,
+      schedule_mode: input.scheduleMode ?? 'finite',
       start_date: input.startDate,
       tablets_per_dose: input.tabletsPerDose,
     },
@@ -272,7 +278,7 @@ export async function fetchScheduledDoseRemindersFromToday(
   const { data, error } = await supabase
     .from('patient_medicine_dose_events')
     .select(
-      'id, scheduled_for, slot, notification_id, patient_medicine_courses!inner(tablets_per_dose, medicines!inner(name))',
+      'id, scheduled_for, slot, notification_id, patient_medicine_courses!inner(tablets_per_dose, medicines(name), patient_custom_medicines(name))',
     )
     .eq('patient_id', patientId)
     .eq('status', 'scheduled')
@@ -287,22 +293,33 @@ export async function fetchScheduledDoseRemindersFromToday(
     patient_medicine_courses:
       | {
           tablets_per_dose: number;
-          medicines: { name: string } | Array<{ name: string }>;
+          medicines: { name: string } | Array<{ name: string }> | null;
+          patient_custom_medicines:
+            | { name: string }
+            | Array<{ name: string }>
+            | null;
         }
       | Array<{
           tablets_per_dose: number;
-          medicines: { name: string } | Array<{ name: string }>;
+          medicines: { name: string } | Array<{ name: string }> | null;
+          patient_custom_medicines:
+            | { name: string }
+            | Array<{ name: string }>
+            | null;
         }>;
   }>).map((row) => {
     const course = Array.isArray(row.patient_medicine_courses)
       ? row.patient_medicine_courses[0]!
       : row.patient_medicine_courses;
     const medicine = Array.isArray(course.medicines)
-      ? course.medicines[0]!
+      ? course.medicines[0]
       : course.medicines;
+    const customMedicine = Array.isArray(course.patient_custom_medicines)
+      ? course.patient_custom_medicines[0]
+      : course.patient_custom_medicines;
     return {
       eventId: row.id,
-      medicineName: medicine.name,
+      medicineName: customMedicine?.name ?? medicine?.name ?? 'Medicine',
       notificationId: row.notification_id,
       scheduledFor: row.scheduled_for,
       slot: row.slot,

@@ -17,6 +17,7 @@ import { SplashTransitionProvider } from '../src/components/SplashTransition';
 import { CartProvider } from '../src/lib/cart';
 import { loadExpoNotifications } from '../src/lib/expoNotifications';
 import { LanguageProvider } from '../src/lib/i18n';
+import { replenishOngoingMedicineCourses } from '../src/lib/ongoingMedicineCoordinator';
 import { colors } from '../src/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -58,6 +59,19 @@ export default function RootLayout() {
       }
     });
 
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    const replenish = () => {
+      void replenishOngoingMedicineCourses().catch((error) =>
+        console.warn('Unable to extend ongoing medicine reminders', error),
+      );
+    };
+    replenish();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') replenish();
+    });
     return () => subscription.remove();
   }, []);
 

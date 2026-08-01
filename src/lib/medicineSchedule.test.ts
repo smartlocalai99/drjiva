@@ -7,7 +7,18 @@ import {
   getActiveDose,
   replaceEventSlotTime,
   validateMedicineCourseInput,
+  validateCourseDuration,
 } from './medicineSchedule';
+
+describe('course duration', () => {
+  it('accepts one to seven finite days and open-ended Everyday', () => {
+    expect(validateCourseDuration({ days: 7, mode: 'finite' })).toBeNull();
+    expect(validateCourseDuration({ mode: 'ongoing' })).toBeNull();
+    expect(
+      validateCourseDuration({ days: 8, mode: 'finite' } as never),
+    ).toBe('invalidCourseDuration');
+  });
+});
 
 const validInput = {
   durationDays: 5,
