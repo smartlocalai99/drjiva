@@ -38,6 +38,23 @@ describe('deleteMedicineReminderWithAdapter', () => {
     expect(adapter.queueCancellations).toHaveBeenCalledWith(['one']);
   });
 
+  it('keeps a grouped alert that is still used by another course', async () => {
+    const adapter = {
+      cancelNotifications: vi.fn(async () => undefined),
+      deleteCourse: vi.fn(async () => undefined),
+      filterUnusedNotificationIds: vi.fn(async () => []),
+      listNotificationIds: vi.fn(async () => ['shared']),
+      queueCancellations: vi.fn(async () => undefined),
+    };
+
+    await deleteMedicineReminderWithAdapter(adapter, 'course-1');
+
+    expect(adapter.filterUnusedNotificationIds).toHaveBeenCalledWith([
+      'shared',
+    ]);
+    expect(adapter.cancelNotifications).not.toHaveBeenCalled();
+  });
+
   it('keeps the course when notification lookup fails', async () => {
     const adapter = {
       cancelNotifications: vi.fn(async () => undefined),

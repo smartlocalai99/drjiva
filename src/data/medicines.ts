@@ -276,6 +276,20 @@ export async function deleteMedicineReminder(courseId: string): Promise<void> {
     {
       cancelNotifications: cancelDoseNotifications,
       deleteCourse: deleteMedicineCourse,
+      filterUnusedNotificationIds: async (identifiers) => {
+        const { data, error } = await supabase
+          .from('patient_medicine_dose_events')
+          .select('notification_id')
+          .eq('status', 'scheduled')
+          .in('notification_id', [...identifiers]);
+        if (error) throw error;
+        const usedIds = new Set(
+          (data ?? []).flatMap((row) =>
+            row.notification_id ? [row.notification_id] : [],
+          ),
+        );
+        return identifiers.filter((identifier) => !usedIds.has(identifier));
+      },
       listNotificationIds: async (id) => {
         const { data, error } = await supabase
           .from('patient_medicine_dose_events')
@@ -311,9 +325,17 @@ export async function completeDoseEvent(
     .eq('id', eventId);
   if (error) throw error;
   if (completed && event.notification_id) {
-    await cancelDoseNotifications([event.notification_id]).catch(
-      () => undefined,
-    );
+    const { count: linkedScheduledCount, error: linkedCountError } =
+      await supabase
+        .from('patient_medicine_dose_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('notification_id', event.notification_id)
+        .eq('status', 'scheduled');
+    if (!linkedCountError && (linkedScheduledCount ?? 0) === 0) {
+      await cancelDoseNotifications([event.notification_id]).catch(
+        () => undefined,
+      );
+    }
   }
   const { count, error: countError } = await supabase
     .from('patient_medicine_dose_events')

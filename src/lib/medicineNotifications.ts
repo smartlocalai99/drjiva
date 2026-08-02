@@ -18,12 +18,24 @@ type NotificationContent = {
   tablets: number;
 };
 
+export type DoseNotificationRequest = NotificationEvent & NotificationContent;
+
+type DoseNotificationGroup = {
+  reminders: DoseNotificationRequest[];
+  scheduledFor: string;
+};
+
 type NotificationAdapter = {
   cancel: (identifier: string) => Promise<void>;
   schedule: (
     event: NotificationEvent,
     content: NotificationContent,
   ) => Promise<string>;
+};
+
+type GroupedNotificationAdapter = {
+  cancel: (identifier: string) => Promise<void>;
+  schedule: (group: DoseNotificationGroup) => Promise<string>;
 };
 
 const PENDING_CANCELLATIONS_KEY = 'drjiva.pendingNotificationCancellations';
@@ -91,6 +103,56 @@ export async function scheduleDoseNotificationsWithAdapter(
   } catch (error) {
     await Promise.allSettled(
       scheduled.map(({ notificationId }) => adapter.cancel(notificationId)),
+    );
+    throw error;
+  }
+}
+
+export function groupDoseNotificationRequests(
+  reminders: readonly DoseNotificationRequest[],
+): DoseNotificationGroup[] {
+  const groups = new Map<number, DoseNotificationGroup>();
+  for (const reminder of reminders) {
+    const timestamp = new Date(reminder.scheduledFor).getTime();
+    if (!Number.isFinite(timestamp)) continue;
+    const group = groups.get(timestamp);
+    if (group) {
+      group.reminders.push(reminder);
+    } else {
+      groups.set(timestamp, {
+        reminders: [reminder],
+        scheduledFor: reminder.scheduledFor,
+      });
+    }
+  }
+  return [...groups.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, group]) => group);
+}
+
+export async function scheduleGroupedDoseNotificationsWithAdapter(
+  adapter: GroupedNotificationAdapter,
+  reminders: readonly DoseNotificationRequest[],
+): Promise<Array<{ eventId: string; notificationId: string }>> {
+  const scheduledIds: string[] = [];
+  const identifiers: Array<{ eventId: string; notificationId: string }> = [];
+  try {
+    for (const group of groupDoseNotificationRequests(reminders)) {
+      const notificationId = await adapter.schedule(group);
+      scheduledIds.push(notificationId);
+      identifiers.push(
+        ...group.reminders.map((reminder) => ({
+          eventId: reminder.eventId,
+          notificationId,
+        })),
+      );
+    }
+    return identifiers;
+  } catch (error) {
+    await Promise.allSettled(
+      [...new Set(scheduledIds)].map((identifier) =>
+        adapter.cancel(identifier),
+      ),
     );
     throw error;
   }
@@ -164,12 +226,75 @@ export async function scheduleDoseNotifications(
   );
 }
 
+export async function scheduleGroupedDoseNotifications(
+  reminders: readonly DoseNotificationRequest[],
+): Promise<Array<{ eventId: string; notificationId: string }>> {
+  const Notifications = await requireExpoNotifications();
+  await ensureMedicineReminderChannel();
+  const { channelId, sound } = getMedicineReminderSoundConfig();
+  const futureReminders = reminders.filter(
+    (reminder) => new Date(reminder.scheduledFor).getTime() > Date.now(),
+  );
+
+  return scheduleGroupedDoseNotificationsWithAdapter(
+    {
+      cancel: Notifications.cancelScheduledNotificationAsync,
+      schedule: (group) => {
+        const first = group.reminders[0]!;
+        const multiple = group.reminders.length > 1;
+        const medicineList = group.reminders
+          .map(
+            (reminder) =>
+              `${reminder.medicineName} (${reminder.tablets} tablet${
+                reminder.tablets === 1 ? '' : 's'
+              })`,
+          )
+          .join(', ');
+
+        return Notifications.scheduleNotificationAsync({
+          content: {
+            body: multiple
+              ? `${medicineList} · ${formatScheduledTime12Hour(
+                  group.scheduledFor,
+                )}`
+              : `${first.tablets} tablet${
+                  first.tablets === 1 ? '' : 's'
+                } · ${first.slot} · ${formatScheduledTime12Hour(
+                  group.scheduledFor,
+                )}`,
+            color: DOSE_SLOT_THEME[first.slotKey].accent,
+            data: {
+              eventId: first.eventId,
+              eventIds: group.reminders.map((reminder) => reminder.eventId),
+              route: '/home',
+            },
+            interruptionLevel: 'timeSensitive',
+            badge: 1,
+            sound,
+            title: multiple
+              ? `Time for ${group.reminders.length} medicines`
+              : `Time for ${first.medicineName}`,
+          },
+          trigger: {
+            channelId,
+            date: new Date(group.scheduledFor),
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+          },
+        });
+      },
+    },
+    futureReminders,
+  );
+}
+
 export async function cancelDoseNotifications(
   identifiers: readonly string[],
 ): Promise<void> {
   const Notifications = await requireExpoNotifications();
   await Promise.all(
-    identifiers.map(Notifications.cancelScheduledNotificationAsync),
+    [...new Set(identifiers)].map(
+      Notifications.cancelScheduledNotificationAsync,
+    ),
   );
 }
 

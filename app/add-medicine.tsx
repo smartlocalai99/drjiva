@@ -57,18 +57,16 @@ import {
   fetchVerifiedHospitals,
   getNotificationSettings,
   rollbackMedicineCourse,
-  saveNotificationIds,
   type MedicineCatalogueItem,
 } from '../src/lib/medicineCourses';
 import { HospitalLogo } from '../src/components/HospitalLogo';
 import { DOSE_SLOT_THEME } from '../src/lib/doseSlotTheme';
 import {
-  cancelDoseNotifications,
   hasShownNotificationSettingsNudge,
   markNotificationSettingsNudgeShown,
   requestMedicineNotificationPermission,
-  scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
+import { syncPatientDoseNotifications } from '../src/lib/medicineNotificationSync';
 import {
   adjustTabletCount,
   expandDoseEvents,
@@ -375,37 +373,14 @@ export default function AddMedicineScreen() {
           tabletsPerDose,
         });
         createdCourseIds.push(created.courseId);
+      }
 
-        if (permitted) {
-          const identifiers: Array<{
-            eventId: string;
-            notificationId: string;
-          }> = [];
-          try {
-            for (const [index, draft] of drafts.entries()) {
-              const eventId = created.eventIds[index];
-              if (!eventId) {
-                throw new Error('A saved reminder event is missing.');
-              }
-              const next = await scheduleDoseNotifications(
-                [{ eventId, scheduledFor: draft.scheduledFor }],
-                {
-                  medicineName: medicine.name,
-                  slot: t(draft.slot),
-                  slotKey: draft.slot,
-                  tablets: tabletsPerDose,
-                },
-              );
-              identifiers.push(...next);
-            }
-            await saveNotificationIds(identifiers);
-          } catch (error) {
-            notificationWarning = true;
-            await cancelDoseNotifications(
-              identifiers.map((item) => item.notificationId),
-            ).catch(() => undefined);
-            console.warn('Medicine reminder phone alert failed', error);
-          }
+      if (permitted) {
+        try {
+          await syncPatientDoseNotifications(patientId);
+        } catch (error) {
+          notificationWarning = true;
+          console.warn('Medicine reminder phone alert failed', error);
         }
       }
 

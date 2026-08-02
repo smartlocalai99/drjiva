@@ -1,17 +1,14 @@
 import { addCalendarDays, formatDateOnly } from './medicineCalendar';
-import { getNotificationSettings, saveNotificationIds } from './medicineCourses';
-import {
-  requestMedicineNotificationPermission,
-  scheduleDoseNotifications,
-} from './medicineNotifications';
+import { getNotificationSettings } from './medicineCourses';
+import { requestMedicineNotificationPermission } from './medicineNotifications';
+import { syncPatientDoseNotifications } from './medicineNotificationSync';
 import { buildRollingDoseEvents } from './ongoingMedicineSchedule';
 import { ensureSecureReportSession } from './reportAuth';
 import type { DoseSlot } from './medicineSchedule';
 import { supabase } from './supabase';
 
-function one<T>(value: T | T[] | null | undefined): T | null {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
+const GROUPED_NOTIFICATION_MIGRATION_KEY =
+  'drjiva.groupedMedicineNotifications.v1';
 
 type OngoingCourseRow = {
   id: string;
@@ -34,6 +31,8 @@ export async function replenishOngoingMedicineCourses(horizonDays = 14): Promise
   if (error) throw error;
 
   const notificationsAllowed = await requestMedicineNotificationPermission().catch(() => false);
+  const patientsToSync = new Set<string>();
+  let migrationStorageKey: string | null = null;
   const today = formatDateOnly(new Date());
   for (const course of (data ?? []) as unknown as OngoingCourseRow[]) {
     const startDate = course.start_date > today ? course.start_date : today;
@@ -71,20 +70,39 @@ export async function replenishOngoingMedicineCourses(horizonDays = 14): Promise
       .select('id, scheduled_for, slot');
     if (insertError) throw insertError;
     if (!notificationsAllowed) continue;
+    if ((inserted ?? []).length > 0) patientsToSync.add(course.patient_id);
+  }
 
-    const medicineName = one(course.patient_custom_medicines)?.name ?? one(course.medicines)?.name ?? 'your medicine';
-    const identifiers: Array<{ eventId: string; notificationId: string }> = [];
-    for (const event of inserted ?? []) {
-      identifiers.push(...await scheduleDoseNotifications(
-        [{ eventId: event.id, scheduledFor: event.scheduled_for }],
-        {
-          medicineName,
-          slot: event.slot,
-          slotKey: event.slot as DoseSlot,
-          tablets: Number(course.tablets_per_dose),
-        },
-      ));
+  if (notificationsAllowed) {
+    const { default: AsyncStorage } = await import(
+      '@react-native-async-storage/async-storage'
+    );
+    migrationStorageKey = `${GROUPED_NOTIFICATION_MIGRATION_KEY}.${ownerUserId}`;
+    const alreadyMigrated = await AsyncStorage.getItem(migrationStorageKey);
+    if (alreadyMigrated !== 'true') {
+      const { data: scheduledEvents, error: scheduledEventsError } =
+        await supabase
+          .from('patient_medicine_dose_events')
+          .select('patient_id')
+          .eq('status', 'scheduled')
+          .gt('scheduled_for', new Date().toISOString());
+      if (scheduledEventsError) throw scheduledEventsError;
+      for (const event of scheduledEvents ?? []) {
+        patientsToSync.add(event.patient_id);
+      }
+    } else {
+      migrationStorageKey = null;
     }
-    await saveNotificationIds(identifiers);
+  }
+
+  for (const patientId of patientsToSync) {
+    await syncPatientDoseNotifications(patientId);
+  }
+
+  if (migrationStorageKey) {
+    const { default: AsyncStorage } = await import(
+      '@react-native-async-storage/async-storage'
+    );
+    await AsyncStorage.setItem(migrationStorageKey, 'true');
   }
 }

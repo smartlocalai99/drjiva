@@ -25,8 +25,11 @@ vi.mock('./expoNotifications', () => ({
 }));
 
 import {
+  groupDoseNotificationRequests,
   scheduleDoseNotifications,
   scheduleDoseNotificationsWithAdapter,
+  scheduleGroupedDoseNotifications,
+  scheduleGroupedDoseNotificationsWithAdapter,
 } from './medicineNotifications';
 
 describe('scheduleDoseNotificationsWithAdapter', () => {
@@ -132,5 +135,116 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     expect(scheduledRequests[0]).toMatchObject({
       content: { sound: 'rec' },
     });
+  });
+
+  it('groups every medicine due at the exact same time', () => {
+    const groups = groupDoseNotificationRequests([
+      {
+        eventId: 'dolo-event',
+        medicineName: 'Dolo 650',
+        scheduledFor: '2026-08-03T08:00:00.000Z',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 1,
+      },
+      {
+        eventId: 'metformin-event',
+        medicineName: 'Metformin',
+        scheduledFor: '2026-08-03T08:00:00.000Z',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 2,
+      },
+      {
+        eventId: 'night-event',
+        medicineName: 'Dolo 650',
+        scheduledFor: '2026-08-03T20:00:00.000Z',
+        slot: 'Night',
+        slotKey: 'night',
+        tablets: 1,
+      },
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.reminders.map((item) => item.eventId)).toEqual([
+      'dolo-event',
+      'metformin-event',
+    ]);
+  });
+
+  it('links one grouped phone alert to every dose event at that time', async () => {
+    const identifiers = await scheduleGroupedDoseNotificationsWithAdapter(
+      {
+        cancel: vi.fn(async () => undefined),
+        schedule: vi.fn(async () => 'one-alert'),
+      },
+      [
+        {
+          eventId: 'event-1',
+          medicineName: 'Dolo 650',
+          scheduledFor: '2026-08-03T08:00:00.000Z',
+          slot: 'Morning',
+          slotKey: 'morning',
+          tablets: 1,
+        },
+        {
+          eventId: 'event-2',
+          medicineName: 'Metformin',
+          scheduledFor: '2026-08-03T08:00:00.000Z',
+          slot: 'Morning',
+          slotKey: 'morning',
+          tablets: 1,
+        },
+      ],
+    );
+
+    expect(identifiers).toEqual([
+      { eventId: 'event-1', notificationId: 'one-alert' },
+      { eventId: 'event-2', notificationId: 'one-alert' },
+    ]);
+  });
+
+  it('creates one combined operating-system notification for same-time medicines', async () => {
+    const scheduledRequests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue({
+      SchedulableTriggerInputTypes: { DATE: 'date' },
+      cancelScheduledNotificationAsync: async () => undefined,
+      scheduleNotificationAsync: async (request: unknown) => {
+        scheduledRequests.push(request);
+        return 'combined-alert';
+      },
+    });
+    const scheduledFor = new Date(Date.now() + 60_000).toISOString();
+
+    const identifiers = await scheduleGroupedDoseNotifications([
+      {
+        eventId: 'event-1',
+        medicineName: 'Dolo 650',
+        scheduledFor,
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 1,
+      },
+      {
+        eventId: 'event-2',
+        medicineName: 'Metformin',
+        scheduledFor,
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 2,
+      },
+    ]);
+
+    expect(scheduledRequests).toHaveLength(1);
+    expect(scheduledRequests[0]).toMatchObject({
+      content: {
+        data: { eventIds: ['event-1', 'event-2'] },
+        title: 'Time for 2 medicines',
+      },
+    });
+    expect(identifiers).toEqual([
+      { eventId: 'event-1', notificationId: 'combined-alert' },
+      { eventId: 'event-2', notificationId: 'combined-alert' },
+    ]);
   });
 });

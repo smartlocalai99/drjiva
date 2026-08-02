@@ -23,16 +23,13 @@ import {
 import {
   getNotificationSettings,
   fetchScheduledDoseRemindersFromToday,
-  saveNotificationIds,
   saveNotificationSettings,
   replaceNotificationSchedule,
 } from '../src/lib/medicineCourses';
 import {
-  cancelDoseNotifications,
-  queueNotificationCancellations,
   requestMedicineNotificationPermission,
-  scheduleDoseNotifications,
 } from '../src/lib/medicineNotifications';
+import { syncDoseNotifications } from '../src/lib/medicineNotificationSync';
 import { replaceEventSlotTime, type DoseSlot } from '../src/lib/medicineSchedule';
 import {
   areSelectedSlotTimesOrdered,
@@ -166,55 +163,21 @@ export default function NotificationTimingsScreen() {
         if (reminders.length > 0) {
           await replaceNotificationSchedule(patientId, nextSettings, updates);
 
-          const oldIds = reminders.flatMap((item) =>
-            item.notificationId ? [item.notificationId] : [],
-          );
-          try {
-            await cancelDoseNotifications(oldIds);
-          } catch {
-            await queueNotificationCancellations(oldIds);
-            cleanupPending = true;
-          }
-
           const permitted =
             await requestMedicineNotificationPermission().catch(() => false);
           if (!permitted) {
             phoneAlertsUnavailable = true;
           } else {
-            const newNotifications: Array<{
-              eventId: string;
-              notificationId: string;
-            }> = [];
             try {
-              for (const reminder of reminders) {
-                const update = updates.find(
-                  (item) => item.eventId === reminder.eventId,
-                );
-                if (!update) {
-                  continue;
-                }
-                const scheduled = await scheduleDoseNotifications(
-                  [
-                    {
-                      eventId: reminder.eventId,
-                      scheduledFor: update.scheduledFor,
-                    },
-                  ],
-                  {
-                    medicineName: reminder.medicineName,
-                    slot: t(reminder.slot),
-                    slotKey: reminder.slot,
-                    tablets: reminder.tablets,
-                  },
-                );
-                newNotifications.push(...scheduled);
-              }
-              await saveNotificationIds(newNotifications);
+              const result = await syncDoseNotifications(
+                reminders.map((reminder, index) => ({
+                  ...reminder,
+                  scheduledFor: updates[index]!.scheduledFor,
+                })),
+              );
+              cleanupPending = result.cleanupPending;
             } catch {
               phoneAlertsUnavailable = true;
-              await cancelDoseNotifications(
-                newNotifications.map((item) => item.notificationId),
-              ).catch(() => undefined);
             }
           }
         }
