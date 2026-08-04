@@ -15,6 +15,9 @@ describe('app config medicine reminder sound', () => {
 
     expect(config.extra.medicineReminderSoundIOS).toBe('reminder.caf');
     expect(config.extra.medicineReminderSoundAndroid).toBe('rec');
+    expect(config.extra.medicineReminderChannel).toBe(
+      'medicine-reminders-loud-v3',
+    );
     expect(notificationsPlugin?.[1]?.sounds).toContain(
       './assets/sounds/reminder.caf',
     );

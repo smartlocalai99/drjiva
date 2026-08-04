@@ -4,7 +4,7 @@ const { join } = require('node:path');
 const MEDICINE_REMINDER_CHANNEL = 'medicine-reminders';
 // Android notification channels keep their original sound forever. A new id
 // makes devices that already created the old channel adopt the bundled sound.
-const MEDICINE_REMINDER_SOUND_CHANNEL = 'medicine-reminders-voice-v2';
+const MEDICINE_REMINDER_SOUND_CHANNEL = 'medicine-reminders-loud-v3';
 const ORDER_SUCCESS_CHANNEL = 'order-success-v1';
 // iOS plays the bundled sound file by its exact filename; Android plays it by
 // the res/raw resource name the expo-notifications plugin derives from the

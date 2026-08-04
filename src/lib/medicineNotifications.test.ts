@@ -13,7 +13,7 @@ vi.mock('expo-constants', () => ({
   default: {
     expoConfig: {
       extra: {
-        medicineReminderChannel: 'medicine-reminders',
+        medicineReminderChannel: 'medicine-reminders-loud-v3',
         medicineReminderSoundAndroid: 'rec',
         medicineReminderSoundIOS: 'reminder.caf',
       },
@@ -103,17 +103,23 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
 
   it('uses the Android sound resource name on Android', async () => {
     mockPlatform.OS = 'android';
+    const notificationChannels: unknown[] = [];
     const scheduledRequests: unknown[] = [];
     requireExpoNotifications.mockResolvedValue({
       AndroidAudioContentType: { SPEECH: 'speech' },
       AndroidAudioUsage: { ALARM: 'alarm' },
-      AndroidImportance: { MAX: 5 },
+      AndroidImportance: { MAX: 7 },
       SchedulableTriggerInputTypes: { DATE: 'date' },
       scheduleNotificationAsync: async (request: unknown) => {
         scheduledRequests.push(request);
         return 'notification-android-sound';
       },
-      setNotificationChannelAsync: async () => undefined,
+      setNotificationChannelAsync: async (
+        channelId: string,
+        configuration: unknown,
+      ) => {
+        notificationChannels.push({ channelId, configuration });
+      },
     });
 
     await scheduleDoseNotifications(
@@ -132,8 +138,18 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     );
 
     expect(scheduledRequests).toHaveLength(1);
+    expect(notificationChannels).toEqual([
+      expect.objectContaining({
+        channelId: 'medicine-reminders-loud-v3',
+        configuration: expect.objectContaining({
+          importance: 7,
+          sound: 'rec',
+        }),
+      }),
+    ]);
     expect(scheduledRequests[0]).toMatchObject({
       content: { sound: 'rec' },
+      trigger: { channelId: 'medicine-reminders-loud-v3' },
     });
   });
 
