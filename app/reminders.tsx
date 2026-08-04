@@ -15,6 +15,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  FadeInRight,
+  LinearTransition,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, type DateData } from 'react-native-calendars';
 
@@ -28,6 +32,7 @@ import {
 } from '../src/data/medicines';
 import { DoctorAvatar } from '../src/components/DoctorAvatar';
 import { HospitalLogo } from '../src/components/HospitalLogo';
+import { CourseStreakRow } from '../src/components/course-streak-row';
 import {
   dashboardColors,
   dashboardRadii,
@@ -175,98 +180,161 @@ export default function RemindersScreen() {
         <View style={styles.headerSide} />
       </View>
 
-      <View style={styles.calendarWrap}>
-        <Calendar
-          current={formatDateOnly(visibleMonth)}
-          enableSwipeMonths
-          markedDates={markedDates}
-          onDayPress={handleSelectDate}
-          onMonthChange={handleVisibleMonthChange}
-          style={styles.calendar}
-          theme={{
-            arrowColor: dashboardColors.primary,
-            calendarBackground: dashboardColors.card,
-            dayTextColor: dashboardColors.text,
-            monthTextColor: dashboardColors.text,
-            selectedDayBackgroundColor: dashboardColors.primary,
-            selectedDayTextColor: '#FFFFFF',
-            textDayFontFamily: 'Inter_500Medium',
-            textDayHeaderFontFamily: 'Inter_600SemiBold',
-            textDisabledColor: dashboardColors.textFaint,
-            textMonthFontFamily: 'Inter_700Bold',
-            textSectionTitleColor: dashboardColors.textMuted,
-            todayTextColor: dashboardColors.primary,
-          }}
-        />
-      </View>
-
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={dashboardColors.primary} />
-        </View>
-      ) : errorMessage ? (
-        <View style={styles.centered}>
-          <Ionicons
-            color={dashboardColors.error}
-            name="cloud-offline-outline"
-            size={38}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.calendarWrap}>
+          <Calendar
+            current={formatDateOnly(visibleMonth)}
+            enableSwipeMonths
+            markedDates={markedDates}
+            onDayPress={handleSelectDate}
+            onMonthChange={handleVisibleMonthChange}
+            style={styles.calendar}
+            theme={{
+              arrowColor: dashboardColors.primary,
+              calendarBackground: dashboardColors.card,
+              dayTextColor: dashboardColors.text,
+              monthTextColor: dashboardColors.text,
+              selectedDayBackgroundColor: dashboardColors.primary,
+              selectedDayTextColor: '#FFFFFF',
+              textDayFontFamily: 'Inter_500Medium',
+              textDayHeaderFontFamily: 'Inter_600SemiBold',
+              textDisabledColor: dashboardColors.textFaint,
+              textMonthFontFamily: 'Inter_700Bold',
+              textSectionTitleColor: dashboardColors.textMuted,
+              todayTextColor: dashboardColors.primary,
+            }}
           />
-          <Text style={styles.emptyTitle}>{errorMessage}</Text>
-          <Pressable
-            onPress={() => void reload(selectedDate)}
-            style={styles.retry}
-          >
-            <Text style={styles.retryText}>{t('tryAgain')}</Text>
-          </Pressable>
         </View>
-      ) : medicines.length === 0 ? (
-        <View style={styles.centered}>
-          <View style={styles.emptyIcon}>
-            <Ionicons
-              color={dashboardColors.primary}
-              name="alarm-outline"
-              size={40}
-            />
+
+        {isLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={dashboardColors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>{t('noRemindersForDate')}</Text>
-          <Text style={styles.emptySubtitle}>{t('noRemindersSubtitle')}</Text>
-        </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {medicines.map((medicine) => (
-            <ReminderCard
-              deleting={deletingCourseId === medicine.courseId}
-              key={medicine.id}
-              medicine={medicine}
-              onDelete={() => confirmDelete(medicine)}
+        ) : errorMessage ? (
+          <View style={styles.centered}>
+            <Ionicons
+              color={dashboardColors.error}
+              name="cloud-offline-outline"
+              size={38}
             />
-          ))}
-        </ScrollView>
-      )}
+            <Text style={styles.emptyTitle}>{errorMessage}</Text>
+            <Pressable
+              onPress={() => void reload(selectedDate)}
+              style={styles.retry}
+            >
+              <Text style={styles.retryText}>{t('tryAgain')}</Text>
+            </Pressable>
+          </View>
+        ) : medicines.length === 0 ? (
+          <View style={styles.centered}>
+            <View style={styles.emptyIcon}>
+              <Ionicons
+                color={dashboardColors.primary}
+                name="alarm-outline"
+                size={40}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>{t('noRemindersForDate')}</Text>
+            <Text style={styles.emptySubtitle}>{t('noRemindersSubtitle')}</Text>
+          </View>
+        ) : (
+          <View style={styles.content}>
+            {medicines.map((medicine, index) => (
+              <ReminderCard
+                deleting={deletingCourseId === medicine.courseId}
+                index={index}
+                key={medicine.id}
+                medicine={medicine}
+                onDelete={() => confirmDelete(medicine)}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 function ReminderCard({
   deleting,
+  index,
   medicine,
   onDelete,
 }: {
   deleting: boolean;
+  index: number;
   medicine: Medicine;
   onDelete: () => void;
 }) {
   const slotTheme = DOSE_SLOT_THEME[medicine.slot];
+  const courseDuration =
+    medicine.scheduleMode === 'ongoing'
+      ? 'Ongoing course'
+      : medicine.durationDays && medicine.durationDays > 0
+        ? `${medicine.durationDays}-day course`
+        : 'Course duration unavailable';
 
   return (
-    <View style={styles.card}>
-      <View style={styles.imageWrap}>
+    <Animated.View
+      entering={FadeInRight.delay(Math.min(index, 6) * 45).duration(260)}
+      layout={LinearTransition.duration(220)}
+      style={styles.card}
+    >
+      <View style={[styles.cardBody, { backgroundColor: slotTheme.tint }]}>
+        <View style={styles.titleRow}>
+          <Text numberOfLines={1} selectable style={styles.cardName}>
+            {medicine.name}
+          </Text>
+
+          <View
+            style={[styles.slotBadge, { backgroundColor: slotTheme.tint }]}
+          >
+            <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={12} />
+            <Text
+              numberOfLines={1}
+              style={[styles.slotBadgeText, { color: slotTheme.accent }]}
+            >
+              {medicine.timing} · {medicine.nextReminderTime}
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityLabel={`Delete ${medicine.name} reminder`}
+            disabled={deleting}
+            hitSlop={8}
+            onPress={onDelete}
+            style={({ pressed }) => [
+              styles.deleteButton,
+              pressed && styles.deleteButtonPressed,
+            ]}
+          >
+            {deleting ? (
+              <ActivityIndicator color={dashboardColors.error} size="small" />
+            ) : (
+              <Ionicons
+                color={dashboardColors.error}
+                name="trash-outline"
+                size={15}
+              />
+            )}
+          </Pressable>
+        </View>
+
+        <Text numberOfLines={1} selectable style={styles.metaSummary}>
+          {medicine.tabletCount} · {medicine.description} · {courseDuration}
+        </Text>
+      </View>
+
+      <View style={[styles.imageWrap, { backgroundColor: slotTheme.tint }]}>
         <Image
           accessibilityLabel={medicine.name}
+          cachePolicy="memory-disk"
           contentFit="contain"
+          recyclingKey={medicine.id}
           source={
             medicine.imageUrl
               ? { uri: medicine.imageUrl }
@@ -275,58 +343,32 @@ function ReminderCard({
           style={styles.cardImage}
           transition={120}
         />
-      </View>
-      <Pressable
-        accessibilityLabel={`Delete ${medicine.name} reminder`}
-        disabled={deleting}
-        hitSlop={8}
-        onPress={onDelete}
-        style={styles.deleteButton}
-      >
-        {deleting ? (
-          <ActivityIndicator color={dashboardColors.error} size="small" />
-        ) : (
-          <Ionicons color={dashboardColors.error} name="trash-outline" size={16} />
-        )}
-      </Pressable>
-      {medicine.completed ? (
-        <View style={styles.completedBadge}>
-          <Ionicons color="#FFFFFF" name="checkmark" size={11} />
-          <Text style={styles.completedBadgeText}>Taken</Text>
-        </View>
-      ) : null}
 
-      <View style={[styles.cardBody, { backgroundColor: slotTheme.tint }]}>
-        <View style={styles.nameRow}>
-          <Text numberOfLines={1} style={styles.cardName}>
-            {medicine.name}
-          </Text>
-          <View style={styles.doseChip}>
-            <Ionicons color={slotTheme.accent} name="medical" size={13} />
-            <Text style={[styles.doseChipText, { color: slotTheme.accent }]}>
-              {medicine.tabletCount}
-            </Text>
+        {medicine.completed ? (
+          <View style={styles.completedBadge}>
+            <Ionicons color="#FFFFFF" name="checkmark" size={12} />
+            <Text style={styles.completedBadgeText}>Taken</Text>
           </View>
-        </View>
+        ) : null}
+      </View>
 
-        <View style={styles.slotBadge}>
-          <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={13} />
-          <Text style={[styles.cardDuration, { color: slotTheme.accent }]}>
-            {medicine.timing} · {medicine.nextReminderTime}
+      <CourseStreakRow
+        accentColor={slotTheme.accent}
+        backgroundColor={slotTheme.tint}
+        days={medicine.streakDays}
+        ongoing={medicine.scheduleMode === 'ongoing'}
+      />
+
+      <View style={[styles.peopleRow, { backgroundColor: slotTheme.tint }]}>
+        <View style={styles.hospitalGroup}>
+          <HospitalLogo size={44} />
+          <Text numberOfLines={2} selectable style={styles.hospitalName}>
+            {medicine.hospitalName}
           </Text>
         </View>
-
-        <View style={styles.peopleRow}>
-          <View style={styles.hospitalGroup}>
-            <HospitalLogo size={44} />
-            <Text numberOfLines={2} style={styles.hospitalName}>
-              {medicine.hospitalName}
-            </Text>
-          </View>
-          <DoctorAvatar size={48} />
-        </View>
+        <DoctorAvatar size={48} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -368,9 +410,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: dashboardSpacing.xl,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: dashboardSpacing.xxl,
+  },
   content: {
     gap: dashboardSpacing.md,
-    paddingBottom: dashboardSpacing.xxl,
     paddingHorizontal: dashboardSpacing.pagePadding,
     paddingTop: dashboardSpacing.sm,
   },
@@ -408,43 +453,46 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: dashboardColors.card,
-    borderColor: dashboardColors.track,
-    borderRadius: dashboardRadii.card,
-    borderWidth: 1,
+    borderRadius: 0,
+    marginHorizontal: -dashboardSpacing.pagePadding,
     overflow: 'hidden',
   },
   imageWrap: {
     alignItems: 'center',
-    backgroundColor: '#D6D6D6',
-    height: 160,
+    height: 260,
     justifyContent: 'center',
+    position: 'relative',
     width: '100%',
   },
   cardImage: {
-    height: '82%',
-    width: '82%',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   deleteButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: 16,
-    height: 32,
+    backgroundColor: dashboardColors.errorTint,
+    borderRadius: 15,
+    height: 30,
     justifyContent: 'center',
-    position: 'absolute',
-    right: dashboardSpacing.md,
-    top: dashboardSpacing.md,
-    width: 32,
+    width: 30,
+  },
+  deleteButtonPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.94 }],
   },
   completedBadge: {
     alignItems: 'center',
     backgroundColor: dashboardColors.success,
     borderRadius: dashboardRadii.pill,
-    bottom: dashboardSpacing.sm,
+    bottom: 10,
     flexDirection: 'row',
-    gap: 3,
-    left: dashboardSpacing.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    gap: 4,
+    left: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     position: 'absolute',
   },
   completedBadgeText: {
@@ -453,47 +501,43 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   cardBody: {
-    gap: 8,
-    padding: dashboardSpacing.md,
+    backgroundColor: dashboardColors.card,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  nameRow: {
+  titleRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: dashboardSpacing.sm,
-    justifyContent: 'space-between',
+    gap: 6,
   },
   cardName: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.text,
     flex: 1,
-    fontSize: 17,
+    fontSize: 16,
+    lineHeight: 20,
   },
-  doseChip: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: dashboardRadii.pill,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  doseChipText: {
-    ...dashboardTypography.caption,
-    fontFamily: 'Inter_700Bold',
-  },
-  cardDuration: {
-    ...dashboardTypography.caption,
-    fontFamily: 'Inter_700Bold',
+  metaSummary: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
   },
   slotBadge: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
     gap: 4,
-    paddingHorizontal: 8,
+    maxWidth: '36%',
+    paddingHorizontal: 7,
     paddingVertical: 4,
+  },
+  slotBadgeText: {
+    ...dashboardTypography.caption,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+    lineHeight: 13,
   },
   peopleRow: {
     alignItems: 'center',
@@ -501,8 +545,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 2,
-    paddingTop: 10,
+    paddingHorizontal: dashboardSpacing.md,
+    paddingVertical: 12,
   },
   hospitalGroup: {
     alignItems: 'center',

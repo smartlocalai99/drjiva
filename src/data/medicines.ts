@@ -33,8 +33,18 @@ type RawDoseCourse = {
   hospitals: { name: string } | Array<{ name: string }> | null;
   id: string;
   medicines:
-    | { image_url: string | null; name: string; hospital_name: string }
-    | Array<{ image_url: string | null; name: string; hospital_name: string }>
+    | {
+        description: string | null;
+        image_url: string | null;
+        name: string;
+        hospital_name: string;
+      }
+    | Array<{
+        description: string | null;
+        image_url: string | null;
+        name: string;
+        hospital_name: string;
+      }>
     | null;
   patient_custom_medicines:
     | { image_path: string; name: string }
@@ -75,7 +85,7 @@ export async function fetchMedicinesForDate(
   const { data, error } = await supabase
     .from('patient_medicine_dose_events')
     .select(
-      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name), patient_custom_medicines(name,image_path))',
+      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name,description), patient_custom_medicines(name,image_path))',
     )
     .eq('patient_id', patientId)
     .gte('scheduled_for', start.toISOString())
@@ -153,6 +163,8 @@ export async function fetchMedicinesForDate(
     return [{
       completed: event.status === 'completed',
       courseId: course.id,
+      description: customMedicine ? null : medicine?.description ?? null,
+      durationDays: course.duration_days,
       eventId: event.id,
       hospitalName: hospital,
       imageUrl,

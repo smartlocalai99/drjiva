@@ -27,6 +27,33 @@ describe('buildMedicineStreak', () => {
     expect(week[0]).toMatchObject({ date: '2026-07-27', completed: true });
     expect(week[1]).toMatchObject({ date: '2026-07-28', completed: false });
   });
+
+  it('shows the ongoing-course flame only after every reminder is completed', () => {
+    const events = [
+      { scheduledFor: localScheduledFor(30, 8), status: 'scheduled' },
+      { scheduledFor: localScheduledFor(30, 20), status: 'scheduled' },
+    ];
+
+    expect(
+      buildCurrentWeekMedicineStreak(
+        '2026-07-20',
+        events,
+        new Date(2026, 6, 30, 20, 1),
+      ).find((day) => day.date === '2026-07-30')?.completed,
+    ).toBe(false);
+
+    const completedEvents = events.map((event) => ({
+      ...event,
+      status: 'completed',
+    }));
+    expect(
+      buildCurrentWeekMedicineStreak(
+        '2026-07-20',
+        completedEvents,
+        new Date(2026, 6, 30, 20, 1),
+      ).find((day) => day.date === '2026-07-30')?.completed,
+    ).toBe(true);
+  });
   it('shows scheduled dates only and checks only fully completed days', () => {
     const streak = buildMedicineStreak(
       '2026-07-28',
@@ -37,7 +64,6 @@ describe('buildMedicineStreak', () => {
         { scheduledFor: localScheduledFor(30, 8), status: 'completed' },
         { scheduledFor: localScheduledFor(30, 20), status: 'scheduled' },
       ],
-      '2026-07-30',
     );
 
     expect(streak).toEqual([
@@ -68,19 +94,18 @@ describe('buildMedicineStreak', () => {
     expect(buildMedicineStreak('2026-07-28', 10, events)).toHaveLength(7);
   });
 
-  it('turns a scheduled course day into a streak after that day passes', () => {
+  it('keeps the date when a reminder was not completed, even after that day passes', () => {
     const streak = buildMedicineStreak(
       '2026-07-30',
       2,
       [{ scheduledFor: localScheduledFor(30, 8), status: 'scheduled' }],
-      '2026-07-31',
     );
 
-    expect(streak[0]?.completed).toBe(true);
+    expect(streak[0]?.completed).toBe(false);
   });
 
-  it('replaces today’s date with a streak after its scheduled time passes', () => {
-    const event = {
+  it('replaces the date with a streak only when its reminder is completed', () => {
+    const scheduledEvent = {
       scheduledFor: localScheduledFor(30, 8),
       status: 'scheduled',
     };
@@ -89,23 +114,21 @@ describe('buildMedicineStreak', () => {
       buildMedicineStreak(
         '2026-07-30',
         1,
-        [event],
-        new Date(2026, 6, 30, 7, 59),
+        [scheduledEvent],
       )[0]?.completed,
     ).toBe(false);
     expect(
       buildMedicineStreak(
         '2026-07-30',
         1,
-        [event],
-        new Date(2026, 6, 30, 8, 1),
+        [{ ...scheduledEvent, status: 'completed' }],
       )[0]?.completed,
     ).toBe(true);
   });
 
-  it('waits for every scheduled time on a course day before showing its streak', () => {
+  it('waits for every reminder on a course day to be completed', () => {
     const events = [
-      { scheduledFor: localScheduledFor(30, 8), status: 'scheduled' },
+      { scheduledFor: localScheduledFor(30, 8), status: 'completed' },
       { scheduledFor: localScheduledFor(30, 20), status: 'scheduled' },
     ];
 
@@ -114,15 +137,13 @@ describe('buildMedicineStreak', () => {
         '2026-07-30',
         1,
         events,
-        new Date(2026, 6, 30, 9),
       )[0]?.completed,
     ).toBe(false);
     expect(
       buildMedicineStreak(
         '2026-07-30',
         1,
-        events,
-        new Date(2026, 6, 30, 20, 1),
+        events.map((event) => ({ ...event, status: 'completed' })),
       )[0]?.completed,
     ).toBe(true);
   });
@@ -135,6 +156,8 @@ describe('mapDoseRows', () => {
         {
           completed: true,
           courseId: 'course-1',
+          description: 'Pain and fever relief',
+          durationDays: 7,
           eventId: 'event-1',
           hospitalName: 'Medico Hospital',
           imageUrl: 'https://db.test/dolo.jpg',
@@ -148,6 +171,8 @@ describe('mapDoseRows', () => {
       expect.objectContaining({
         completed: true,
         courseId: 'course-1',
+        description: 'Pain and fever relief',
+        durationDays: 7,
         id: 'event-1',
         imageUrl: 'https://db.test/dolo.jpg',
         slot: 'morning',

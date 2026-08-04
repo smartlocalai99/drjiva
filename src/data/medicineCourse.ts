@@ -17,7 +17,9 @@ export type MedicineStreakDay = {
 export type Medicine = {
   completed: boolean;
   courseId: string;
+  description: string;
   doctorName: string;
+  durationDays: number | null;
   hospitalName: string;
   id: string;
   imageUrl: string;
@@ -39,6 +41,8 @@ export type CourseStreakEvent = {
 export type DoseRow = {
   completed: boolean;
   courseId: string;
+  description?: string | null;
+  durationDays?: number | null;
   eventId: string;
   hospitalName: string;
   imageUrl: string;
@@ -60,7 +64,6 @@ export function buildMedicineStreak(
   startDate: string,
   durationDays: number,
   events: readonly CourseStreakEvent[],
-  asOf: Date | string = new Date(),
 ): MedicineStreakDay[] {
   const firstDate = parseDateOnly(startDate);
   if (!firstDate || !Number.isInteger(durationDays) || durationDays <= 0) {
@@ -68,14 +71,6 @@ export function buildMedicineStreak(
   }
 
   const courseEndDate = addCalendarDays(startDate, durationDays);
-  const asOfDate =
-    typeof asOf === 'string'
-      ? parseDateOnly(asOf) ?? new Date(asOf)
-      : new Date(asOf);
-  const asOfTime = asOfDate.getTime();
-  const asOfDateKey = Number.isNaN(asOfTime)
-    ? formatDateOnly(new Date())
-    : formatDateOnly(asOfDate);
   const eventsByDate = new Map<string, CourseStreakEvent[]>();
   for (const event of events) {
     const eventDate = new Date(event.scheduledFor);
@@ -96,18 +91,9 @@ export function buildMedicineStreak(
     .slice(0, 7)
     .map(([date, dateEvents]) => {
       const parsed = parseDateOnly(date)!;
-      const everyDoseTimePassed =
-        !Number.isNaN(asOfTime) &&
-        dateEvents.every((event) => {
-          const scheduledTime = new Date(event.scheduledFor).getTime();
-          return (
-            event.status === 'completed' ||
-            (!Number.isNaN(scheduledTime) && scheduledTime <= asOfTime)
-          );
-        });
 
       return {
-        completed: date < asOfDateKey || everyDoseTimePassed,
+        completed: dateEvents.every((event) => event.status === 'completed'),
         date,
         day: parsed.getDate(),
         scheduled: true,
@@ -143,7 +129,9 @@ export function buildCurrentWeekMedicineStreak(
     const dateEvents = eventsByDate.get(key) ?? [];
     const scheduled = key >= startDate && dateEvents.length > 0;
     return {
-      completed: scheduled && dateEvents.every((event) => event.status === 'completed'),
+      completed:
+        scheduled &&
+        dateEvents.every((event) => event.status === 'completed'),
       date: key,
       day: date.getDate(),
       scheduled,
@@ -162,7 +150,9 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
     .map((row) => ({
       completed: row.completed,
       courseId: row.courseId,
+      description: row.description?.trim() || 'Medicine reminder',
       doctorName: 'Care team',
+      durationDays: row.durationDays ?? null,
       hospitalName: row.hospitalName,
       id: row.eventId,
       imageUrl: row.imageUrl.trim(),
