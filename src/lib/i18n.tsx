@@ -123,6 +123,7 @@ const translations = {
     unableToScanDocument: 'Unable to scan document',
     checkCameraAndTryAgain: 'Check camera permission and try scanning again.',
     helpCenter: 'Help Center',
+    healthFeed: 'Health Feed',
     language: 'Language',
     logOut: 'Log out',
     logOutConfirm: 'Are you sure you want to log out?',
@@ -280,6 +281,7 @@ const translations = {
     checkCameraAndTryAgain:
       'కెమెరా అనుమతిని తనిఖీ చేసి మళ్లీ స్కాన్ చేయండి.',
     helpCenter: 'సహాయ కేంద్రం',
+    healthFeed: 'ఆరోగ్య ఫీడ్',
     language: 'భాష',
     logOut: 'లాగ్ అవుట్',
     logOutConfirm: 'మీరు లాగ్ అవుట్ కావాలనుకుంటున్నారా?',

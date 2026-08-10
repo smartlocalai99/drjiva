@@ -10,7 +10,7 @@ import {
 } from '../../dashboardTheme';
 import { useLanguage, type TranslationKey } from '../../lib/i18n';
 
-export type NavTabKey = 'today' | 'documents' | 'shop' | 'more';
+export type NavTabKey = 'today' | 'documents' | 'healthFeed' | 'shop';
 
 const TAB_DEFS: {
   activeIcon: keyof typeof Ionicons.glyphMap;
@@ -25,12 +25,17 @@ const TAB_DEFS: {
     key: 'documents',
     labelKey: 'documents',
   },
+  {
+    activeIcon: 'pulse',
+    icon: 'pulse-outline',
+    key: 'healthFeed',
+    labelKey: 'healthFeed',
+  },
   { activeIcon: 'cart', icon: 'cart-outline', key: 'shop', labelKey: 'shop' },
-  { activeIcon: 'menu', icon: 'menu-outline', key: 'more', labelKey: 'more' },
 ];
 
 type BottomNavProps = {
-  activeTab: NavTabKey;
+  activeTab: NavTabKey | null;
   bottomOffset: number;
   onSelectTab: (tab: NavTabKey) => void;
 };
@@ -83,7 +88,12 @@ function NavItem({ activeIcon, icon, isActive, label, onPress }: NavItemProps) {
         name={isActive ? activeIcon : icon}
         size={22}
       />
-      <Text style={[styles.label, isActive && styles.labelActive]}>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        numberOfLines={1}
+        style={[styles.label, isActive && styles.labelActive]}
+      >
         {label}
       </Text>
     </Pressable>

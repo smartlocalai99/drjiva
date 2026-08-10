@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -29,6 +30,13 @@ import {
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { clearDashboardPreload } from '../src/lib/dashboardPreload';
 import { useLanguage } from '../src/lib/i18n';
+import {
+  getAccountDeletionEmailUrl,
+  openLegalPage,
+  PRIVACY_POLICY_URL,
+  SUPPORT_URL,
+  TERMS_AND_CONDITIONS_URL,
+} from '../src/lib/legal-links';
 import { getAccountMenuItems } from '../src/lib/moreMenu';
 import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
@@ -57,7 +65,6 @@ export default function MoreScreen() {
   const phone = normalizeRoutePhone(params.phone);
 
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<NavTabKey>('more');
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -118,16 +125,11 @@ export default function MoreScreen() {
     navBottomOffset + dashboardLayout.bottomNavHeight + 24;
 
   const handleSelectTab = (tab: NavTabKey) => {
-    if (tab === activeTab) {
-      return;
-    }
-
     const route = getTabRoute(tab);
     if (!route) {
       return;
     }
 
-    setActiveTab(tab);
     router.replace({ params: { phone }, pathname: route });
   };
 
@@ -137,6 +139,37 @@ export default function MoreScreen() {
 
   const handleOpenSupport = () => {
     router.push({ params: { phone }, pathname: '/support' });
+  };
+
+  const handleOpenLegalPage = (url: string) => {
+    void openLegalPage(url).catch(() => {
+      Alert.alert(
+        'Unable to open link',
+        'Please check your internet connection and try again.',
+      );
+    });
+  };
+
+  const handleRequestAccountDeletion = () => {
+    Alert.alert(
+      'Request account deletion?',
+      'Your email app will open with a prepared request. Support will verify account ownership before permanently deleting your account and associated data.',
+      [
+        { style: 'cancel', text: t('cancel') },
+        {
+          onPress: () => {
+            void Linking.openURL(getAccountDeletionEmailUrl(phone)).catch(() => {
+              Alert.alert(
+                'Contact support',
+                'Email support@smartlocalai.in with the subject “Delete my Dr Jiva account”.',
+              );
+            });
+          },
+          style: 'destructive',
+          text: 'Continue',
+        },
+      ],
+    );
   };
 
   const comingSoon = (title: string) => Alert.alert(title, t('comingSoon'));
@@ -274,13 +307,43 @@ export default function MoreScreen() {
             />
           </Section>
 
-          <Section label={t('support')}>
+          <Section label="Legal & Support">
+            <Row
+              icon="document-text-outline"
+              isLink
+              label="Terms & Conditions"
+              onPress={() => handleOpenLegalPage(TERMS_AND_CONDITIONS_URL)}
+            />
+            <Divider />
+            <Row
+              icon="shield-checkmark-outline"
+              isLink
+              label="Privacy Policy"
+              onPress={() => handleOpenLegalPage(PRIVACY_POLICY_URL)}
+            />
+            <Divider />
             <Row
               icon="headset-outline"
-              label="Support"
+              label="Help & Support"
               onPress={handleOpenSupport}
             />
             <Divider />
+            <Row
+              icon="globe-outline"
+              isLink
+              label="Online Help Center"
+              onPress={() => handleOpenLegalPage(SUPPORT_URL)}
+            />
+            <Divider />
+            <Row
+              icon="trash-outline"
+              label="Request account deletion"
+              labelColor={dashboardColors.error}
+              onPress={handleRequestAccountDeletion}
+            />
+          </Section>
+
+          <Section label="Session">
             <Row
               icon="log-out-outline"
               iconColor={dashboardColors.error}
@@ -294,7 +357,7 @@ export default function MoreScreen() {
       )}
 
       <BottomNav
-        activeTab={activeTab}
+        activeTab={null}
         bottomOffset={navBottomOffset}
         onSelectTab={handleSelectTab}
       />
@@ -320,6 +383,7 @@ function Section({
 function Row({
   icon,
   iconColor,
+  isLink = false,
   label,
   labelColor,
   onPress,
@@ -328,6 +392,7 @@ function Row({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
+  isLink?: boolean;
   label: string;
   labelColor?: string;
   onPress: () => void;
@@ -335,7 +400,11 @@ function Row({
   value?: string;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.row}>
+    <Pressable
+      accessibilityRole={isLink ? 'link' : 'button'}
+      onPress={onPress}
+      style={styles.row}
+    >
       <Ionicons color={iconColor ?? dashboardColors.text} name={icon} size={20} />
       <Text style={[styles.rowLabel, labelColor ? { color: labelColor } : null]}>
         {label}

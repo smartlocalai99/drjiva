@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --ink: #173b38;
-  --ink-soft: #496a66;
-  --teal: #087f70;
-  --teal-dark: #056357;
-  --mint: #dff3ed;
-  --mist: #f3f9f7;
-  --line: #cfe3de;
+  --ink: #1b2d35;
+  --ink-soft: #667085;
+  --teal: #2e7ebc;
+  --teal-dark: #256596;
+  --mint: #eaf3f8;
+  --mist: #f6f9fc;
+  --line: #d7e3ec;
   --white: #ffffff;
   --warm: #fff9ee;
   --warm-line: #ecd9ad;
-  --shadow: 0 18px 50px rgba(18, 74, 67, 0.09);
+  --shadow: 0 18px 50px rgba(23, 43, 52, 0.09);
 }
 
 * {
@@ -24,7 +24,7 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 100% 0%, rgba(122, 201, 183, 0.2), transparent 28rem),
+    radial-gradient(circle at 100% 0%, rgba(46, 126, 188, 0.16), transparent 28rem),
     var(--mist);
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -47,7 +47,7 @@ a:hover {
 a:focus-visible,
 summary:focus-visible {
   border-radius: 0.3rem;
-  outline: 3px solid rgba(8, 127, 112, 0.3);
+  outline: 3px solid rgba(46, 126, 188, 0.3);
   outline-offset: 4px;
 }
 
@@ -96,6 +96,12 @@ summary:focus-visible {
   font-size: 0.9rem;
 }
 
+.top-links {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+}
+
 .hero {
   background: var(--white);
   border: 1px solid var(--line);
@@ -109,7 +115,7 @@ summary:focus-visible {
 }
 
 .hero::before {
-  background: linear-gradient(180deg, var(--teal), #7ac9b7);
+  background: linear-gradient(180deg, var(--teal), #8abbdc);
   content: "";
   inset: 0 auto 0 0;
   position: absolute;
@@ -162,7 +168,7 @@ h3 {
 .document-card {
   align-self: end;
   background: var(--mint);
-  border: 1px solid #b8ddd4;
+  border: 1px solid #c7dce9;
   border-radius: 1.2rem;
   display: grid;
   gap: 0.85rem;
@@ -171,7 +177,7 @@ h3 {
 
 .document-row {
   align-items: baseline;
-  border-bottom: 1px solid rgba(8, 127, 112, 0.18);
+  border-bottom: 1px solid rgba(46, 126, 188, 0.18);
   display: flex;
   gap: 1rem;
   justify-content: space-between;
@@ -253,7 +259,7 @@ h3 {
 }
 
 .contact-card .response-time {
-  color: #a9d9ce;
+  color: #b8d9ef;
   font-size: 0.94rem;
   font-weight: 750;
 }
@@ -323,7 +329,7 @@ li + li {
 
 .policy-nav a {
   background: var(--mint);
-  border: 1px solid #b8ddd4;
+  border: 1px solid #c7dce9;
   border-radius: 999px;
   font-size: 0.82rem;
   padding: 0.45rem 0.78rem;
@@ -337,7 +343,7 @@ li + li {
 }
 
 .data-item {
-  border-left: 0.25rem solid #7ac9b7;
+  border-left: 0.25rem solid #8abbdc;
   padding-left: 1rem;
 }
 

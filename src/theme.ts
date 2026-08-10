@@ -1,19 +1,19 @@
 import type { TextStyle } from 'react-native';
 
 export const colors = {
-  primary: '#2D83C5',
-  primaryDark: '#223A75',
+  primary: '#2E7EBC',
+  primaryDark: '#256596',
   onPrimary: '#FFFFFF',
   bg: '#FFFFFF',
   text: '#1B2D35',
   textMuted: '#667085',
   border: '#E2E8EC',
-  borderFocus: '#2D83C5',
-  tileTint: '#EEF7FC',
+  borderFocus: '#2E7EBC',
+  tileTint: '#EAF3F8',
   error: '#D92D20',
   success: '#12B76A',
   shadow: '#172B34',
-  focusShadow: 'rgba(45, 131, 197, 0.18)',
+  focusShadow: 'rgba(46, 126, 188, 0.18)',
   transparentWhite: 'rgba(255, 255, 255, 0)',
 } as const;
 

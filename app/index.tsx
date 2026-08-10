@@ -6,10 +6,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AuthScaffold } from '../src/components/AuthScaffold';
 import { BrandHeader } from '../src/components/BrandHeader';
+import { LoginLegalLinks } from '../src/components/login-legal-links';
 import {
   isValidIndianPhone,
   PhoneInput,
@@ -23,7 +24,7 @@ import {
   getSessionPhone,
   saveSessionPhone,
 } from '../src/lib/session';
-import { colors, spacing, typography } from '../src/theme';
+import { spacing } from '../src/theme';
 
 const SESSION_LOOKUP_TIMEOUT_MS = 1200;
 
@@ -162,7 +163,7 @@ export default function LoginScreen() {
         />
       </View>
 
-      <Text style={styles.legal}>{copy.legal}</Text>
+      <LoginLegalLinks />
     </AuthScaffold>
   );
 }
@@ -176,13 +177,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.xl,
     width: '100%',
-  },
-  legal: {
-    ...typography.helper,
-    color: colors.textMuted,
-    marginTop: spacing.md,
-    minHeight: 32,
-    paddingHorizontal: spacing.sm,
-    textAlign: 'center',
   },
 });

@@ -15,7 +15,8 @@ export const copy = {
   wrongCode: 'Incorrect code. Try again.',
   invalidPhone: 'Enter a valid 10-digit mobile number',
   sendCodeError: 'Unable to send the code. Please try again.',
-  legal: 'By continuing, you agree to our Terms & Privacy Policy.',
+  legal:
+    'By continuing, you agree to the Terms & Conditions and acknowledge the Privacy Policy.',
   onboardingHeadline: 'Smarter reminders for your daily medicines',
   onboardingSubtitle:
     'మీ హెల్త్ రికార్డ్స్, రిమైండర్లు, మందుల డెలివరీ — అన్నీ ఒకే చోట.',
