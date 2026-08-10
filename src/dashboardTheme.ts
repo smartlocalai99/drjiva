@@ -6,9 +6,9 @@ import type { TextStyle } from 'react-native';
 export const dashboardColors = {
   bg: '#F8F9FB',
   card: '#FFFFFF',
-  primary: '#2E7EBC',
-  primaryDark: '#256596',
-  primaryTint: '#EAF3F8',
+  primary: '#2A6BA5',
+  primaryDark: '#225684',
+  primaryTint: '#EAF2F8',
   success: '#22C55E',
   successTint: '#E9F9EF',
   warning: '#F59E0B',

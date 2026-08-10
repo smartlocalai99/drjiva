@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   addHospitalOption: {
     backgroundColor: dashboardColors.primaryTint,
-    borderColor: '#C7D7FE',
+    borderColor: '#C5D8E7',
   },
   addHospitalCopy: {
     flex: 1,

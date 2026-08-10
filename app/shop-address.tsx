@@ -301,8 +301,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   addressCardActive: {
-    backgroundColor: '#F6F9FF',
-    borderColor: '#BFD0FF',
+    backgroundColor: '#F4F8FB',
+    borderColor: '#BFD3E4',
   },
   addressMain: {
     alignItems: 'center',
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     alignItems: 'center',
-    borderColor: '#BFD0FF',
+    borderColor: '#BFD3E4',
     borderRadius: dashboardRadii.card,
     borderStyle: 'dashed',
     borderWidth: 1,

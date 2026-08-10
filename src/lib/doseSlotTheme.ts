@@ -19,8 +19,8 @@ export const DOSE_SLOT_THEME: Record<
     tint: '#FDEBEC',
   },
   night: {
-    accent: '#376ED0',
+    accent: '#2A6BA5',
     icon: 'moon-outline',
-    tint: '#E8F0FF',
+    tint: '#EAF2F8',
   },
 };

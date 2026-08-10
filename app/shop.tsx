@@ -113,8 +113,8 @@ const SECTION_TINTS = {
     color: '#0F8A94',
   },
   diabetes_care: {
-    backgroundColor: '#E8F3FB',
-    color: '#1E6FA8',
+    backgroundColor: dashboardColors.primaryTint,
+    color: dashboardColors.primary,
   },
   fever: {
     backgroundColor: dashboardColors.errorTint,
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   },
   heroRow: {
     alignItems: 'center',
-    backgroundColor: '#102A56',
+    backgroundColor: dashboardColors.primary,
     borderRadius: 22,
     flexDirection: 'row',
     gap: dashboardSpacing.sm,
@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   heroEyebrow: {
-    color: '#9DBCF7',
+    color: '#D9E8F3',
     fontFamily: 'Inter_700Bold',
     fontSize: 9,
     letterSpacing: 1.2,
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
   },
   checkoutBar: {
     alignItems: 'center',
-    backgroundColor: '#102A56',
+    backgroundColor: dashboardColors.primary,
     borderRadius: 22,
     flexDirection: 'row',
     gap: dashboardSpacing.sm,
@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
   },
   checkoutBag: {
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: dashboardColors.primary,
     borderRadius: 18,
     height: 38,
     justifyContent: 'center',
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   checkoutSubtitle: {
-    color: '#AFC6F4',
+    color: '#D9E8F3',
     fontFamily: 'Inter_500Medium',
     fontSize: 10,
     marginTop: 1,

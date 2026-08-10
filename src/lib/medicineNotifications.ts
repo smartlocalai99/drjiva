@@ -80,7 +80,7 @@ async function ensureMedicineReminderChannel(): Promise<void> {
     enableLights: true,
     enableVibrate: true,
     importance: Notifications.AndroidImportance.MAX,
-    lightColor: '#2563EB',
+    lightColor: '#2A6BA5',
     name: 'Medicine reminders',
     showBadge: true,
     sound,
