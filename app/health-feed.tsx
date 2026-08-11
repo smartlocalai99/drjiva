@@ -707,17 +707,22 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                 <View style={styles.commentInputShell}>
                   <TextInput
                     accessibilityLabel="Write a comment"
+                    cursorColor="#2E7EBC"
+                    keyboardAppearance="light"
                     maxLength={500}
                     multiline
                     onChangeText={setDraft}
                     onFocus={() => setKeyboardVisible(true)}
                     placeholder={`Comment as ${authorName}`}
                     placeholderTextColor="#87919D"
-                    style={styles.commentInput}
+                    selectionColor="#2E7EBC"
+                    style={[styles.commentInput, (draft.trim() || submitting) && styles.commentInputWithSend]}
+                    textAlignVertical="center"
+                    underlineColorAndroid="transparent"
                     value={draft}
                   />
                   {draft.trim() || submitting ? (
-                    <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(100)}>
+                    <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(100)} style={styles.commentSendSlot}>
                       <Pressable
                         accessibilityLabel="Post comment"
                         accessibilityRole="button"
@@ -904,9 +909,10 @@ const styles = StyleSheet.create({
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, height: 5, width: 40 },
   commentHeader: { alignItems: 'center', borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
-  commentInput: { color: '#18202A', flex: 1, fontFamily: dashboardFonts.medium, fontSize: 13, maxHeight: 92, minHeight: 34, paddingHorizontal: 0, paddingVertical: 7 },
+  commentInput: { backgroundColor: 'transparent', color: '#101828', fontFamily: dashboardFonts.medium, fontSize: 14, lineHeight: 19, maxHeight: 92, minHeight: 42, opacity: 1, paddingLeft: 14, paddingRight: 14, paddingVertical: 10, width: '100%' },
+  commentInputWithSend: { paddingRight: 48 },
   commentInputDock: { backgroundColor: '#FFFFFF', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, gap: 7, paddingTop: 4 },
-  commentInputShell: { alignItems: 'flex-end', backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 22, flex: 1, flexDirection: 'row', gap: 7, minHeight: 42, paddingBottom: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 4 },
+  commentInputShell: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 22, flex: 1, justifyContent: 'center', minHeight: 42, position: 'relative' },
   commentKeyboard: { backgroundColor: '#FFFFFF', flex: 1 },
   commentList: { flexGrow: 1, gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   commentListView: { flex: 1 },
@@ -918,6 +924,7 @@ const styles = StyleSheet.create({
   commentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
   commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   commentSendDisabled: { backgroundColor: '#AFBAC3' },
+  commentSendSlot: { bottom: 4, position: 'absolute', right: 4, zIndex: 2 },
   commentSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, gap: 12, overflow: 'hidden', paddingTop: 10 },
   commentState: { alignItems: 'center', flex: 1, gap: 9, justifyContent: 'center', minHeight: 220, paddingHorizontal: 32 },
   commentStateText: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
