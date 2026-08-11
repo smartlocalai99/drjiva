@@ -41,6 +41,43 @@ export function buildProfilePhotoPath(
   return `${safePatientId}/${timestamp}-${randomSuffix}.${extension}`;
 }
 
+export function getProfilePhotoStoragePath(
+  patientId: string,
+  publicUrl: string,
+): string | null {
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${PROFILE_PHOTO_BUCKET}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex < 0) {
+      return null;
+    }
+
+    const encodedPath = url.pathname.slice(markerIndex + marker.length);
+    const pathParts = encodedPath.split('/').map(decodeURIComponent);
+    const safePatientId = patientId.replaceAll('/', '-');
+    if (
+      pathParts.length < 2 ||
+      pathParts[0] !== safePatientId ||
+      pathParts.some(
+        (part) =>
+          !part ||
+          part === '.' ||
+          part === '..' ||
+          part.includes('/') ||
+          part.includes('\\'),
+      ) ||
+      !/\.(?:jpe?g|png)$/i.test(pathParts[pathParts.length - 1] ?? '')
+    ) {
+      return null;
+    }
+
+    return pathParts.join('/');
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadProfilePhoto(
   patientId: string,
   asset: ImagePicker.ImagePickerAsset,
@@ -73,4 +110,23 @@ export async function uploadProfilePhoto(
 
   return supabase.storage.from(PROFILE_PHOTO_BUCKET).getPublicUrl(path).data
     .publicUrl;
+}
+
+export async function deleteProfilePhoto(
+  patientId: string,
+  publicUrl: string,
+): Promise<void> {
+  const path = getProfilePhotoStoragePath(patientId, publicUrl);
+  if (!path) {
+    throw new Error('Unable to locate the stored profile photo.');
+  }
+
+  await ensureSecureReportSession();
+  const { error } = await supabase.storage
+    .from(PROFILE_PHOTO_BUCKET)
+    .remove([path]);
+
+  if (error) {
+    throw error;
+  }
 }

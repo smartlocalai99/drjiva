@@ -47,7 +47,11 @@ vi.mock('./reportAuth', () => ({
   ensureSecureReportSession: vi.fn(async () => 'anonymous-user'),
 }));
 
-import { getPatientByPhone, updatePatientProfile } from './patients';
+import {
+  clearPatientProfilePhoto,
+  getPatientByPhone,
+  updatePatientProfile,
+} from './patients';
 
 describe('patient profile photos', () => {
   beforeEach(() => {
@@ -99,5 +103,11 @@ describe('patient profile photos', () => {
       name: 'Asha Rao',
     });
     expect(updatePayload).not.toHaveProperty('address');
+  });
+
+  it('clears only the profile photo url', async () => {
+    await clearPatientProfilePhoto('9876543210');
+
+    expect(updatePayload).toEqual({ avatar_url: null });
   });
 });

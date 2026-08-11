@@ -19,6 +19,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
+import { ProfileAvatarFallback } from '../src/components/ProfileAvatarFallback';
 import { VerifiedBadge } from '../src/components/VerifiedBadge';
 import {
   dashboardColors,
@@ -47,16 +48,6 @@ import {
   saveCachedAvatarUrl,
   saveCachedPatientName,
 } from '../src/lib/session';
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) {
-    return '?';
-  }
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
-  return `${first}${last}`.toUpperCase();
-}
 
 export default function MoreScreen() {
   const router = useRouter();
@@ -223,9 +214,7 @@ export default function MoreScreen() {
                   style={styles.avatarImage}
                 />
               ) : (
-                <Text style={styles.avatarInitials}>
-                  {getInitials(name || '?')}
-                </Text>
+                <ProfileAvatarFallback size={68} />
               )}
             </View>
             <Text style={styles.avatarName}>{name || 'Your name'}</Text>
@@ -447,22 +436,20 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.primary,
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.primary,
     borderRadius: 40,
+    borderWidth: 2,
     height: 80,
     justifyContent: 'center',
     marginBottom: dashboardSpacing.sm,
-    overflow: 'hidden',
+    padding: 4,
     width: 80,
   },
   avatarImage: {
-    height: '100%',
-    width: '100%',
-  },
-  avatarInitials: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-    fontSize: 28,
+    borderRadius: 34,
+    height: 68,
+    width: 68,
   },
   avatarName: {
     ...dashboardTypography.title,

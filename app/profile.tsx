@@ -22,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MedicineToggle } from '../src/components/dashboard/MedicineToggle';
+import { ProfileAvatarFallback } from '../src/components/ProfileAvatarFallback';
 import { AgePicker } from '../src/components/profile/AgePicker';
 import { PressableScale } from '../src/components/PressableScale';
 import { VerifiedBadge } from '../src/components/VerifiedBadge';
@@ -31,13 +32,19 @@ import {
   dashboardSpacing,
   dashboardTypography,
 } from '../src/dashboardTheme';
-import { getPatientByPhone, updatePatientProfile } from '../src/lib/patients';
+import {
+  clearPatientProfilePhoto,
+  getPatientByPhone,
+  updatePatientProfile,
+} from '../src/lib/patients';
 import {
   getCachedPatientName,
+  saveCachedAvatarUrl,
   saveCachedPatientName,
 } from '../src/lib/session';
 import { isNativeModuleAvailable } from '../src/lib/nativeModuleAvailability';
 import {
+  deleteProfilePhoto,
   uploadProfilePhoto,
   validateProfilePhoto,
 } from '../src/lib/profilePhotos';
@@ -48,16 +55,6 @@ const GENDER_OPTIONS = [
   { label: 'Other', value: 'other' },
 ] as const;
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) {
-    return '?';
-  }
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
-  return `${first}${last}`.toUpperCase();
-}
-
 export default function ProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
@@ -66,6 +63,7 @@ export default function ProfileScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRemovingPhoto, setIsRemovingPhoto] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [savedAt, setSavedAt] = useState<number | undefined>();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -216,6 +214,54 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const removeStoredProfilePhoto = async () => {
+    if (!avatarUrl || !patientId || isRemovingPhoto || isSaving) {
+      return;
+    }
+
+    setIsRemovingPhoto(true);
+    setErrorMessage(undefined);
+    try {
+      await deleteProfilePhoto(patientId, avatarUrl);
+      await clearPatientProfilePhoto(phone);
+      await saveCachedAvatarUrl(phone, null).catch(() => undefined);
+      setAvatarUrl(null);
+      setPendingPhoto(null);
+      setSavedAt(undefined);
+    } catch (error) {
+      console.error('Unable to remove profile photo', error);
+      setErrorMessage(
+        'Unable to remove your profile photo. Please try again.',
+      );
+    } finally {
+      setIsRemovingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    if (pendingPhoto) {
+      setPendingPhoto(null);
+      setSavedAt(undefined);
+      return;
+    }
+    if (!avatarUrl) {
+      return;
+    }
+
+    Alert.alert(
+      'Remove profile photo?',
+      'This permanently deletes the photo from your profile and cloud storage.',
+      [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          onPress: () => void removeStoredProfilePhoto(),
+          style: 'destructive',
+          text: 'Remove photo',
+        },
+      ],
+    );
+  };
+
   const handleSave = async () => {
     if (!isNameValid || !isAgeValid || isSaving) {
       return;
@@ -240,7 +286,9 @@ export default function ProfileScreen() {
         name: trimmedName,
       });
       await saveCachedPatientName(phone, patient.name).catch(() => undefined);
-      setAvatarUrl(patient.avatarUrl ?? nextAvatarUrl);
+      const savedAvatarUrl = patient.avatarUrl ?? nextAvatarUrl;
+      await saveCachedAvatarUrl(phone, savedAvatarUrl).catch(() => undefined);
+      setAvatarUrl(savedAvatarUrl);
       setPendingPhoto(null);
       setSavedAt(Date.now());
     } catch (error) {
@@ -286,6 +334,7 @@ export default function ProfileScreen() {
                 accessibilityHint="Opens camera and gallery options"
                 accessibilityLabel="Change profile photo"
                 accessibilityRole="button"
+                disabled={isRemovingPhoto || isSaving}
                 onPress={showPhotoOptions}
                 style={styles.avatarButton}
               >
@@ -297,9 +346,7 @@ export default function ProfileScreen() {
                       style={styles.avatarImage}
                     />
                   ) : (
-                    <Text style={styles.avatarInitials}>
-                      {getInitials(name || '?')}
-                    </Text>
+                    <ProfileAvatarFallback size={68} />
                   )}
                 </View>
                 <View style={styles.cameraBadge}>
@@ -311,6 +358,45 @@ export default function ProfileScreen() {
                 <Text style={styles.phoneText}>+91 {phone}</Text>
                 <VerifiedBadge />
               </View>
+              {pendingPhoto || avatarUrl ? (
+                <Pressable
+                  accessibilityLabel={
+                    pendingPhoto
+                      ? 'Discard selected profile photo'
+                      : 'Remove profile photo'
+                  }
+                  accessibilityRole="button"
+                  disabled={isRemovingPhoto || isSaving}
+                  onPress={handleRemovePhoto}
+                  style={({ pressed }) => [
+                    styles.removePhotoButton,
+                    pressed &&
+                      !isRemovingPhoto &&
+                      !isSaving &&
+                      styles.removePhotoButtonPressed,
+                  ]}
+                >
+                  {isRemovingPhoto ? (
+                    <ActivityIndicator
+                      color={dashboardColors.error}
+                      size="small"
+                    />
+                  ) : (
+                    <Ionicons
+                      color={dashboardColors.error}
+                      name={
+                        pendingPhoto
+                          ? 'close-circle-outline'
+                          : 'trash-outline'
+                      }
+                      size={16}
+                    />
+                  )}
+                  <Text style={styles.removePhotoText}>
+                    {pendingPhoto ? 'Discard selected photo' : 'Remove photo'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
 
             <Text style={styles.sectionLabel}>Personal Details</Text>
@@ -549,11 +635,13 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.primary,
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.primary,
     borderRadius: 40,
+    borderWidth: 2,
     height: 80,
     justifyContent: 'center',
-    overflow: 'hidden',
+    padding: 4,
     width: 80,
   },
   avatarButton: {
@@ -561,13 +649,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarImage: {
-    height: '100%',
-    width: '100%',
-  },
-  avatarInitials: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-    fontSize: 28,
+    borderRadius: 34,
+    height: 68,
+    width: 68,
   },
   cameraBadge: {
     alignItems: 'center',
@@ -595,6 +679,22 @@ const styles = StyleSheet.create({
   phoneText: {
     ...dashboardTypography.body,
     color: dashboardColors.textMuted,
+  },
+  removePhotoButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 36,
+    marginTop: dashboardSpacing.sm,
+    paddingHorizontal: dashboardSpacing.sm,
+  },
+  removePhotoButtonPressed: {
+    opacity: 0.65,
+  },
+  removePhotoText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.error,
+    fontFamily: 'Inter_600SemiBold',
   },
   sectionLabel: {
     ...dashboardTypography.caption,

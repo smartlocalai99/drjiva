@@ -55,7 +55,9 @@ import { useLanguage } from '../src/lib/i18n';
 import { formatDateOnly } from '../src/lib/medicineCalendar';
 import { getPatientByPhone } from '../src/lib/patients';
 import {
+  getCachedAvatarUrl,
   getCachedPatientName,
+  saveCachedAvatarUrl,
   saveCachedPatientName,
 } from '../src/lib/session';
 
@@ -95,6 +97,7 @@ export default function HomeScreen() {
   const [patientName, setPatientName] = useState<string | undefined>(
     initialSnapshot?.patientName,
   );
+  const [patientAvatarUrl, setPatientAvatarUrl] = useState<string | null>(null);
   const [patientNamePhone, setPatientNamePhone] = useState(phone);
   const [patientContext, setPatientContext] = useState<{
     patientId: string;
@@ -171,6 +174,7 @@ export default function HomeScreen() {
     );
     setPatientName(currentSnapshot?.patientName || undefined);
     setPatientNamePhone(phone);
+    setPatientAvatarUrl(null);
 
     if (!phone) {
       setMedicineLoadState('ready');
@@ -180,10 +184,16 @@ export default function HomeScreen() {
     let cancelled = false;
 
     const loadPatientName = async () => {
-      const cachedName = await getCachedPatientName(phone).catch(() => null);
+      const [cachedName, cachedAvatarUrl] = await Promise.all([
+        getCachedPatientName(phone).catch(() => null),
+        getCachedAvatarUrl(phone).catch(() => null),
+      ]);
       if (!cancelled && cachedName) {
         setPatientName(cachedName);
         setPatientNamePhone(phone);
+      }
+      if (!cancelled && cachedAvatarUrl) {
+        setPatientAvatarUrl(cachedAvatarUrl);
       }
 
       try {
@@ -205,7 +215,11 @@ export default function HomeScreen() {
             setPatientContext({ patientId: patient.patientId, phone });
             setPatientName(patient.name);
             setPatientNamePhone(phone);
+            setPatientAvatarUrl(patient.avatarUrl);
             void saveCachedPatientName(phone, patient.name).catch(
+              () => undefined,
+            );
+            void saveCachedAvatarUrl(phone, patient.avatarUrl).catch(
               () => undefined,
             );
           } else {
@@ -310,6 +324,12 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (phone) {
+        void getCachedAvatarUrl(phone)
+          .then((cachedAvatarUrl) => setPatientAvatarUrl(cachedAvatarUrl))
+          .catch(() => undefined);
+      }
+
       const focusDate = new Date();
       setDashboardDate(focusDate);
       let observedDateKey = formatDateOnly(focusDate);
@@ -331,7 +351,7 @@ export default function HomeScreen() {
         clearInterval(clock);
         medicineRequestIdRef.current += 1;
       };
-    }, [loadMedicines, patientId]),
+    }, [loadMedicines, patientId, phone]),
   );
 
   useEffect(() => {
@@ -348,6 +368,31 @@ export default function HomeScreen() {
     () => selectNearestSession(visibleMedicines, dashboardDate),
     [dashboardDate, visibleMedicines],
   );
+  const nextDashboardTransitionTime = useMemo(() => {
+    const nowTime = dashboardDate.getTime();
+    return visibleMedicines.reduce<number | null>((next, medicine) => {
+      if (medicine.completed) return next;
+      const scheduledTime = new Date(medicine.scheduledFor).getTime();
+      if (Number.isNaN(scheduledTime) || scheduledTime <= nowTime) {
+        return next;
+      }
+      return next === null || scheduledTime < next ? scheduledTime : next;
+    }, null);
+  }, [dashboardDate, visibleMedicines]);
+
+  useEffect(() => {
+    if (nextDashboardTransitionTime === null) return;
+    const remaining = Math.max(
+      0,
+      nextDashboardTransitionTime - Date.now(),
+    );
+    const timeout = setTimeout(
+      () => setDashboardDate(new Date()),
+      Math.min(remaining + 50, 2_147_483_647),
+    );
+    return () => clearTimeout(timeout);
+  }, [nextDashboardTransitionTime]);
+
   const medicineContent = getDashboardMedicineContent(
     visibleMedicineLoadState,
     nearestSession.length,
@@ -425,8 +470,13 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DashboardHeader
+          avatarUrl={patientAvatarUrl}
           greeting={getGreeting(dashboardDate)}
           name={visiblePatientName}
+          onPressProfile={() =>
+            router.push({ params: { phone }, pathname: '/more' })
+          }
+          profileAccessibilityLabel={t('manageProfile')}
         />
 
         {medicineContent === 'loading' ? (

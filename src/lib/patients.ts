@@ -206,6 +206,18 @@ export async function updatePatientProfile(
   return mapPatientRow(data);
 }
 
+export async function clearPatientProfilePhoto(phone: string): Promise<void> {
+  await ensureSecureReportSession();
+  const { error } = await supabase
+    .from('patients')
+    .update({ avatar_url: null })
+    .eq('mobile', toIndianE164(phone));
+
+  if (error && !isMissingColumnError(error)) {
+    throw error;
+  }
+}
+
 export async function updatePatientAddress(
   phone: string,
   address: string | null,
