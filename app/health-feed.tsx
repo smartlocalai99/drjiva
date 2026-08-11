@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -31,6 +32,7 @@ import Animated, {
   FadeOut,
   interpolate,
   LinearTransition,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -509,6 +511,8 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const commentScrollOffsetRef = useRef(0);
+  const sheetTranslateY = useSharedValue(0);
   const previewHeight = keyboardVisible
     ? Math.min(250, Math.max(205, height * 0.27))
     : Math.min(380, Math.max(240, height * 0.39));
@@ -523,6 +527,8 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
   useEffect(() => {
     if (!post) {
+      commentScrollOffsetRef.current = 0;
+      sheetTranslateY.value = 0;
       setComments([]);
       setDraft('');
       setDeletingIds(new Set());
@@ -545,7 +551,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [post]);
+  }, [post, sheetTranslateY]);
 
   useEffect(() => {
     if (!post) return undefined;
@@ -559,10 +565,44 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     };
   }, [post]);
 
-  const closeComments = () => {
+  const closeComments = useCallback(() => {
     Keyboard.dismiss();
     onClose();
-  };
+  }, [onClose]);
+
+  const sheetDragStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslateY.value }],
+  }));
+  const sheetDragResponder = useMemo(() => {
+    const isDownwardSheetDrag = (dx: number, dy: number) => (
+      commentScrollOffsetRef.current <= 0 && dy > 6 && Math.abs(dy) > Math.abs(dx) * 1.2
+    );
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
+      onMoveShouldSetPanResponderCapture: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
+      onPanResponderGrant: () => {
+        Keyboard.dismiss();
+        cancelAnimation(sheetTranslateY);
+      },
+      onPanResponderMove: (_, gesture) => {
+        sheetTranslateY.value = Math.max(0, gesture.dy);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const shouldDismiss = gesture.dy > Math.min(120, height * 0.16) || gesture.vy > 0.85;
+        if (shouldDismiss) {
+          sheetTranslateY.value = withTiming(height, { duration: 190 }, (finished) => {
+            if (finished) runOnJS(closeComments)();
+          });
+          return;
+        }
+        sheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 260 });
+      },
+      onPanResponderTerminate: () => {
+        sheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 260 });
+      },
+      onPanResponderTerminationRequest: () => false,
+    });
+  }, [closeComments, height, sheetTranslateY]);
 
   const appendEmoji = (emoji: typeof COMMENT_EMOJIS[number]) => {
     setDraft((current) => {
@@ -642,16 +682,20 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
               </View>
             </Animated.View>
           ) : null}
-          <View style={styles.commentSheet}>
-            <View style={styles.commentHandle} />
-            <View style={styles.commentHeader}>
-              <View>
-                <Text style={styles.commentHeading}>Comments</Text>
-                <Text numberOfLines={1} style={styles.commentPostTitle}>{post?.title}</Text>
+          <Animated.View {...sheetDragResponder.panHandlers} style={[styles.commentSheet, sheetDragStyle]}>
+            <View
+              accessibilityLabel="Comments sheet. Swipe down to close."
+              accessible
+              onAccessibilityEscape={closeComments}
+              style={styles.commentDragArea}
+            >
+              <View style={styles.commentHandle} />
+              <View style={styles.commentHeader}>
+                <View>
+                  <Text style={styles.commentHeading}>Comments</Text>
+                  <Text numberOfLines={1} style={styles.commentPostTitle}>{post?.title}</Text>
+                </View>
               </View>
-              <Pressable accessibilityLabel="Close comments" hitSlop={10} onPress={closeComments} style={styles.commentClose}>
-                <Ionicons color="#18202A" name="close" size={22} />
-              </Pressable>
             </View>
 
             {loading ? (
@@ -662,6 +706,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                 data={comments}
                 keyboardShouldPersistTaps="handled"
                 keyExtractor={(item) => item.id}
+                onScroll={(event) => { commentScrollOffsetRef.current = event.nativeEvent.contentOffset.y; }}
                 renderItem={({ item }) => (
                   <CommentRow
                     avatarUrl={item.is_owner ? authorAvatarUrl : null}
@@ -670,6 +715,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                     onDelete={item.is_owner ? () => confirmCommentDeletion(item) : undefined}
                   />
                 )}
+                scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 style={styles.commentListView}
               />
@@ -738,7 +784,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                 </View>
               </View>
             </View>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -897,17 +943,17 @@ const styles = StyleSheet.create({
   commentAuthorInitial: { color: '#2E7EBC', fontFamily: dashboardFonts.bold, fontSize: 13 },
   commentBody: { color: '#36424E', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
   commentBubble: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, flex: 1, gap: 5, paddingHorizontal: 12, paddingVertical: 10 },
-  commentClose: { alignItems: 'center', backgroundColor: '#F0F3F5', borderCurve: 'continuous', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   commentComposer: { alignItems: 'flex-end', flexDirection: 'row', flexShrink: 0, gap: 9, paddingHorizontal: 16 },
   commentDelete: { alignItems: 'center', height: 24, justifyContent: 'center', marginLeft: 'auto', width: 24 },
   commentEmoji: { fontSize: 25, lineHeight: 32 },
   commentEmojiBar: { flexGrow: 0, flexShrink: 0 },
   commentEmojiButton: { alignItems: 'center', height: 42, justifyContent: 'center', width: 44 },
   commentEmojiContent: { alignItems: 'center', flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 8 },
+  commentDragArea: { flexShrink: 0, gap: 12 },
   commentEmptyIcon: { alignItems: 'center', backgroundColor: '#E7F2FA', borderCurve: 'continuous', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   commentError: { backgroundColor: '#FFF0F2', color: '#B4233A', fontFamily: dashboardFonts.semiBold, fontSize: 11, lineHeight: 16, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 9 },
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, flexShrink: 0, height: 5, width: 40 },
-  commentHeader: { alignItems: 'center', borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', flexShrink: 0, justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 18 },
+  commentHeader: { borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0, paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
   commentInput: { backgroundColor: 'transparent', color: '#101828', fontFamily: dashboardFonts.medium, fontSize: 14, lineHeight: 19, maxHeight: 92, minHeight: 42, opacity: 1, paddingLeft: 14, paddingRight: 14, paddingVertical: 10, width: '100%' },
   commentInputWithSend: { paddingRight: 48 },
