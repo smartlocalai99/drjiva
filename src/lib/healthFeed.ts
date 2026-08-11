@@ -36,7 +36,12 @@ export type HealthFeedComment = {
   body: string;
   created_at: string;
   id: string;
+  is_owner: boolean;
   post_id: string;
+};
+
+type HealthFeedCommentRow = Omit<HealthFeedComment, 'is_owner'> & {
+  owner_user_id: string;
 };
 
 export type HealthFeedViewerState = {
@@ -191,15 +196,18 @@ export async function recordHealthPostView(postId: string): Promise<HealthFeedCo
 }
 
 export async function fetchHealthPostComments(postId: string): Promise<HealthFeedComment[]> {
-  await ensureSecureReportSession();
+  const ownerUserId = await ensureSecureReportSession();
   const { data, error } = await supabase
     .from('health_post_comments')
-    .select('id,post_id,author_name,body,created_at')
+    .select('id,post_id,owner_user_id,author_name,body,created_at')
     .eq('post_id', postId)
     .order('created_at', { ascending: true })
     .limit(100);
   if (error) throw new Error('Unable to load comments. Please try again.');
-  return (data || []) as HealthFeedComment[];
+  return ((data || []) as HealthFeedCommentRow[]).map(({ owner_user_id, ...comment }) => ({
+    ...comment,
+    is_owner: owner_user_id === ownerUserId,
+  }));
 }
 
 export async function createHealthPostComment(
@@ -220,12 +228,32 @@ export async function createHealthPostComment(
       owner_user_id: ownerUserId,
       post_id: postId,
     })
-    .select('id,post_id,author_name,body,created_at')
+    .select('id,post_id,owner_user_id,author_name,body,created_at')
     .single();
   if (error) throw new Error('Unable to post your comment. Please try again.');
 
   const result = await readPostCount(postId, 'comments_count');
-  return { comment: data as HealthFeedComment, count: result.count };
+  const { owner_user_id: _ownerUserId, ...comment } = data as HealthFeedCommentRow;
+  return { comment: { ...comment, is_owner: true }, count: result.count };
+}
+
+export async function deleteHealthPostComment(
+  postId: string,
+  commentId: string,
+): Promise<HealthFeedCountResult> {
+  const ownerUserId = await ensureSecureReportSession();
+  const { data, error } = await supabase
+    .from('health_post_comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('post_id', postId)
+    .eq('owner_user_id', ownerUserId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw new Error('Unable to delete your comment. Please try again.');
+  if (!data) throw new Error('This comment is no longer available or does not belong to you.');
+  return readPostCount(postId, 'comments_count');
 }
 
 async function readPostCount(

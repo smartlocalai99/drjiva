@@ -19,6 +19,8 @@ vi.mock('./supabase', () => ({
 
 import {
   createHealthPostComment,
+  deleteHealthPostComment,
+  fetchHealthPostComments,
   fetchHealthFeedViewerState,
   setHealthPostLike,
 } from './healthFeed';
@@ -79,6 +81,7 @@ describe('Health Feed interactions', () => {
       body: 'Very helpful.',
       created_at: '2026-08-11T12:00:00.000Z',
       id: 'comment-1',
+      owner_user_id: 'patient-user-id',
       post_id: 'post-1',
     };
     const commentSingle = vi.fn(async () => ({ data: comment, error: null }));
@@ -101,12 +104,85 @@ describe('Health Feed interactions', () => {
 
     await expect(
       createHealthPostComment('post-1', '  Anita  ', '  Very helpful.  '),
-    ).resolves.toEqual({ comment, count: 3 });
+    ).resolves.toEqual({
+      comment: {
+        author_name: 'Anita',
+        body: 'Very helpful.',
+        created_at: '2026-08-11T12:00:00.000Z',
+        id: 'comment-1',
+        is_owner: true,
+        post_id: 'post-1',
+      },
+      count: 3,
+    });
     expect(commentInsertMock).toHaveBeenCalledWith({
       author_name: 'Anita',
       body: 'Very helpful.',
       owner_user_id: 'patient-user-id',
       post_id: 'post-1',
     });
+  });
+
+  it('marks only the signed-in patient’s comments as owned', async () => {
+    const limitMock = vi.fn(async () => ({
+      data: [
+        {
+          author_name: 'Anita',
+          body: 'My comment',
+          created_at: '2026-08-11T12:00:00.000Z',
+          id: 'comment-owned',
+          owner_user_id: 'patient-user-id',
+          post_id: 'post-1',
+        },
+        {
+          author_name: 'Rahul',
+          body: 'Another comment',
+          created_at: '2026-08-11T12:01:00.000Z',
+          id: 'comment-other',
+          owner_user_id: 'another-user-id',
+          post_id: 'post-1',
+        },
+      ],
+      error: null,
+    }));
+    fromMock.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          order: () => ({ limit: limitMock }),
+        }),
+      }),
+    });
+
+    await expect(fetchHealthPostComments('post-1')).resolves.toMatchObject([
+      { id: 'comment-owned', is_owner: true },
+      { id: 'comment-other', is_owner: false },
+    ]);
+  });
+
+  it('deletes only the authenticated patient’s comment and returns the new count', async () => {
+    const maybeSingleMock = vi.fn(async () => ({ data: { id: 'comment-1' }, error: null }));
+    const ownerEqMock = vi.fn(() => ({ select: () => ({ maybeSingle: maybeSingleMock }) }));
+    const postEqMock = vi.fn(() => ({ eq: ownerEqMock }));
+    const idEqMock = vi.fn(() => ({ eq: postEqMock }));
+    const deleteMock = vi.fn(() => ({ eq: idEqMock }));
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'health_post_comments') return { delete: deleteMock };
+      if (table === 'health_posts') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: { comments_count: 1 }, error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(deleteHealthPostComment('post-1', 'comment-1')).resolves.toEqual({ count: 1 });
+    expect(idEqMock).toHaveBeenCalledWith('id', 'comment-1');
+    expect(postEqMock).toHaveBeenCalledWith('post_id', 'post-1');
+    expect(ownerEqMock).toHaveBeenCalledWith('owner_user_id', 'patient-user-id');
   });
 });

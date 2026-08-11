@@ -7,6 +7,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -22,11 +23,13 @@ import {
 } from 'react-native';
 import Animated, {
   cancelAnimation,
+  Easing,
+  Extrapolation,
   FadeIn,
   FadeOut,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSequence,
   withSpring,
   withTiming,
@@ -38,6 +41,7 @@ import { dashboardFonts, dashboardLayout } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import {
   createHealthPostComment,
+  deleteHealthPostComment,
   fetchHealthFeed,
   fetchHealthFeedViewerState,
   fetchHealthPostComments,
@@ -49,12 +53,19 @@ import {
   type HealthFeedComment,
   type HealthFeedPost,
 } from '../src/lib/healthFeed';
+import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
-import { getCachedPatientName } from '../src/lib/session';
+import {
+  getCachedAvatarUrl,
+  getCachedPatientName,
+  saveCachedAvatarUrl,
+  saveCachedPatientName,
+  subscribeCachedAvatarUrl,
+} from '../src/lib/session';
 
 type FeedTab = 'forYou' | 'following' | 'saved';
 
-const DOUBLE_TAP_HEART_SIZE = 130;
+const DOUBLE_TAP_HEART_SIZE = 96;
 
 export default function HealthFeedScreen() {
   const router = useRouter();
@@ -70,6 +81,7 @@ export default function HealthFeedScreen() {
   const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
   const [commentPost, setCommentPost] = useState<HealthFeedPost | null>(null);
   const [patientName, setPatientName] = useState('Patient');
+  const [patientAvatarUrl, setPatientAvatarUrl] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -104,9 +116,39 @@ export default function HealthFeedScreen() {
   useFocusEffect(useCallback(() => { void loadPosts(); }, [loadPosts]));
   useEffect(() => subscribeToPublishedHealthPosts(() => { void loadPosts(false, true); }), [loadPosts]);
   useEffect(() => {
-    void getCachedPatientName(phone)
-      .then((name) => setPatientName(name?.trim() || 'Patient'))
-      .catch(() => setPatientName('Patient'));
+    let cancelled = false;
+    const unsubscribeAvatar = subscribeCachedAvatarUrl(phone, (avatarUrl) => {
+      if (!cancelled) setPatientAvatarUrl(avatarUrl);
+    });
+
+    const loadPatient = async () => {
+      const [cachedName, cachedAvatarUrl] = await Promise.all([
+        getCachedPatientName(phone).catch(() => null),
+        getCachedAvatarUrl(phone).catch(() => null),
+      ]);
+      if (!cancelled) {
+        setPatientName(cachedName?.trim() || 'Patient');
+        setPatientAvatarUrl(cachedAvatarUrl);
+      }
+
+      try {
+        const patient = await getPatientByPhone(phone);
+        if (!cancelled && patient) {
+          setPatientName(patient.name.trim() || 'Patient');
+          setPatientAvatarUrl(patient.avatarUrl);
+          void saveCachedPatientName(phone, patient.name).catch(() => undefined);
+          void saveCachedAvatarUrl(phone, patient.avatarUrl).catch(() => undefined);
+        }
+      } catch {
+        // Keep the cached profile details if the background refresh is unavailable.
+      }
+    };
+
+    void loadPatient();
+    return () => {
+      cancelled = true;
+      unsubscribeAvatar();
+    };
   }, [phone]);
 
   useEffect(() => {
@@ -233,9 +275,10 @@ export default function HealthFeedScreen() {
       ) : <EmptyFeed tab={activeTab} />}
       {actionError ? <ActionToast message={actionError} /> : null}
       <CommentSheet
+        authorAvatarUrl={patientAvatarUrl}
         authorName={patientName}
         onClose={() => setCommentPost(null)}
-        onCommentAdded={(postId, count) => updatePostCount(setPosts, postId, 'comments_count', count)}
+        onCommentCountChanged={(postId, count) => updatePostCount(setPosts, postId, 'comments_count', count)}
         post={commentPost}
       />
       <BottomNav activeTab="healthFeed" bottomOffset={insets.bottom + dashboardLayout.navBottomGap} onSelectTab={handleSelectTab} />
@@ -278,24 +321,55 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   saved: boolean;
 }) {
   const { width } = useWindowDimensions();
-  const heartOpacity = useSharedValue(0);
-  const heartScale = useSharedValue(0.45);
-  const heartX = useSharedValue(0);
-  const heartY = useSharedValue(0);
-  const heartDriftX = useSharedValue(0);
-  const heartRise = useSharedValue(0);
+  const heartProgress = useSharedValue(0);
+  const heartStartX = useSharedValue(0);
+  const heartStartY = useSharedValue(0);
+  const heartArcHeight = useSharedValue(54);
   const heartRotation = useSharedValue(0);
   const actionHeartScale = useSharedValue(1);
   const lastTapRef = useRef(0);
-  const heartStyle = useAnimatedStyle(() => ({
-    opacity: heartOpacity.value,
-    transform: [
-      { translateX: heartX.value + heartDriftX.value },
-      { translateY: heartY.value + heartRise.value },
-      { rotate: `${heartRotation.value}deg` },
-      { scale: heartScale.value },
-    ],
-  }));
+  const likeArrivalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartStyle = useAnimatedStyle(() => {
+    const progress = heartProgress.value;
+    const travelProgress = interpolate(
+      progress,
+      [0, 0.22, 1],
+      [0, 0, 1],
+      Extrapolation.CLAMP,
+    );
+    const targetX = width - 40 - DOUBLE_TAP_HEART_SIZE / 2;
+    const targetY = Math.max(72, height - 292) - DOUBLE_TAP_HEART_SIZE / 2;
+    const arcY = Math.sin(Math.PI * travelProgress) * heartArcHeight.value;
+
+    return {
+      opacity: interpolate(
+        progress,
+        [0, 0.04, 0.86, 1],
+        [0, 1, 1, 0],
+        Extrapolation.CLAMP,
+      ),
+      transform: [
+        {
+          translateX: heartStartX.value
+            + (targetX - heartStartX.value) * travelProgress,
+        },
+        {
+          translateY: heartStartY.value
+            + (targetY - heartStartY.value) * travelProgress
+            - arcY,
+        },
+        { rotate: `${heartRotation.value * (1 - travelProgress)}deg` },
+        {
+          scale: interpolate(
+            progress,
+            [0, 0.1, 0.22, 0.78, 1],
+            [0.32, 1.24, 1, 0.55, 0.28],
+            Extrapolation.CLAMP,
+          ),
+        },
+      ],
+    };
+  });
   const actionHeartStyle = useAnimatedStyle(() => ({
     transform: [{ scale: actionHeartScale.value }],
   }));
@@ -308,6 +382,10 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
     );
   }, [actionHeartScale, liked]);
 
+  useEffect(() => () => {
+    if (likeArrivalTimerRef.current) clearTimeout(likeArrivalTimerRef.current);
+  }, []);
+
   const handleMediaTap = (event: GestureResponderEvent) => {
     const now = Date.now();
     if (now - lastTapRef.current > 300) {
@@ -316,36 +394,45 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
     }
 
     lastTapRef.current = 0;
-    const { locationX, locationY } = event.nativeEvent;
-    const driftDirection = locationX <= width / 2 ? 1 : -1;
+    const webTapEvent = event.nativeEvent as typeof event.nativeEvent & {
+      offsetX?: number;
+      offsetY?: number;
+    };
+    const locationX = process.env.EXPO_OS === 'web' && typeof webTapEvent.offsetX === 'number'
+      ? webTapEvent.offsetX
+      : event.nativeEvent.locationX;
+    const locationY = process.env.EXPO_OS === 'web' && typeof webTapEvent.offsetY === 'number'
+      ? webTapEvent.offsetY
+      : event.nativeEvent.locationY;
+    const likeCenterX = width - 40;
+    const likeCenterY = Math.max(72, height - 292);
+    const horizontalDistance = Math.abs(likeCenterX - locationX);
+    const verticalDistance = Math.abs(likeCenterY - locationY);
 
-    cancelAnimation(heartOpacity);
-    cancelAnimation(heartScale);
-    cancelAnimation(heartDriftX);
-    cancelAnimation(heartRise);
-    cancelAnimation(heartRotation);
+    cancelAnimation(heartProgress);
+    heartStartX.value = locationX - DOUBLE_TAP_HEART_SIZE / 2;
+    heartStartY.value = locationY - DOUBLE_TAP_HEART_SIZE / 2;
+    heartArcHeight.value = Math.min(
+      108,
+      Math.max(48, (horizontalDistance + verticalDistance) * 0.16),
+    );
+    heartRotation.value = locationX <= width / 2 ? -9 : 9;
+    heartProgress.value = 0;
+    heartProgress.value = withSequence(
+      withTiming(0.22, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 420, easing: Easing.inOut(Easing.cubic) }),
+    );
 
-    heartX.value = locationX - DOUBLE_TAP_HEART_SIZE / 2;
-    heartY.value = locationY - DOUBLE_TAP_HEART_SIZE / 2;
-    heartDriftX.value = 0;
-    heartRise.value = 0;
-    heartRotation.value = driftDirection * -7;
-    heartOpacity.value = 0;
-    heartScale.value = 0.45;
-    heartOpacity.value = withSequence(
-      withTiming(1, { duration: 70 }),
-      withDelay(360, withTiming(0, { duration: 190 })),
-    );
-    heartScale.value = withSequence(
-      withSpring(1.18, { damping: 8, stiffness: 230 }),
-      withTiming(1, { duration: 90 }),
-      withDelay(260, withTiming(0.72, { duration: 190 })),
-    );
-    heartDriftX.value = withDelay(90, withTiming(driftDirection * 18, { duration: 520 }));
-    heartRise.value = withDelay(70, withTiming(-58, { duration: 540 }));
-    heartRotation.value = withTiming(driftDirection * 5, { duration: 520 });
+    if (likeArrivalTimerRef.current) clearTimeout(likeArrivalTimerRef.current);
+    likeArrivalTimerRef.current = setTimeout(() => {
+      actionHeartScale.value = withSequence(
+        withSpring(1.34, { damping: 8, stiffness: 280 }),
+        withSpring(1, { damping: 12, stiffness: 250 }),
+      );
+      onDoubleLike();
+      likeArrivalTimerRef.current = null;
+    }, 520);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
-    onDoubleLike();
   };
 
   return (
@@ -354,7 +441,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
       <Pressable accessibilityHint="Double tap to like this post" accessibilityLabel={post.title} onPress={handleMediaTap} style={styles.mediaTapTarget} />
       <View pointerEvents="none" style={styles.mediaShade} />
       <Animated.View pointerEvents="none" style={[styles.doubleTapHeart, heartStyle]}>
-        <Ionicons color="#FF3158" name="heart" size={104} />
+        <Ionicons color="#FF3158" name="heart" size={78} />
       </Animated.View>
       <View style={styles.postCopy}>
         <View style={styles.doctorRow}>
@@ -402,10 +489,11 @@ function FeedAction({ active = false, animatedStyle, count, icon, label, onPress
   );
 }
 
-function CommentSheet({ authorName, onClose, onCommentAdded, post }: {
+function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChanged, post }: {
+  authorAvatarUrl: string | null;
   authorName: string;
   onClose: () => void;
-  onCommentAdded: (postId: string, count: number) => void;
+  onCommentCountChanged: (postId: string, count: number) => void;
   post: HealthFeedPost | null;
 }) {
   const insets = useSafeAreaInsets();
@@ -413,12 +501,14 @@ function CommentSheet({ authorName, onClose, onCommentAdded, post }: {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!post) {
       setComments([]);
       setDraft('');
+      setDeletingIds(new Set());
       setError('');
       return;
     }
@@ -447,13 +537,48 @@ function CommentSheet({ authorName, onClose, onCommentAdded, post }: {
       const result = await createHealthPostComment(post.id, authorName, draft);
       setComments((current) => [...current, result.comment]);
       setDraft('');
-      onCommentAdded(post.id, result.count);
+      onCommentCountChanged(post.id, result.count);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     } catch (commentError) {
       setError(commentError instanceof Error ? commentError.message : 'Unable to post your comment.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const removeComment = async (comment: HealthFeedComment) => {
+    if (!post || deletingIds.has(comment.id)) return;
+    setDeletingIds((current) => new Set(current).add(comment.id));
+    setError('');
+    try {
+      const result = await deleteHealthPostComment(post.id, comment.id);
+      setComments((current) => current.filter((item) => item.id !== comment.id));
+      onCommentCountChanged(post.id, result.count);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    } catch (commentError) {
+      setError(commentError instanceof Error ? commentError.message : 'Unable to delete your comment.');
+    } finally {
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(comment.id);
+        return next;
+      });
+    }
+  };
+
+  const confirmCommentDeletion = (comment: HealthFeedComment) => {
+    if (process.env.EXPO_OS === 'web') {
+      void removeComment(comment);
+      return;
+    }
+    Alert.alert(
+      'Delete comment?',
+      'This comment will be permanently removed.',
+      [
+        { style: 'cancel', text: 'Cancel' },
+        { onPress: () => void removeComment(comment), style: 'destructive', text: 'Delete' },
+      ],
+    );
   };
 
   return (
@@ -481,20 +606,27 @@ function CommentSheet({ authorName, onClose, onCommentAdded, post }: {
                 data={comments}
                 keyboardShouldPersistTaps="handled"
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => <CommentRow comment={item} />}
+                renderItem={({ item }) => (
+                  <CommentRow
+                    avatarUrl={item.is_owner ? authorAvatarUrl : null}
+                    comment={item}
+                    deleting={deletingIds.has(item.id)}
+                    onDelete={item.is_owner ? () => confirmCommentDeletion(item) : undefined}
+                  />
+                )}
                 showsVerticalScrollIndicator={false}
               />
             ) : (
               <View style={styles.commentState}>
                 <View style={styles.commentEmptyIcon}><Ionicons color="#2E7EBC" name="chatbubble-ellipses-outline" size={25} /></View>
-                <Text style={styles.commentStateTitle}>Start the conversation</Text>
-                <Text style={styles.commentStateText}>Ask a clear question or share what helped you.</Text>
+                <Text style={styles.commentStateTitle}>No comments yet</Text>
+                <Text style={styles.commentStateText}>Be the first to share a helpful comment.</Text>
               </View>
             )}
 
             {error ? <Text accessibilityRole="alert" selectable style={styles.commentError}>{error}</Text> : null}
             <View style={styles.commentComposer}>
-              <View style={styles.commentAuthorAvatar}><Text style={styles.commentAuthorInitial}>{getInitial(authorName)}</Text></View>
+              <CommentAvatar name={authorName} uri={authorAvatarUrl} />
               <TextInput
                 accessibilityLabel="Write a comment"
                 maxLength={500}
@@ -523,17 +655,62 @@ function CommentSheet({ authorName, onClose, onCommentAdded, post }: {
   );
 }
 
-function CommentRow({ comment }: { comment: HealthFeedComment }) {
+function CommentRow({ avatarUrl, comment, deleting, onDelete }: {
+  avatarUrl: string | null;
+  comment: HealthFeedComment;
+  deleting: boolean;
+  onDelete?: () => void;
+}) {
   return (
     <View style={styles.commentRow}>
-      <View style={styles.commentAuthorAvatar}><Text style={styles.commentAuthorInitial}>{getInitial(comment.author_name)}</Text></View>
+      <CommentAvatar name={comment.author_name} uri={avatarUrl} />
       <View style={styles.commentBubble}>
         <View style={styles.commentMeta}>
           <Text numberOfLines={1} style={styles.commentAuthor}>{comment.author_name}</Text>
           <Text style={styles.commentTime}>{formatRelativeTime(comment.created_at)}</Text>
+          {onDelete ? (
+            <Pressable
+              accessibilityLabel="Delete your comment"
+              accessibilityRole="button"
+              disabled={deleting}
+              hitSlop={8}
+              onPress={onDelete}
+              style={styles.commentDelete}
+            >
+              {deleting
+                ? <ActivityIndicator color="#A43A4B" size="small" />
+                : <Ionicons color="#A43A4B" name="trash-outline" size={16} />}
+            </Pressable>
+          ) : null}
         </View>
         <Text selectable style={styles.commentBody}>{comment.body}</Text>
       </View>
+    </View>
+  );
+}
+
+function CommentAvatar({ name, uri }: { name: string; uri: string | null }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => setImageFailed(false), [uri]);
+
+  if (uri && !imageFailed) {
+    return (
+      <Image
+        accessibilityLabel={`${name} profile photo`}
+        cachePolicy="memory-disk"
+        contentFit="cover"
+        onError={() => setImageFailed(true)}
+        source={{ uri }}
+        style={styles.commentAuthorImage}
+        transition={120}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.commentAuthorAvatar}>
+      <Text style={styles.commentAuthorInitial}>{getInitial(name)}</Text>
     </View>
   );
 }
@@ -626,11 +803,13 @@ const styles = StyleSheet.create({
   centerState: { alignItems: 'center', backgroundColor: '#090B0D', flex: 1, gap: 12, justifyContent: 'center', paddingHorizontal: 36 },
   commentAuthor: { color: '#18202A', flexShrink: 1, fontFamily: dashboardFonts.bold, fontSize: 12 },
   commentAuthorAvatar: { alignItems: 'center', backgroundColor: '#E7F2FA', borderCurve: 'continuous', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  commentAuthorImage: { borderColor: '#E1E5E9', borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, height: 36, width: 36 },
   commentAuthorInitial: { color: '#2E7EBC', fontFamily: dashboardFonts.bold, fontSize: 13 },
   commentBody: { color: '#36424E', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
   commentBubble: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, flex: 1, gap: 5, paddingHorizontal: 12, paddingVertical: 10 },
   commentClose: { alignItems: 'center', backgroundColor: '#F0F3F5', borderCurve: 'continuous', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   commentComposer: { alignItems: 'flex-end', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 9, paddingHorizontal: 16, paddingTop: 12 },
+  commentDelete: { alignItems: 'center', height: 24, justifyContent: 'center', marginLeft: 'auto', width: 24 },
   commentEmptyIcon: { alignItems: 'center', backgroundColor: '#E7F2FA', borderCurve: 'continuous', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   commentError: { backgroundColor: '#FFF0F2', color: '#B4233A', fontFamily: dashboardFonts.semiBold, fontSize: 11, lineHeight: 16, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 9 },
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, height: 5, width: 40 },
@@ -655,7 +834,7 @@ const styles = StyleSheet.create({
   doctorRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   doctorSpecialty: { color: 'rgba(255,255,255,0.72)', fontFamily: dashboardFonts.medium, fontSize: 11, paddingTop: 2 },
   doctorText: { flex: 1 },
-  doubleTapHeart: { alignItems: 'center', height: DOUBLE_TAP_HEART_SIZE, justifyContent: 'center', left: 0, position: 'absolute', top: 0, width: DOUBLE_TAP_HEART_SIZE, zIndex: 2 },
+  doubleTapHeart: { alignItems: 'center', height: DOUBLE_TAP_HEART_SIZE, justifyContent: 'center', left: 0, position: 'absolute', top: 0, width: DOUBLE_TAP_HEART_SIZE, zIndex: 5 },
   feedCard: { backgroundColor: '#111416', overflow: 'hidden', position: 'relative' },
   followButton: { borderColor: 'rgba(255,255,255,0.55)', borderRadius: 8, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6 },
   followButtonActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
