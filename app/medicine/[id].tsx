@@ -19,6 +19,10 @@ import { PressableScale } from "../../src/components/PressableScale";
 import { MedicineDetailContent } from "../../src/components/shop/medicine-detail-content";
 import { ProductQuantityControl } from "../../src/components/shop/product-quantity-control";
 import {
+  ProductDetailHeaderActions,
+  ProductDetailHeaderTitle,
+} from "../../src/components/shop/product-detail-header";
+import {
   dashboardColors,
   dashboardRadii,
   dashboardSpacing,
@@ -52,6 +56,7 @@ export default function MedicineDetailScreen() {
   const [relatedProducts, setRelatedProducts] = useState<ShopProduct[]>([]);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [isHeaderCondensed, setIsHeaderCondensed] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -103,8 +108,7 @@ export default function MedicineDetailScreen() {
   const isLoading = product === undefined;
   const quantity = product ? cart.getQuantity(product.id) : 0;
 
-  const actionBarOffset = insets.bottom + dashboardSpacing.sm;
-  const actionBarHeight = 72;
+  const actionBarHeight = 112 + insets.bottom;
 
   const openProduct = (nextProduct: ShopProduct) => {
     router.push({
@@ -118,8 +122,30 @@ export default function MedicineDetailScreen() {
       <Stack.Screen
         options={{
           headerBackButtonDisplayMode: "minimal",
+          headerRight: isHeaderCondensed
+            ? () => (
+                <ProductDetailHeaderActions
+                  cartCount={cart.totalItems}
+                  onOpenCart={() =>
+                    router.push({ params: { phone }, pathname: "/cart" })
+                  }
+                  onSearch={() =>
+                    router.push({ params: { phone }, pathname: "/shop" })
+                  }
+                />
+              )
+            : undefined,
           headerShadowVisible: false,
           headerShown: true,
+          headerStyle: { backgroundColor: "#FFFFFF" },
+          headerTitle: () => (
+            <ProductDetailHeaderTitle
+              condensed={isHeaderCondensed}
+              fallbackTitle={t("medicineDetails")}
+              product={product}
+            />
+          ),
+          headerTitleAlign: "left",
           title: t("medicineDetails"),
         }}
       />
@@ -159,10 +185,16 @@ export default function MedicineDetailScreen() {
         <>
           <ScrollView
             contentContainerStyle={{
-              paddingBottom:
-                actionBarOffset + actionBarHeight + dashboardSpacing.md,
+              paddingBottom: actionBarHeight + dashboardSpacing.md,
             }}
             contentInsetAdjustmentBehavior="automatic"
+            onScroll={({ nativeEvent }) => {
+              const shouldCondense = nativeEvent.contentOffset.y > 180;
+              setIsHeaderCondensed((current) =>
+                current === shouldCondense ? current : shouldCondense,
+              );
+            }}
+            scrollEventThrottle={16}
           >
             <MedicineDetailContent
               onAddRelatedProduct={(relatedProduct) => {
@@ -177,55 +209,65 @@ export default function MedicineDetailScreen() {
             />
           </ScrollView>
 
-          <View style={[styles.actionBar, { bottom: actionBarOffset }]}>
-            {quantity === 0 ? (
-              <PressableScale
-                accessibilityLabel={`Add ${product.name} to bag`}
-                onPress={() => {
-                  void Haptics.impactAsync(
-                    Haptics.ImpactFeedbackStyle.Light,
-                  ).catch(() => undefined);
-                  cart.add(product);
-                }}
-                pressedScale={0.97}
-                style={styles.addToCartButton}
-              >
-                <Ionicons color="#FFFFFF" name="bag-add-outline" size={20} />
-                <Text style={styles.addToCartText}>Add to cart</Text>
-              </PressableScale>
-            ) : (
-              <>
-                <ProductQuantityControl
-                  onAdd={() => cart.add(product)}
-                  onDecrement={() => cart.decrement(product.id)}
-                  onIncrement={() => cart.increment(product.id)}
-                  productName={product.name}
-                  quantity={quantity}
-                />
+          <View
+            style={[styles.actionBar, { paddingBottom: insets.bottom }]}
+          >
+            <View style={styles.orderSignal}>
+              <Ionicons color="#15803D" name="stats-chart" size={18} />
+              <Text style={styles.orderSignalText}>
+                46 people ordered in the last 7 days
+              </Text>
+            </View>
+            <View style={styles.actionControls}>
+              {quantity === 0 ? (
                 <PressableScale
-                  accessibilityLabel={`View cart with ${cart.totalItems} items`}
-                  onPress={() =>
-                    router.push({ params: { phone }, pathname: "/checkout" })
-                  }
+                  accessibilityLabel={`Add ${product.name} to bag`}
+                  onPress={() => {
+                    void Haptics.impactAsync(
+                      Haptics.ImpactFeedbackStyle.Light,
+                    ).catch(() => undefined);
+                    cart.add(product);
+                  }}
                   pressedScale={0.97}
-                  style={styles.viewCartButton}
+                  style={styles.addToCartButton}
                 >
-                  <Ionicons
-                    color="#FFFFFF"
-                    name="bag-check-outline"
-                    size={19}
-                  />
-                  <View style={styles.viewCartCopy}>
-                    <Text style={styles.viewCartTitle}>View cart</Text>
-                    <Text style={styles.viewCartSubtitle}>
-                      {cart.totalItems}{" "}
-                      {cart.totalItems === 1 ? "item" : "items"}
-                    </Text>
-                  </View>
-                  <Ionicons color="#FFFFFF" name="arrow-forward" size={17} />
+                  <Ionicons color="#FFFFFF" name="bag-add-outline" size={20} />
+                  <Text style={styles.addToCartText}>Add to cart</Text>
                 </PressableScale>
-              </>
-            )}
+              ) : (
+                <>
+                  <ProductQuantityControl
+                    onAdd={() => cart.add(product)}
+                    onDecrement={() => cart.decrement(product.id)}
+                    onIncrement={() => cart.increment(product.id)}
+                    productName={product.name}
+                    quantity={quantity}
+                  />
+                  <PressableScale
+                    accessibilityLabel={`View cart with ${cart.totalItems} items`}
+                    onPress={() =>
+                      router.push({ params: { phone }, pathname: "/checkout" })
+                    }
+                    pressedScale={0.97}
+                    style={styles.viewCartButton}
+                  >
+                    <Ionicons
+                      color="#FFFFFF"
+                      name="bag-check-outline"
+                      size={19}
+                    />
+                    <View style={styles.viewCartCopy}>
+                      <Text style={styles.viewCartTitle}>View cart</Text>
+                      <Text style={styles.viewCartSubtitle}>
+                        {cart.totalItems}{" "}
+                        {cart.totalItems === 1 ? "item" : "items"}
+                      </Text>
+                    </View>
+                    <Ionicons color="#FFFFFF" name="arrow-forward" size={17} />
+                  </PressableScale>
+                </>
+              )}
+            </View>
           </View>
         </>
       )}
@@ -235,7 +277,7 @@ export default function MedicineDetailScreen() {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: dashboardColors.bg,
+    backgroundColor: "#FFFFFF",
     flex: 1,
   },
   centerState: {
@@ -263,25 +305,41 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   actionBar: {
-    alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderColor: dashboardColors.track,
-    borderRadius: 22,
-    borderWidth: 1,
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.16)",
+    borderTopColor: dashboardColors.track,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  orderSignal: {
+    alignItems: "center",
+    backgroundColor: "#E9FBF0",
     flexDirection: "row",
     gap: dashboardSpacing.sm,
-    height: 72,
+    height: 38,
     justifyContent: "center",
-    left: dashboardSpacing.md,
-    paddingHorizontal: 10,
-    position: "absolute",
-    right: dashboardSpacing.md,
+    paddingHorizontal: dashboardSpacing.md,
+  },
+  orderSignalText: {
+    ...dashboardTypography.body,
+    color: "#166534",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  actionControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: dashboardSpacing.sm,
+    height: 74,
+    paddingHorizontal: dashboardSpacing.gap,
+    paddingVertical: dashboardSpacing.md,
   },
   addToCartButton: {
     alignItems: "center",
     backgroundColor: dashboardColors.primary,
-    borderRadius: dashboardRadii.pill,
+    borderRadius: 14,
     flex: 1,
     flexDirection: "row",
     gap: dashboardSpacing.sm,
@@ -296,7 +354,7 @@ const styles = StyleSheet.create({
   viewCartButton: {
     alignItems: "center",
     backgroundColor: dashboardColors.primary,
-    borderRadius: dashboardRadii.pill,
+    borderRadius: 14,
     flex: 1,
     flexDirection: "row",
     gap: 7,

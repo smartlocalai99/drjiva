@@ -33,7 +33,7 @@ describe('formatShopProductPrice', () => {
 
 describe('resolveShopProductPrice', () => {
   it('keeps the catalogue price as the discounted selling price', () => {
-    expect(SHOP_DISCOUNT_PERCENT).toBe(10);
+    expect(SHOP_DISCOUNT_PERCENT).toBe(15);
     expect(resolveShopProductPrice(32)).toBe(32);
   });
 
@@ -44,11 +44,11 @@ describe('resolveShopProductPrice', () => {
 
 describe('shop product MRP', () => {
   it('derives MRP from the selling price and advertised discount', () => {
-    expect(resolveShopProductMrp(32)).toBe(35.56);
-    expect(formatShopProductMrp(32)).toBe('₹35.56');
+    expect(resolveShopProductMrp(32)).toBe(37.65);
+    expect(formatShopProductMrp(32)).toBe('₹37.65');
   });
 
   it('derives a placeholder MRP when a price is missing', () => {
-    expect(resolveShopProductMrp(null)).toBe(54.44);
+    expect(resolveShopProductMrp(null)).toBe(57.65);
   });
 });

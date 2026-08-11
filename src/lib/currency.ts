@@ -8,7 +8,7 @@ export function formatRupees(value: number): string {
 }
 
 export const DUMMY_MEDICINE_PRICE = 49;
-export const SHOP_DISCOUNT_PERCENT = 10;
+export const SHOP_DISCOUNT_PERCENT = 15;
 
 export function resolveShopProductPrice(price: number | null): number {
   return price ?? DUMMY_MEDICINE_PRICE;
