@@ -1,21 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   dashboardColors,
   dashboardRadii,
   dashboardSpacing,
   dashboardTypography,
-} from '../../dashboardTheme';
-import type { ShopProduct } from '../../data/shopProducts';
+} from "../../dashboardTheme";
+import type { ShopProduct } from "../../data/shopProducts";
 import {
   formatShopProductMrp,
   formatShopProductPrice,
   SHOP_DISCOUNT_PERCENT,
-} from '../../lib/currency';
-import { getShopProductRating } from '../../lib/shop-product-rating';
-import { ProductQuantityControl } from './product-quantity-control';
+} from "../../lib/currency";
+import { getShopProductRating } from "../../lib/shop-product-rating";
+import { ProductQuantityControl } from "./product-quantity-control";
 
 export function ShopProductCard({
   onAdd,
@@ -87,13 +87,19 @@ export function ShopProductCard({
                 <Text style={styles.deliverySubtitle}>Fast delivery</Text>
               </View>
             </View>
-            <View style={styles.freeDeliveryBadge}>
-              <Ionicons
-                color="#15803D"
-                name="checkmark-circle"
-                size={14}
-              />
-              <Text style={styles.freeDeliveryText}>Free delivery</Text>
+            <View style={styles.fulfilmentBadges}>
+              <View style={styles.freeDeliveryBadge}>
+                <Ionicons color="#15803D" name="cube-outline" size={14} />
+                <Text style={styles.freeDeliveryText}>Free delivery</Text>
+              </View>
+              <View style={styles.codBadge}>
+                <Ionicons
+                  color={dashboardColors.primary}
+                  name="cash-outline"
+                  size={14}
+                />
+                <Text style={styles.codText}>COD</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -131,41 +137,41 @@ const styles = StyleSheet.create({
     borderRadius: dashboardRadii.card,
     borderWidth: 1,
     marginBottom: dashboardSpacing.gap,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   pressable: {
-    width: '100%',
+    width: "100%",
   },
   imageWrap: {
-    alignItems: 'center',
-    backgroundColor: '#D9D9D9',
+    alignItems: "center",
+    backgroundColor: "#D9D9D9",
     height: 152,
-    justifyContent: 'center',
-    position: 'relative',
-    width: '100%',
+    justifyContent: "center",
+    position: "relative",
+    width: "100%",
   },
   image: {
-    height: '82%',
-    width: '82%',
+    height: "82%",
+    width: "82%",
   },
   offerBadge: {
-    alignItems: 'center',
-    backgroundColor: '#FFF1F2',
-    borderColor: '#FECDD3',
+    alignItems: "center",
+    backgroundColor: "#FFF1F2",
+    borderColor: "#FECDD3",
     borderRadius: dashboardRadii.pill,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 4,
     left: dashboardSpacing.sm,
     paddingHorizontal: 9,
     paddingVertical: 6,
-    position: 'absolute',
+    position: "absolute",
     top: dashboardSpacing.sm,
   },
   offerBadgeText: {
     ...dashboardTypography.caption,
-    color: '#DC2626',
-    fontFamily: 'Inter_700Bold',
+    color: "#DC2626",
+    fontFamily: "Inter_700Bold",
     fontSize: 10,
     lineHeight: 12,
   },
@@ -176,7 +182,7 @@ const styles = StyleSheet.create({
   name: {
     ...dashboardTypography.body,
     color: dashboardColors.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: "Inter_700Bold",
     fontSize: 15,
     lineHeight: 19,
   },
@@ -187,25 +193,25 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   ratingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: 7,
     marginTop: dashboardSpacing.sm,
   },
   ratingBadge: {
-    alignItems: 'center',
-    backgroundColor: '#15803D',
+    alignItems: "center",
+    backgroundColor: "#15803D",
     borderRadius: 8,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
   ratingValue: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
     fontSize: 12,
-    fontVariant: ['tabular-nums'],
+    fontVariant: ["tabular-nums"],
     lineHeight: 15,
   },
   ratingCount: {
@@ -214,31 +220,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   fulfilmentRow: {
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
     borderColor: dashboardColors.track,
     borderRadius: 14,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: dashboardSpacing.sm,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginTop: dashboardSpacing.sm,
     paddingHorizontal: 10,
     paddingVertical: 9,
   },
   deliveryEta: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     minWidth: 0,
   },
   deliveryIcon: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: dashboardColors.primaryTint,
     borderRadius: 16,
     height: 32,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 32,
   },
   deliveryCopy: {
@@ -248,39 +254,59 @@ const styles = StyleSheet.create({
   deliveryTitle: {
     ...dashboardTypography.caption,
     color: dashboardColors.text,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: "Inter_700Bold",
     fontSize: 11,
     lineHeight: 14,
   },
   deliverySubtitle: {
     ...dashboardTypography.caption,
     color: dashboardColors.primary,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: "Inter_600SemiBold",
     fontSize: 10,
     lineHeight: 13,
     marginTop: 1,
   },
   freeDeliveryBadge: {
-    alignItems: 'center',
-    backgroundColor: '#ECFDF3',
+    alignItems: "center",
+    backgroundColor: "#ECFDF3",
     borderRadius: dashboardRadii.pill,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 4,
     paddingHorizontal: 9,
     paddingVertical: 6,
   },
+  fulfilmentBadges: {
+    alignItems: "flex-end",
+    gap: 5,
+  },
   freeDeliveryText: {
     ...dashboardTypography.caption,
-    color: '#15803D',
-    fontFamily: 'Inter_700Bold',
+    color: "#15803D",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    lineHeight: 13,
+  },
+  codBadge: {
+    alignItems: "center",
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: dashboardRadii.pill,
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  codText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    fontFamily: "Inter_700Bold",
     fontSize: 10,
     lineHeight: 13,
   },
   chipRow: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
+    alignItems: "flex-end",
+    flexDirection: "row",
     gap: dashboardSpacing.sm,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     paddingBottom: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.md,
   },
@@ -288,8 +314,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   mrpRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: 5,
   },
   mrpLabel: {
@@ -301,12 +327,12 @@ const styles = StyleSheet.create({
     ...dashboardTypography.caption,
     color: dashboardColors.textFaint,
     fontSize: 11,
-    textDecorationLine: 'line-through',
+    textDecorationLine: "line-through",
   },
   price: {
     ...dashboardTypography.cardTitle,
     color: dashboardColors.primaryDark,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: "Inter_700Bold",
     fontSize: 18,
     marginTop: 1,
   },
