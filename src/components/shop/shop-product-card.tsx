@@ -144,15 +144,15 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     alignItems: "center",
-    backgroundColor: "#D9D9D9",
-    height: 152,
+    backgroundColor: "#FFFFFF",
+    height: 164,
     justifyContent: "center",
     position: "relative",
     width: "100%",
   },
   image: {
-    height: "82%",
-    width: "82%",
+    height: "94%",
+    width: "94%",
   },
   offerBadge: {
     alignItems: "center",

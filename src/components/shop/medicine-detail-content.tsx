@@ -85,62 +85,71 @@ function Benefit({
 }
 
 function RelatedProductCard({
+  onAdd,
   onOpen,
   product,
 }: {
+  onAdd: () => void;
   onOpen: () => void;
   product: ShopProduct;
 }) {
   return (
-    <PressableScale
-      accessibilityLabel={`Open ${product.name}`}
-      onPress={onOpen}
-      pressedScale={0.98}
-      style={styles.relatedCard}
-    >
-      <View style={styles.relatedImageWrap}>
-        <Image
-          accessibilityLabel={product.name}
-          cachePolicy="memory-disk"
-          contentFit="contain"
-          recyclingKey={product.id}
-          source={{ uri: product.imageUrl }}
-          style={styles.relatedImage}
-          transition={120}
-        />
-      </View>
-      <Text numberOfLines={2} style={styles.relatedName}>
-        {product.name}
-      </Text>
-      <Text numberOfLines={1} style={styles.relatedMeta}>
-        {product.packSize}
-      </Text>
+    <View style={styles.relatedCard}>
+      <Pressable
+        accessibilityLabel={`Open ${product.name}`}
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={styles.relatedOpenArea}
+      >
+        <View style={styles.relatedImageWrap}>
+          <Image
+            accessibilityLabel={product.name}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            recyclingKey={product.id}
+            source={{ uri: product.imageUrl }}
+            style={styles.relatedImage}
+            transition={120}
+          />
+        </View>
+        <Text numberOfLines={2} style={styles.relatedName}>
+          {product.name}
+        </Text>
+        <Text numberOfLines={1} style={styles.relatedMeta}>
+          {product.packSize}
+        </Text>
+      </Pressable>
       <View style={styles.relatedPriceRow}>
         <Text style={styles.relatedPrice}>
           {formatShopProductPrice(product.price)}
         </Text>
-        <Ionicons
-          color={dashboardColors.primary}
-          name="arrow-forward-circle"
-          size={20}
-        />
+        <PressableScale
+          accessibilityLabel={`Add ${product.name} to cart`}
+          onPress={onAdd}
+          pressedScale={0.94}
+          style={styles.relatedAddButton}
+        >
+          <Ionicons color="#FFFFFF" name="add" size={16} />
+          <Text style={styles.relatedAddText}>Add</Text>
+        </PressableScale>
       </View>
-    </PressableScale>
+    </View>
   );
 }
 
 export function MedicineDetailContent({
+  onAddRelatedProduct,
   onOpenRelatedProduct,
   product,
   relatedProducts = [],
 }: {
+  onAddRelatedProduct?: (product: ShopProduct) => void;
   onOpenRelatedProduct?: (product: ShopProduct) => void;
   product: ShopProduct;
   relatedProducts?: readonly ShopProduct[];
 }) {
   const { t } = useLanguage();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
-  const [reviewsExpanded, setReviewsExpanded] = useState(false);
   const rating = getShopProductRating(product.id, product.name);
   const faqs = buildFaqs(product);
   const hasSource = Boolean(
@@ -156,11 +165,6 @@ export function MedicineDetailContent({
   const toggleFaq = (index: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedFaq((current) => (current === index ? null : index));
-  };
-
-  const toggleReviews = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setReviewsExpanded((current) => !current);
   };
 
   return (
@@ -247,6 +251,42 @@ export function MedicineDetailContent({
             </Text>
           </View>
         ) : null}
+      </View>
+
+      <View style={styles.sectionCard}>
+        <View style={styles.reviewHeader}>
+          <View style={styles.reviewHeaderCopy}>
+            <Text style={styles.sectionTitle}>Ratings & reviews</Text>
+            <Text style={styles.reviewSummary}>
+              {rating.label} out of 5 · {rating.count} ratings
+            </Text>
+          </View>
+        </View>
+        <View style={styles.reviewExpanded}>
+          <View style={styles.reviewScoreRow}>
+            <Text style={styles.reviewScore}>{rating.label}</Text>
+            <View style={styles.reviewStars}>
+              {[0, 1, 2, 3, 4].map((star) => (
+                <Ionicons
+                  key={star}
+                  color="#F59E0B"
+                  name={
+                    Number(rating.label) >= star + 1
+                      ? "star"
+                      : Number(rating.label) >= star + 0.5
+                        ? "star-half"
+                        : "star-outline"
+                  }
+                  size={18}
+                />
+              ))}
+            </View>
+          </View>
+          <Text style={styles.reviewBody}>
+            Based on customer ratings. Written reviews will appear here when
+            customers submit them after purchase.
+          </Text>
+        </View>
       </View>
 
       <View style={styles.sectionCard}>
@@ -351,59 +391,6 @@ export function MedicineDetailContent({
         </View>
       </View>
 
-      <View style={styles.sectionCard}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: reviewsExpanded }}
-          onPress={toggleReviews}
-          style={styles.reviewHeader}
-        >
-          <View style={styles.reviewHeaderCopy}>
-            <Text style={styles.sectionTitle}>Ratings & reviews</Text>
-            <Text style={styles.reviewSummary}>
-              {rating.label} out of 5 · {rating.count} ratings
-            </Text>
-          </View>
-          <View style={styles.reviewAction}>
-            <Text style={styles.reviewActionText}>
-              {reviewsExpanded ? "Hide" : "Show reviews"}
-            </Text>
-            <Ionicons
-              color={dashboardColors.primary}
-              name={reviewsExpanded ? "chevron-up" : "chevron-down"}
-              size={17}
-            />
-          </View>
-        </Pressable>
-        {reviewsExpanded ? (
-          <View style={styles.reviewExpanded}>
-            <View style={styles.reviewScoreRow}>
-              <Text style={styles.reviewScore}>{rating.label}</Text>
-              <View style={styles.reviewStars}>
-                {[0, 1, 2, 3, 4].map((star) => (
-                  <Ionicons
-                    key={star}
-                    color="#F59E0B"
-                    name={
-                      Number(rating.label) >= star + 1
-                        ? "star"
-                        : Number(rating.label) >= star + 0.5
-                          ? "star-half"
-                          : "star-outline"
-                    }
-                    size={18}
-                  />
-                ))}
-              </View>
-            </View>
-            <Text style={styles.reviewBody}>
-              Based on customer ratings. Written reviews will appear here when
-              customers submit them after purchase.
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
       {hasSource ? (
         <Pressable
           accessibilityRole="link"
@@ -441,6 +428,7 @@ export function MedicineDetailContent({
             {relatedProducts.map((relatedProduct) => (
               <RelatedProductCard
                 key={relatedProduct.id}
+                onAdd={() => onAddRelatedProduct?.(relatedProduct)}
                 onOpen={() => onOpenRelatedProduct?.(relatedProduct)}
                 product={relatedProduct}
               />
@@ -458,7 +446,7 @@ const styles = StyleSheet.create({
     padding: dashboardSpacing.pagePadding,
   },
   imageWrap: {
-    backgroundColor: "#F1F3F5",
+    backgroundColor: "#FFFFFF",
     borderCurve: "continuous",
     borderRadius: 24,
     height: 250,
@@ -770,21 +758,6 @@ const styles = StyleSheet.create({
     ...dashboardTypography.caption,
     color: dashboardColors.textMuted,
   },
-  reviewAction: {
-    alignItems: "center",
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.pill,
-    flexDirection: "row",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  reviewActionText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-  },
   reviewExpanded: {
     backgroundColor: "#F8FAFC",
     borderRadius: 14,
@@ -854,19 +827,22 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     padding: dashboardSpacing.sm,
-    width: 158,
+    width: 174,
+  },
+  relatedOpenArea: {
+    width: "100%",
   },
   relatedImageWrap: {
     alignItems: "center",
-    backgroundColor: "#F1F3F5",
+    backgroundColor: "#FFFFFF",
     borderRadius: 14,
-    height: 112,
+    height: 134,
     justifyContent: "center",
     overflow: "hidden",
   },
   relatedImage: {
-    height: "88%",
-    width: "88%",
+    height: "98%",
+    width: "98%",
   },
   relatedName: {
     ...dashboardTypography.body,
@@ -893,5 +869,20 @@ const styles = StyleSheet.create({
     ...dashboardTypography.cardTitle,
     color: dashboardColors.primaryDark,
     fontSize: 15,
+  },
+  relatedAddButton: {
+    alignItems: "center",
+    backgroundColor: dashboardColors.primary,
+    borderRadius: dashboardRadii.pill,
+    flexDirection: "row",
+    gap: 3,
+    minHeight: 34,
+    paddingHorizontal: 12,
+  },
+  relatedAddText: {
+    ...dashboardTypography.caption,
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
   },
 });

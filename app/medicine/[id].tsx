@@ -165,6 +165,12 @@ export default function MedicineDetailScreen() {
             contentInsetAdjustmentBehavior="automatic"
           >
             <MedicineDetailContent
+              onAddRelatedProduct={(relatedProduct) => {
+                void Haptics.impactAsync(
+                  Haptics.ImpactFeedbackStyle.Light,
+                ).catch(() => undefined);
+                cart.add(relatedProduct);
+              }}
               onOpenRelatedProduct={openProduct}
               product={product}
               relatedProducts={relatedProducts}
