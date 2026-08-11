@@ -191,6 +191,20 @@ export function MedicineDetailContent({
         <Text selectable style={styles.meta}>
           {product.packSize}
         </Text>
+        <View style={styles.priceBlock}>
+          <View style={styles.sellingPriceRow}>
+            <Text selectable style={styles.price}>
+              {formatShopProductPrice(product.price)}
+            </Text>
+            <View style={styles.mrpRow}>
+              <Text style={styles.mrpLabel}>MRP</Text>
+              <Text style={styles.mrpPrice}>
+                {formatShopProductMrp(product.price)}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.taxText}>Inclusive of all taxes</Text>
+        </View>
         <View style={styles.ratingRow}>
           <View style={styles.ratingBadge}>
             <Text style={styles.ratingBadgeText}>{rating.label}</Text>
@@ -199,18 +213,6 @@ export function MedicineDetailContent({
           <Text selectable style={styles.ratingCount}>
             {rating.count} ratings
           </Text>
-        </View>
-        <View style={styles.priceBlock}>
-          <View style={styles.mrpRow}>
-            <Text style={styles.mrpLabel}>MRP</Text>
-            <Text style={styles.mrpPrice}>
-              {formatShopProductMrp(product.price)}
-            </Text>
-          </View>
-          <Text selectable style={styles.price}>
-            {formatShopProductPrice(product.price)}
-          </Text>
-          <Text style={styles.taxText}>Inclusive of all taxes</Text>
         </View>
       </View>
 
@@ -446,7 +448,7 @@ const styles = StyleSheet.create({
     padding: dashboardSpacing.pagePadding,
   },
   imageWrap: {
-    backgroundColor: "#F1F3F5",
+    backgroundColor: dashboardColors.productImageBg,
     borderCurve: "continuous",
     borderRadius: 24,
     height: 250,
@@ -517,7 +519,13 @@ const styles = StyleSheet.create({
     color: dashboardColors.textMuted,
   },
   priceBlock: {
+    gap: 1,
     paddingTop: dashboardSpacing.sm,
+  },
+  sellingPriceRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 10,
   },
   mrpRow: {
     alignItems: "center",
@@ -834,7 +842,7 @@ const styles = StyleSheet.create({
   },
   relatedImageWrap: {
     alignItems: "center",
-    backgroundColor: "#F1F3F5",
+    backgroundColor: dashboardColors.productImageBg,
     borderRadius: 14,
     height: 134,
     justifyContent: "center",

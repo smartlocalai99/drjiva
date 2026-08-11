@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     alignItems: "center",
-    backgroundColor: "#F1F3F5",
+    backgroundColor: dashboardColors.productImageBg,
     height: 164,
     justifyContent: "center",
     position: "relative",
