@@ -571,11 +571,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const sheetDragStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
   }));
-  const sheetDragResponder = useMemo(() => {
+  const sheetDragResponders = useMemo(() => {
     const isDownwardSheetDrag = (dx: number, dy: number) => (
-      dy > 6 && Math.abs(dy) > Math.abs(dx) * 1.2
+      dy > 4 && Math.abs(dy) > Math.abs(dx)
     );
-    return PanResponder.create({
+    const createDragResponder = () => PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
       onMoveShouldSetPanResponderCapture: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
       onPanResponderGrant: () => {
@@ -586,7 +586,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
         sheetTranslateY.value = Math.max(0, gesture.dy);
       },
       onPanResponderRelease: (_, gesture) => {
-        const shouldDismiss = gesture.dy > Math.min(120, height * 0.16) || gesture.vy > 0.85;
+        const shouldDismiss = gesture.dy > 32 || gesture.vy > 0.55;
         if (shouldDismiss) {
           sheetTranslateY.value = withTiming(height, { duration: 190 }, (finished) => {
             if (finished) runOnJS(closeComments)();
@@ -600,6 +600,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       },
       onPanResponderTerminationRequest: () => false,
     });
+    return {
+      content: createDragResponder(),
+      header: createDragResponder(),
+      input: createDragResponder(),
+    };
   }, [closeComments, height, sheetTranslateY]);
 
   const appendEmoji = (emoji: typeof COMMENT_EMOJIS[number]) => {
@@ -680,8 +685,9 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
               </View>
             </Animated.View>
           ) : null}
-          <Animated.View {...sheetDragResponder.panHandlers} style={[styles.commentSheet, sheetDragStyle]}>
+          <Animated.View style={[styles.commentSheet, sheetDragStyle]}>
             <View
+              {...sheetDragResponders.header.panHandlers}
               accessibilityLabel="Comments sheet. Swipe down to close."
               accessible
               onAccessibilityEscape={closeComments}
@@ -696,35 +702,37 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
               </View>
             </View>
 
-            {loading ? (
-              <View style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
-            ) : comments.length ? (
-              <FlatList
-                contentContainerStyle={styles.commentList}
-                data={comments}
-                keyboardShouldPersistTaps="handled"
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <CommentRow
-                    avatarUrl={item.is_owner ? authorAvatarUrl : null}
-                    comment={item}
-                    deleting={deletingIds.has(item.id)}
-                    onDelete={item.is_owner ? () => confirmCommentDeletion(item) : undefined}
-                  />
-                )}
-                showsVerticalScrollIndicator={false}
-                style={styles.commentListView}
-              />
-            ) : (
-              <View style={styles.commentState}>
-                <View style={styles.commentEmptyIcon}><Ionicons color="#2E7EBC" name="chatbubble-ellipses-outline" size={25} /></View>
-                <Text style={styles.commentStateTitle}>No comments yet</Text>
-                <Text style={styles.commentStateText}>Be the first to share a helpful comment.</Text>
-              </View>
-            )}
+            <View {...sheetDragResponders.content.panHandlers} style={styles.commentGestureContent}>
+              {loading ? (
+                <View style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
+              ) : comments.length ? (
+                <FlatList
+                  contentContainerStyle={styles.commentList}
+                  data={comments}
+                  keyboardShouldPersistTaps="handled"
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <CommentRow
+                      avatarUrl={item.is_owner ? authorAvatarUrl : null}
+                      comment={item}
+                      deleting={deletingIds.has(item.id)}
+                      onDelete={item.is_owner ? () => confirmCommentDeletion(item) : undefined}
+                    />
+                  )}
+                  showsVerticalScrollIndicator={false}
+                  style={styles.commentListView}
+                />
+              ) : (
+                <View style={styles.commentState}>
+                  <View style={styles.commentEmptyIcon}><Ionicons color="#2E7EBC" name="chatbubble-ellipses-outline" size={25} /></View>
+                  <Text style={styles.commentStateTitle}>No comments yet</Text>
+                  <Text style={styles.commentStateText}>Be the first to share a helpful comment.</Text>
+                </View>
+              )}
 
-            {error ? <Text accessibilityRole="alert" selectable style={styles.commentError}>{error}</Text> : null}
-            <View style={[styles.commentInputDock, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 10) }]}>
+              {error ? <Text accessibilityRole="alert" selectable style={styles.commentError}>{error}</Text> : null}
+            </View>
+            <View {...sheetDragResponders.input.panHandlers} style={[styles.commentInputDock, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 10) }]}>
               <ScrollView
                 contentContainerStyle={styles.commentEmojiContent}
                 horizontal
@@ -948,6 +956,7 @@ const styles = StyleSheet.create({
   commentDragArea: { flexShrink: 0, gap: 12 },
   commentEmptyIcon: { alignItems: 'center', backgroundColor: '#E7F2FA', borderCurve: 'continuous', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   commentError: { backgroundColor: '#FFF0F2', color: '#B4233A', fontFamily: dashboardFonts.semiBold, fontSize: 11, lineHeight: 16, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 9 },
+  commentGestureContent: { flex: 1, gap: 8, minHeight: 0 },
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, flexShrink: 0, height: 5, width: 40 },
   commentHeader: { borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0, paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
