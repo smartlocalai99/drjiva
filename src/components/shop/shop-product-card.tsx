@@ -14,6 +14,7 @@ import {
   formatShopProductPrice,
   SHOP_DISCOUNT_PERCENT,
 } from '../../lib/currency';
+import { getShopProductRating } from '../../lib/shop-product-rating';
 import { ProductQuantityControl } from './product-quantity-control';
 
 export function ShopProductCard({
@@ -31,6 +32,8 @@ export function ShopProductCard({
   product: ShopProduct;
   quantity: number;
 }) {
+  const rating = getShopProductRating(product.id, product.name);
+
   return (
     <View style={styles.card}>
       <Pressable
@@ -63,13 +66,35 @@ export function ShopProductCard({
           <Text numberOfLines={1} style={styles.meta}>
             {product.packSize}
           </Text>
-          <View style={styles.deliveryBenefit}>
-            <Ionicons
-              color={dashboardColors.primary}
-              name="bicycle-outline"
-              size={15}
-            />
-            <Text style={styles.deliveryBenefitText}>Free delivery</Text>
+          <View style={styles.ratingRow}>
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingValue}>{rating.label}</Text>
+              <Ionicons color="#FFFFFF" name="star" size={12} />
+            </View>
+            <Text style={styles.ratingCount}>{rating.count} ratings</Text>
+          </View>
+          <View style={styles.fulfilmentRow}>
+            <View style={styles.deliveryEta}>
+              <View style={styles.deliveryIcon}>
+                <Ionicons
+                  color={dashboardColors.primary}
+                  name="bicycle-outline"
+                  size={18}
+                />
+              </View>
+              <View style={styles.deliveryCopy}>
+                <Text style={styles.deliveryTitle}>Get it in 15 mins</Text>
+                <Text style={styles.deliverySubtitle}>Fast delivery</Text>
+              </View>
+            </View>
+            <View style={styles.freeDeliveryBadge}>
+              <Ionicons
+                color="#15803D"
+                name="checkmark-circle"
+                size={14}
+              />
+              <Text style={styles.freeDeliveryText}>Free delivery</Text>
+            </View>
           </View>
         </View>
       </Pressable>
@@ -84,9 +109,6 @@ export function ShopProductCard({
           </View>
           <Text style={styles.price}>
             {formatShopProductPrice(product.price)}
-          </Text>
-          <Text style={styles.offerText}>
-            {SHOP_DISCOUNT_PERCENT}% offer
           </Text>
         </View>
 
@@ -164,21 +186,93 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 3,
   },
-  deliveryBenefit: {
+  ratingRow: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
-    gap: 5,
+    gap: 7,
     marginTop: dashboardSpacing.sm,
-    paddingHorizontal: 9,
+  },
+  ratingBadge: {
+    alignItems: 'center',
+    backgroundColor: '#15803D',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 8,
     paddingVertical: 5,
   },
-  deliveryBenefitText: {
+  ratingValue: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    lineHeight: 15,
+  },
+  ratingCount: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 12,
+  },
+  fulfilmentRow: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: dashboardColors.track,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    justifyContent: 'space-between',
+    marginTop: dashboardSpacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  deliveryEta: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 0,
+  },
+  deliveryIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  deliveryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  deliveryTitle: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  deliverySubtitle: {
     ...dashboardTypography.caption,
     color: dashboardColors.primary,
     fontFamily: 'Inter_600SemiBold',
+    fontSize: 10,
+    lineHeight: 13,
+    marginTop: 1,
+  },
+  freeDeliveryBadge: {
+    alignItems: 'center',
+    backgroundColor: '#ECFDF3',
+    borderRadius: dashboardRadii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  freeDeliveryText: {
+    ...dashboardTypography.caption,
+    color: '#15803D',
+    fontFamily: 'Inter_700Bold',
     fontSize: 10,
     lineHeight: 13,
   },
@@ -214,13 +308,6 @@ const styles = StyleSheet.create({
     color: dashboardColors.primaryDark,
     fontFamily: 'Inter_700Bold',
     fontSize: 18,
-    marginTop: 1,
-  },
-  offerText: {
-    ...dashboardTypography.caption,
-    color: '#DC2626',
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 10,
     marginTop: 1,
   },
 });

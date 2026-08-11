@@ -45,7 +45,7 @@ export function ProductQuantityControl({
       >
         <Ionicons color={dashboardColors.primary} name="remove" size={18} />
       </PressableScale>
-      <Text style={styles.quantityValue}>{quantity}</Text>
+      <Text style={styles.quantityValue}>Qty {quantity}</Text>
       <PressableScale
         accessibilityLabel={`Increase ${productName} quantity, currently ${quantity}`}
         onPress={onIncrement}
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
     height: 48,
-    minWidth: 104,
+    minWidth: 126,
   },
   stepButton: {
     alignItems: 'center',
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 16,
     fontVariant: ['tabular-nums'],
-    minWidth: 20,
+    minWidth: 42,
     textAlign: 'center',
   },
 });
