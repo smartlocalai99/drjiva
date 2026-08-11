@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   },
   profileRing: {
     alignItems: 'center',
-    borderColor: dashboardColors.primary,
+    borderColor: '#CBD5E1',
     borderRadius: 24,
     borderWidth: 2,
     height: 48,

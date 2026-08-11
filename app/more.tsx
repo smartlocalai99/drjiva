@@ -2,8 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +51,7 @@ import {
   getCachedPatientName,
   saveCachedAvatarUrl,
   saveCachedPatientName,
+  subscribeCachedAvatarUrl,
 } from '../src/lib/session';
 
 export default function MoreScreen() {
@@ -67,54 +72,61 @@ export default function MoreScreen() {
 
   useEffect(() => {
     if (!phone) {
-      setIsLoading(false);
-      return;
+      return undefined;
     }
+    return subscribeCachedAvatarUrl(phone, setAvatarUrl);
+  }, [phone]);
 
-    let cancelled = false;
-
-    const loadPatient = async () => {
-      const [cachedName, cachedAvatarUrl] = await Promise.all([
-        getCachedPatientName(phone).catch(() => null),
-        getCachedAvatarUrl(phone).catch(() => null),
-      ]);
-      if (!cancelled) {
-        if (cachedName) {
-          setName(cachedName);
-        }
-        if (cachedAvatarUrl) {
-          setAvatarUrl(cachedAvatarUrl);
-        }
+  useFocusEffect(
+    useCallback(() => {
+      if (!phone) {
         setIsLoading(false);
+        return undefined;
       }
 
-      try {
-        const patient = await getPatientByPhone(phone);
-        if (!cancelled && patient) {
-          setName(patient.name);
-          setAvatarUrl(patient.avatarUrl);
-          void saveCachedPatientName(phone, patient.name).catch(
-            () => undefined,
-          );
-          void saveCachedAvatarUrl(phone, patient.avatarUrl).catch(
-            () => undefined,
-          );
-        }
-      } catch {
-        // Keep the cached value while the background refresh is unavailable.
-      } finally {
+      let cancelled = false;
+
+      const loadPatient = async () => {
+        const [cachedName, cachedAvatarUrl] = await Promise.all([
+          getCachedPatientName(phone).catch(() => null),
+          getCachedAvatarUrl(phone).catch(() => null),
+        ]);
         if (!cancelled) {
+          if (cachedName) {
+            setName(cachedName);
+          }
+          setAvatarUrl(cachedAvatarUrl);
           setIsLoading(false);
         }
-      }
-    };
 
-    void loadPatient();
+        try {
+          const patient = await getPatientByPhone(phone);
+          if (!cancelled && patient) {
+            setName(patient.name);
+            setAvatarUrl(patient.avatarUrl);
+            void saveCachedPatientName(phone, patient.name).catch(
+              () => undefined,
+            );
+            void saveCachedAvatarUrl(phone, patient.avatarUrl).catch(
+              () => undefined,
+            );
+          }
+        } catch {
+          // Keep the cached value while the background refresh is unavailable.
+        } finally {
+          if (!cancelled) {
+            setIsLoading(false);
+          }
+        }
+      };
 
-    return () => {
-      cancelled = true;
-    };
-  }, [phone]);
+      void loadPatient();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [phone]),
+  );
 
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const scrollBottomPadding =
@@ -443,7 +455,7 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
-    borderColor: dashboardColors.primary,
+    borderColor: '#CBD5E1',
     borderRadius: 40,
     borderWidth: 2,
     height: 80,

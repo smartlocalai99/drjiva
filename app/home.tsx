@@ -59,6 +59,7 @@ import {
   getCachedPatientName,
   saveCachedAvatarUrl,
   saveCachedPatientName,
+  subscribeCachedAvatarUrl,
 } from '../src/lib/session';
 
 export default function HomeScreen() {
@@ -147,6 +148,13 @@ export default function HomeScreen() {
   medicineDateKeyRef.current = medicineDateKey;
   medicinePhoneRef.current = medicinePhone;
   patientNameRef.current = visiblePatientName;
+
+  useEffect(() => {
+    if (!phone) {
+      return undefined;
+    }
+    return subscribeCachedAvatarUrl(phone, setPatientAvatarUrl);
+  }, [phone]);
 
   useEffect(() => {
     medicineRequestIdRef.current += 1;

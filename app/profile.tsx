@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
-    borderColor: dashboardColors.primary,
+    borderColor: '#CBD5E1',
     borderRadius: 40,
     borderWidth: 2,
     height: 80,

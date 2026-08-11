@@ -94,6 +94,7 @@ const PLACEHOLDER_QUERIES = [
   'Pain management',
 ] as const;
 const PLACEHOLDER_ROTATION_MS = 2400;
+const BANNER_AUTO_SCROLL_MS = 3600;
 const ADDRESS_HEADER_HEIGHT = 64;
 const AnimatedSectionList = Animated.createAnimatedComponent(
   SectionList<ShopProduct, ShopProductSection>,
@@ -671,6 +672,11 @@ function ShopBannerCarousel({
   ) => void;
 }) {
   const { width } = useWindowDimensions();
+  const carouselRef = useRef<
+    FlatList<(typeof SHOP_BANNERS)[number]>
+  >(null);
+  const activeIndexRef = useRef(0);
+  const isDraggingRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const availableWidth = Math.min(
     width - dashboardSpacing.pagePadding * 2,
@@ -679,22 +685,64 @@ function ShopBannerCarousel({
   const bannerWidth = Math.max(260, availableWidth - 28);
   const snapInterval = bannerWidth + dashboardSpacing.md;
 
+  const updateActiveIndex = useCallback((index: number) => {
+    const boundedIndex = Math.max(
+      0,
+      Math.min(SHOP_BANNERS.length - 1, index),
+    );
+    activeIndexRef.current = boundedIndex;
+    setActiveIndex(boundedIndex);
+  }, []);
+
+  useEffect(() => {
+    carouselRef.current?.scrollToOffset({
+      animated: false,
+      offset: activeIndexRef.current * snapInterval,
+    });
+  }, [snapInterval]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const autoScrollTimer = setInterval(() => {
+        if (isDraggingRef.current) {
+          return;
+        }
+        const nextIndex =
+          (activeIndexRef.current + 1) % SHOP_BANNERS.length;
+        updateActiveIndex(nextIndex);
+        carouselRef.current?.scrollToOffset({
+          animated: true,
+          offset: nextIndex * snapInterval,
+        });
+      }, BANNER_AUTO_SCROLL_MS);
+
+      return () => clearInterval(autoScrollTimer);
+    }, [snapInterval, updateActiveIndex]),
+  );
+
   return (
     <View style={styles.bannerCarousel}>
       <FlatList
+        ref={carouselRef}
         accessibilityLabel="Shop category offers"
         contentContainerStyle={styles.bannerTrack}
         data={SHOP_BANNERS}
         decelerationRate="fast"
+        disableIntervalMomentum
         horizontal
         keyExtractor={(item) => item.sectionCode}
         onMomentumScrollEnd={(event) => {
           const nextIndex = Math.round(
             event.nativeEvent.contentOffset.x / snapInterval,
           );
-          setActiveIndex(
-            Math.max(0, Math.min(SHOP_BANNERS.length - 1, nextIndex)),
-          );
+          isDraggingRef.current = false;
+          updateActiveIndex(nextIndex);
+        }}
+        onScrollBeginDrag={() => {
+          isDraggingRef.current = true;
+        }}
+        onScrollEndDrag={() => {
+          isDraggingRef.current = false;
         }}
         renderItem={({ item }) => (
           <PressableScale
@@ -1063,7 +1111,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...dashboardTypography.title,
-    color: dashboardColors.text,
+    color: dashboardColors.primary,
     flex: 1,
     fontSize: 18,
   },

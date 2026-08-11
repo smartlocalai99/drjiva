@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     ...dashboardTypography.title,
-    color: dashboardColors.text,
+    color: dashboardColors.primary,
     fontSize: 16,
     marginBottom: dashboardSpacing.sm,
   },

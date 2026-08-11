@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DUMMY_MEDICINE_PRICE,
+  SHOP_DISCOUNT_PERCENT,
   formatRupees,
+  formatShopProductMrp,
   formatShopProductPrice,
+  resolveShopProductMrp,
   resolveShopProductPrice,
 } from './currency';
 
@@ -19,7 +22,7 @@ describe('currency formatting', () => {
 });
 
 describe('formatShopProductPrice', () => {
-  it('formats a known price as rupees', () => {
+  it('formats the catalogue selling price as rupees', () => {
     expect(formatShopProductPrice(32)).toBe('₹32');
   });
 
@@ -29,11 +32,23 @@ describe('formatShopProductPrice', () => {
 });
 
 describe('resolveShopProductPrice', () => {
-  it('returns the real price when set', () => {
+  it('keeps the catalogue price as the discounted selling price', () => {
+    expect(SHOP_DISCOUNT_PERCENT).toBe(10);
     expect(resolveShopProductPrice(32)).toBe(32);
   });
 
-  it('returns the dummy placeholder price when missing', () => {
+  it('uses the placeholder selling price when missing', () => {
     expect(resolveShopProductPrice(null)).toBe(DUMMY_MEDICINE_PRICE);
+  });
+});
+
+describe('shop product MRP', () => {
+  it('derives MRP from the selling price and advertised discount', () => {
+    expect(resolveShopProductMrp(32)).toBe(35.56);
+    expect(formatShopProductMrp(32)).toBe('₹35.56');
+  });
+
+  it('derives a placeholder MRP when a price is missing', () => {
+    expect(resolveShopProductMrp(null)).toBe(54.44);
   });
 });

@@ -3,6 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SESSION_PHONE_KEY = 'drjiva.session.phone';
 const PATIENT_NAME_KEY_PREFIX = 'drjiva.patient-name.v1';
 const PATIENT_AVATAR_KEY_PREFIX = 'drjiva.patient-avatar.v1';
+const avatarListeners = new Map<
+  string,
+  Set<(avatarUrl: string | null) => void>
+>();
+
+function normalizeAvatarPhone(phone: string): string {
+  return phone.replace(/\D/g, '').slice(-10);
+}
 
 function getPatientNameKey(phone: string): string {
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
@@ -10,8 +18,34 @@ function getPatientNameKey(phone: string): string {
 }
 
 function getPatientAvatarKey(phone: string): string {
-  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  const normalizedPhone = normalizeAvatarPhone(phone);
   return `${PATIENT_AVATAR_KEY_PREFIX}.${normalizedPhone}`;
+}
+
+function notifyAvatarListeners(
+  phone: string,
+  avatarUrl: string | null,
+): void {
+  avatarListeners
+    .get(normalizeAvatarPhone(phone))
+    ?.forEach((listener) => listener(avatarUrl));
+}
+
+export function subscribeCachedAvatarUrl(
+  phone: string,
+  listener: (avatarUrl: string | null) => void,
+): () => void {
+  const normalizedPhone = normalizeAvatarPhone(phone);
+  const phoneListeners = avatarListeners.get(normalizedPhone) ?? new Set();
+  phoneListeners.add(listener);
+  avatarListeners.set(normalizedPhone, phoneListeners);
+
+  return () => {
+    phoneListeners.delete(listener);
+    if (phoneListeners.size === 0) {
+      avatarListeners.delete(normalizedPhone);
+    }
+  };
 }
 
 export async function saveSessionPhone(phone: string): Promise<void> {
@@ -73,8 +107,10 @@ export async function saveCachedAvatarUrl(
   }
 
   await AsyncStorage.setItem(getPatientAvatarKey(phone), avatarUrl);
+  notifyAvatarListeners(phone, avatarUrl);
 }
 
 export async function clearCachedAvatarUrl(phone: string): Promise<void> {
   await AsyncStorage.removeItem(getPatientAvatarKey(phone));
+  notifyAvatarListeners(phone, null);
 }

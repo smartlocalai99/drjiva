@@ -18,6 +18,7 @@ import {
   getCachedPatientName,
   saveCachedAvatarUrl,
   saveCachedPatientName,
+  subscribeCachedAvatarUrl,
 } from './session';
 
 describe('patient name cache', () => {
@@ -117,5 +118,29 @@ describe('patient avatar cache', () => {
     expect(asyncStorage.removeItem).toHaveBeenCalledWith(
       'drjiva.patient-avatar.v1.9876543210',
     );
+  });
+
+  it('notifies mounted screens immediately when the avatar changes', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeCachedAvatarUrl('98765 43210', listener);
+
+    await saveCachedAvatarUrl(
+      '9876543210',
+      'https://example.test/new.jpg',
+    );
+    await clearCachedAvatarUrl('9876543210');
+
+    expect(listener).toHaveBeenNthCalledWith(
+      1,
+      'https://example.test/new.jpg',
+    );
+    expect(listener).toHaveBeenNthCalledWith(2, null);
+
+    unsubscribe();
+    await saveCachedAvatarUrl(
+      '9876543210',
+      'https://example.test/ignored.jpg',
+    );
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 });
