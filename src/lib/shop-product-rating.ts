@@ -15,5 +15,6 @@ export function getShopProductRating(productId: string, productName: string) {
   return {
     count: 120 + (hash % 1381),
     label: Number.isInteger(rating) ? String(rating) : rating.toFixed(1),
+    recentOrders: 18 + (hash % 79),
   };
 }

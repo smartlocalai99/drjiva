@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     padding: dashboardSpacing.pagePadding,
   },
   imageWrap: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F1F3F5",
     borderCurve: "continuous",
     borderRadius: 24,
     height: 250,
@@ -834,7 +834,7 @@ const styles = StyleSheet.create({
   },
   relatedImageWrap: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F1F3F5",
     borderRadius: 14,
     height: 134,
     justifyContent: "center",

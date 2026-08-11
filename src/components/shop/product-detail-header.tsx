@@ -87,6 +87,20 @@ export function ProductDetailHeaderActions({
   );
 }
 
+export function ProductDetailBackButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityLabel="Go back"
+      accessibilityRole="button"
+      hitSlop={10}
+      onPress={onPress}
+      style={styles.backButton}
+    >
+      <Ionicons color={dashboardColors.text} name="arrow-back" size={25} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   fallbackTitle: {
     ...dashboardTypography.body,
@@ -145,6 +159,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
     width: 36,
+  },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    height: 42,
+    justifyContent: 'center',
+    width: 40,
   },
   cartBadge: {
     alignItems: 'center',

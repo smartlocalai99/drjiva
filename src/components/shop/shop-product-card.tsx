@@ -87,19 +87,9 @@ export function ShopProductCard({
                 <Text style={styles.deliverySubtitle}>Fast delivery</Text>
               </View>
             </View>
-            <View style={styles.fulfilmentBadges}>
-              <View style={styles.freeDeliveryBadge}>
-                <Ionicons color="#15803D" name="cube-outline" size={14} />
-                <Text style={styles.freeDeliveryText}>Free delivery</Text>
-              </View>
-              <View style={styles.codBadge}>
-                <Ionicons
-                  color={dashboardColors.primary}
-                  name="cash-outline"
-                  size={14}
-                />
-                <Text style={styles.codText}>COD</Text>
-              </View>
+            <View style={styles.freeDeliveryBadge}>
+              <Ionicons color="#15803D" name="cube-outline" size={14} />
+              <Text style={styles.freeDeliveryText}>Free delivery</Text>
             </View>
           </View>
         </View>
@@ -144,7 +134,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F1F3F5",
     height: 164,
     justifyContent: "center",
     position: "relative",
@@ -275,29 +265,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 6,
   },
-  fulfilmentBadges: {
-    alignItems: "flex-end",
-    gap: 5,
-  },
   freeDeliveryText: {
     ...dashboardTypography.caption,
     color: "#15803D",
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  codBadge: {
-    alignItems: "center",
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: dashboardRadii.pill,
-    flexDirection: "row",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  codText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.primary,
     fontFamily: "Inter_700Bold",
     fontSize: 10,
     lineHeight: 13,

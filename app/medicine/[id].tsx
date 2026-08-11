@@ -10,16 +10,14 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PressableScale } from "../../src/components/PressableScale";
 import { MedicineDetailContent } from "../../src/components/shop/medicine-detail-content";
 import { ProductQuantityControl } from "../../src/components/shop/product-quantity-control";
 import {
   ProductDetailHeaderActions,
+  ProductDetailBackButton,
   ProductDetailHeaderTitle,
 } from "../../src/components/shop/product-detail-header";
 import {
@@ -36,6 +34,7 @@ import {
 } from "../../src/data/shopProducts";
 import { useCart } from "../../src/lib/cart";
 import { useLanguage } from "../../src/lib/i18n";
+import { getShopProductRating } from "../../src/lib/shop-product-rating";
 
 export default function MedicineDetailScreen() {
   const router = useRouter();
@@ -107,6 +106,9 @@ export default function MedicineDetailScreen() {
 
   const isLoading = product === undefined;
   const quantity = product ? cart.getQuantity(product.id) : 0;
+  const recentOrders = product
+    ? getShopProductRating(product.id, product.name).recentOrders
+    : 0;
 
   const actionBarHeight = 112 + insets.bottom;
 
@@ -118,10 +120,13 @@ export default function MedicineDetailScreen() {
   };
 
   return (
-    <SafeAreaView edges={["top"]} style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <Stack.Screen
         options={{
-          headerBackButtonDisplayMode: "minimal",
+          headerBackVisible: false,
+          headerLeft: () => (
+            <ProductDetailBackButton onPress={() => router.back()} />
+          ),
           headerRight: isHeaderCondensed
             ? () => (
                 <ProductDetailHeaderActions
@@ -215,7 +220,7 @@ export default function MedicineDetailScreen() {
             <View style={styles.orderSignal}>
               <Ionicons color="#15803D" name="stats-chart" size={18} />
               <Text style={styles.orderSignalText}>
-                46 people ordered in the last 7 days
+                {recentOrders} people ordered in the last 7 days
               </Text>
             </View>
             <View style={styles.actionControls}>
@@ -271,7 +276,7 @@ export default function MedicineDetailScreen() {
           </View>
         </>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
