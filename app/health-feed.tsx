@@ -627,7 +627,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   return (
     <Modal animationType="slide" onRequestClose={closeComments} presentationStyle="overFullScreen" visible={Boolean(post)}>
       <View style={styles.commentModal}>
-        <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : 'height'} style={styles.commentKeyboard}>
+        <KeyboardAvoidingView behavior="height" keyboardVerticalOffset={0} style={styles.commentKeyboard}>
           {post ? (
             <Animated.View
               entering={FadeIn.duration(180)}
@@ -898,24 +898,24 @@ const styles = StyleSheet.create({
   commentBody: { color: '#36424E', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
   commentBubble: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, flex: 1, gap: 5, paddingHorizontal: 12, paddingVertical: 10 },
   commentClose: { alignItems: 'center', backgroundColor: '#F0F3F5', borderCurve: 'continuous', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
-  commentComposer: { alignItems: 'flex-end', flexDirection: 'row', gap: 9, paddingHorizontal: 16 },
+  commentComposer: { alignItems: 'flex-end', flexDirection: 'row', flexShrink: 0, gap: 9, paddingHorizontal: 16 },
   commentDelete: { alignItems: 'center', height: 24, justifyContent: 'center', marginLeft: 'auto', width: 24 },
   commentEmoji: { fontSize: 25, lineHeight: 32 },
-  commentEmojiBar: { flexGrow: 0 },
+  commentEmojiBar: { flexGrow: 0, flexShrink: 0 },
   commentEmojiButton: { alignItems: 'center', height: 42, justifyContent: 'center', width: 44 },
   commentEmojiContent: { alignItems: 'center', flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 8 },
   commentEmptyIcon: { alignItems: 'center', backgroundColor: '#E7F2FA', borderCurve: 'continuous', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   commentError: { backgroundColor: '#FFF0F2', color: '#B4233A', fontFamily: dashboardFonts.semiBold, fontSize: 11, lineHeight: 16, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 9 },
-  commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, height: 5, width: 40 },
-  commentHeader: { alignItems: 'center', borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 18 },
+  commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, flexShrink: 0, height: 5, width: 40 },
+  commentHeader: { alignItems: 'center', borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', flexShrink: 0, justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
   commentInput: { backgroundColor: 'transparent', color: '#101828', fontFamily: dashboardFonts.medium, fontSize: 14, lineHeight: 19, maxHeight: 92, minHeight: 42, opacity: 1, paddingLeft: 14, paddingRight: 14, paddingVertical: 10, width: '100%' },
   commentInputWithSend: { paddingRight: 48 },
-  commentInputDock: { backgroundColor: '#FFFFFF', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, gap: 7, paddingTop: 4 },
+  commentInputDock: { backgroundColor: '#FFFFFF', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, flexShrink: 0, gap: 7, paddingTop: 4 },
   commentInputShell: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 22, flex: 1, justifyContent: 'center', minHeight: 42, position: 'relative' },
   commentKeyboard: { backgroundColor: '#FFFFFF', flex: 1 },
   commentList: { flexGrow: 1, gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
-  commentListView: { flex: 1 },
+  commentListView: { flex: 1, minHeight: 0 },
   commentMeta: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   commentModal: { backgroundColor: '#050607', flex: 1 },
   commentPostTitle: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 11, maxWidth: 260, paddingTop: 2 },
@@ -925,8 +925,8 @@ const styles = StyleSheet.create({
   commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   commentSendDisabled: { backgroundColor: '#AFBAC3' },
   commentSendSlot: { bottom: 4, position: 'absolute', right: 4, zIndex: 2 },
-  commentSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, gap: 12, overflow: 'hidden', paddingTop: 10 },
-  commentState: { alignItems: 'center', flex: 1, gap: 9, justifyContent: 'center', minHeight: 220, paddingHorizontal: 32 },
+  commentSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, gap: 12, minHeight: 0, overflow: 'hidden', paddingTop: 10 },
+  commentState: { alignItems: 'center', flex: 1, gap: 9, justifyContent: 'center', minHeight: 0, paddingHorizontal: 32 },
   commentStateText: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   commentStateTitle: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 15 },
   commentTime: { color: '#87919D', fontFamily: dashboardFonts.medium, fontSize: 10, fontVariant: ['tabular-nums'] },
