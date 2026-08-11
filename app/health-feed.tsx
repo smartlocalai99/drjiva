@@ -30,6 +30,7 @@ import Animated, {
   FadeIn,
   FadeOut,
   interpolate,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -508,9 +509,17 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const previewHeight = Math.min(380, Math.max(240, height * 0.39));
-  const previewMediaHeight = Math.max(178, previewHeight - insets.top - 20);
-  const previewMediaWidth = Math.min(width - 72, previewMediaHeight * 0.78);
+  const previewHeight = keyboardVisible
+    ? Math.min(250, Math.max(205, height * 0.27))
+    : Math.min(380, Math.max(240, height * 0.39));
+  const previewMediaHeight = Math.max(
+    keyboardVisible ? 150 : 178,
+    previewHeight - insets.top - (keyboardVisible ? 12 : 20),
+  );
+  const previewMediaWidth = Math.min(
+    width - 72,
+    previewMediaHeight * (keyboardVisible ? 1.04 : 0.78),
+  );
 
   useEffect(() => {
     if (!post) {
@@ -619,10 +628,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     <Modal animationType="slide" onRequestClose={closeComments} presentationStyle="overFullScreen" visible={Boolean(post)}>
       <View style={styles.commentModal}>
         <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : 'height'} style={styles.commentKeyboard}>
-          {!keyboardVisible && post ? (
+          {post ? (
             <Animated.View
               entering={FadeIn.duration(180)}
               exiting={FadeOut.duration(120)}
+              layout={LinearTransition.duration(180)}
               style={[styles.commentPreview, { height: previewHeight, paddingTop: insets.top + 8 }]}
             >
               <View style={[styles.commentPreviewMedia, { height: previewMediaHeight, width: previewMediaWidth }]}>
@@ -699,6 +709,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                   maxLength={500}
                   multiline
                   onChangeText={setDraft}
+                  onFocus={() => setKeyboardVisible(true)}
                   placeholder={`Comment as ${authorName}`}
                   placeholderTextColor="#87919D"
                   style={styles.commentInput}
@@ -746,8 +757,8 @@ function CommentRow({ avatarUrl, comment, deleting, onDelete }: {
               style={styles.commentDelete}
             >
               {deleting
-                ? <ActivityIndicator color="#697480" size="small" />
-                : <Ionicons color="#697480" name="close" size={18} />}
+                ? <ActivityIndicator color="#D92D3F" size="small" />
+                : <Ionicons color="#D92D3F" name="close" size={18} />}
             </Pressable>
           ) : null}
         </View>
