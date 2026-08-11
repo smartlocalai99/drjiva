@@ -218,6 +218,28 @@ export async function clearPatientProfilePhoto(phone: string): Promise<void> {
   }
 }
 
+export async function updatePatientProfilePhoto(
+  phone: string,
+  avatarUrl: string,
+): Promise<Patient> {
+  await ensureSecureReportSession();
+  const { data, error } = await supabase
+    .from('patients')
+    .update({ avatar_url: avatarUrl })
+    .eq('mobile', toIndianE164(phone))
+    .select(PHOTO_COLUMNS)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    throw new Error('Unable to save the profile photo.');
+  }
+
+  return mapPatientRow(data);
+}
+
 export async function updatePatientAddress(
   phone: string,
   address: string | null,

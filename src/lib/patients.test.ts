@@ -51,6 +51,7 @@ import {
   clearPatientProfilePhoto,
   getPatientByPhone,
   updatePatientProfile,
+  updatePatientProfilePhoto,
 } from './patients';
 
 describe('patient profile photos', () => {
@@ -109,5 +110,16 @@ describe('patient profile photos', () => {
     await clearPatientProfilePhoto('9876543210');
 
     expect(updatePayload).toEqual({ avatar_url: null });
+  });
+
+  it('saves a profile photo without overwriting personal details', async () => {
+    await updatePatientProfilePhoto(
+      '9876543210',
+      'https://example.test/new-profile.jpg',
+    );
+
+    expect(updatePayload).toEqual({
+      avatar_url: 'https://example.test/new-profile.jpg',
+    });
   });
 });

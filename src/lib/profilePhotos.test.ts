@@ -18,6 +18,8 @@ import {
   buildProfilePhotoPath,
   deleteProfilePhoto,
   getProfilePhotoStoragePath,
+  resolveProfilePhotoMimeType,
+  saveProfilePhotoReliably,
   validateProfilePhoto,
 } from './profilePhotos';
 
@@ -57,6 +59,17 @@ describe('profile photos', () => {
         mimeType: 'image/heic',
       }),
     ).toMatch(/JPEG or PNG/);
+  });
+
+  it('recovers a missing Android MIME type from the selected file path', () => {
+    expect(
+      resolveProfilePhotoMimeType({
+        fileName: null,
+        fileSize: 1200,
+        mimeType: undefined,
+        uri: 'file:///cache/cropped-profile.JPG',
+      }),
+    ).toBe('image/jpeg');
   });
 
   it('builds a unique object path below the patient folder', () => {
@@ -109,5 +122,77 @@ describe('profile photos', () => {
       ),
     ).rejects.toThrow(/locate/);
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('automatically retries a temporary photo upload failure', async () => {
+    const upload = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('temporary network error'))
+      .mockResolvedValue('https://example.test/photo.jpg');
+    const persist = vi.fn(async (url: string) => url);
+    const wait = vi.fn(async () => undefined);
+
+    await expect(
+      saveProfilePhotoReliably(
+        {
+          discard: vi.fn(async () => undefined),
+          persist,
+          upload,
+          verify: vi.fn(async () => null),
+        },
+        { retryDelaysMs: [10], wait },
+      ),
+    ).resolves.toBe('https://example.test/photo.jpg');
+
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(wait).toHaveBeenCalledWith(10);
+  });
+
+  it('accepts a verified save when the database response was interrupted', async () => {
+    const uploadedUrl = 'https://example.test/photo.jpg';
+    const upload = vi.fn(async () => uploadedUrl);
+    const discard = vi.fn(async () => undefined);
+
+    await expect(
+      saveProfilePhotoReliably({
+        discard,
+        persist: vi.fn(async () => {
+          throw new Error('response interrupted');
+        }),
+        upload,
+        verify: vi.fn(async () => uploadedUrl),
+      }),
+    ).resolves.toBe(uploadedUrl);
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(discard).not.toHaveBeenCalled();
+  });
+
+  it('discards an unreferenced upload before retrying the save', async () => {
+    const firstUrl = 'https://example.test/first.jpg';
+    const secondUrl = 'https://example.test/second.jpg';
+    const discard = vi.fn(async () => undefined);
+    const persist = vi
+      .fn<(url: string) => Promise<string | null>>()
+      .mockRejectedValueOnce(new Error('database unavailable'))
+      .mockImplementation(async (url) => url);
+
+    await expect(
+      saveProfilePhotoReliably(
+        {
+          discard,
+          persist,
+          upload: vi
+            .fn<() => Promise<string>>()
+            .mockResolvedValueOnce(firstUrl)
+            .mockResolvedValueOnce(secondUrl),
+          verify: vi.fn(async () => 'https://example.test/old.jpg'),
+        },
+        { retryDelaysMs: [10], wait: async () => undefined },
+      ),
+    ).resolves.toBe(secondUrl);
+
+    expect(discard).toHaveBeenCalledWith(firstUrl);
   });
 });

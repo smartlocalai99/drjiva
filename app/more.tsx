@@ -59,6 +59,11 @@ export default function MoreScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl]);
 
   useEffect(() => {
     if (!phone) {
@@ -207,9 +212,10 @@ export default function MoreScreen() {
         >
           <View style={styles.avatarCard}>
             <View style={styles.avatar}>
-              {avatarUrl ? (
+              {avatarUrl && !avatarFailed ? (
                 <Image
                   contentFit="cover"
+                  onError={() => setAvatarFailed(true)}
                   source={{ uri: avatarUrl }}
                   style={styles.avatarImage}
                 />

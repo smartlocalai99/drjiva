@@ -5,18 +5,105 @@ import { supabase } from './supabase';
 
 export const PROFILE_PHOTO_BUCKET = 'profile-pictures';
 export const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
+const PROFILE_PHOTO_RETRY_DELAYS_MS = [350, 900] as const;
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png']);
 
 type ProfilePhotoMetadata = Pick<
   ImagePicker.ImagePickerAsset,
   'fileSize' | 'mimeType'
->;
+> &
+  Partial<Pick<ImagePicker.ImagePickerAsset, 'fileName' | 'uri'>>;
+
+export type ReliableProfilePhotoSave = {
+  discard: (uploadedUrl: string) => Promise<void>;
+  persist: (uploadedUrl: string) => Promise<string | null>;
+  upload: () => Promise<string>;
+  verify: () => Promise<string | null>;
+};
+
+type ReliableProfilePhotoSaveOptions = {
+  retryDelaysMs?: readonly number[];
+  wait?: (delayMs: number) => Promise<void>;
+};
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+export async function saveProfilePhotoReliably(
+  operations: ReliableProfilePhotoSave,
+  options: ReliableProfilePhotoSaveOptions = {},
+): Promise<string> {
+  const retryDelaysMs =
+    options.retryDelaysMs ?? PROFILE_PHOTO_RETRY_DELAYS_MS;
+  const waitForRetry = options.wait ?? wait;
+  let lastError: unknown = new Error('Unable to save profile photo.');
+
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+    let uploadedUrl: string | null = null;
+
+    try {
+      uploadedUrl = await operations.upload();
+      const persistedUrl = await operations.persist(uploadedUrl);
+      if (persistedUrl !== uploadedUrl) {
+        throw new Error('The saved profile photo could not be verified.');
+      }
+      return uploadedUrl;
+    } catch (error) {
+      lastError = error;
+
+      if (uploadedUrl) {
+        try {
+          const verifiedUrl = await operations.verify();
+          if (verifiedUrl === uploadedUrl) {
+            return uploadedUrl;
+          }
+          await operations.discard(uploadedUrl).catch(() => undefined);
+        } catch {
+          // Verification may also fail while connectivity is recovering. Keep
+          // the versioned upload intact so we never delete a photo that the
+          // database may already reference.
+        }
+      }
+
+      const retryDelay = retryDelaysMs[attempt];
+      if (retryDelay === undefined) {
+        break;
+      }
+      await waitForRetry(retryDelay);
+    }
+  }
+
+  throw lastError;
+}
+
+export function resolveProfilePhotoMimeType(
+  asset: ProfilePhotoMetadata,
+): 'image/jpeg' | 'image/png' | null {
+  if (asset.mimeType) {
+    return ALLOWED_MIME_TYPES.has(asset.mimeType)
+      ? (asset.mimeType as 'image/jpeg' | 'image/png')
+      : null;
+  }
+
+  const candidate =
+    `${asset.fileName ?? ''} ${asset.uri ?? ''}`
+      .toLowerCase()
+      .split(/[?#]/, 1)[0] ?? '';
+  if (/\.png(?:\s|$)/.test(candidate)) {
+    return 'image/png';
+  }
+  if (/\.jpe?g(?:\s|$)/.test(candidate)) {
+    return 'image/jpeg';
+  }
+  return null;
+}
 
 export function validateProfilePhoto(
   asset: ProfilePhotoMetadata,
 ): string | null {
-  if (!asset.mimeType || !ALLOWED_MIME_TYPES.has(asset.mimeType)) {
+  if (!resolveProfilePhotoMimeType(asset)) {
     return 'Please choose a JPEG or PNG image.';
   }
 
@@ -89,7 +176,10 @@ export async function uploadProfilePhoto(
 
   await ensureSecureReportSession();
 
-  const mimeType = asset.mimeType as 'image/jpeg' | 'image/png';
+  const mimeType = resolveProfilePhotoMimeType(asset);
+  if (!mimeType) {
+    throw new Error('Unable to determine the profile photo type.');
+  }
   const path = buildProfilePhotoPath(patientId, mimeType);
   const response = await fetch(asset.uri);
   if (!response.ok) {

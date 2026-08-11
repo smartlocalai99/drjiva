@@ -6,7 +6,7 @@ import type {
   ImagePickerOptions,
 } from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,6 +36,7 @@ import {
   clearPatientProfilePhoto,
   getPatientByPhone,
   updatePatientProfile,
+  updatePatientProfilePhoto,
 } from '../src/lib/patients';
 import {
   getCachedPatientName,
@@ -45,6 +46,7 @@ import {
 import { isNativeModuleAvailable } from '../src/lib/nativeModuleAvailability';
 import {
   deleteProfilePhoto,
+  saveProfilePhotoReliably,
   uploadProfilePhoto,
   validateProfilePhoto,
 } from '../src/lib/profilePhotos';
@@ -63,9 +65,11 @@ export default function ProfileScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [isRemovingPhoto, setIsRemovingPhoto] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [savedAt, setSavedAt] = useState<number | undefined>();
+  const [photoWasSaved, setPhotoWasSaved] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const [name, setName] = useState('');
@@ -75,9 +79,15 @@ export default function ProfileScreen() {
   >(null);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const [pendingPhoto, setPendingPhoto] =
     useState<ImagePickerAsset | null>(null);
   const [isAgePickerVisible, setIsAgePickerVisible] = useState(false);
+  const recoveredPickerResultHandled = useRef(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl, pendingPhoto?.uri]);
 
   useEffect(() => {
     if (!phone) {
@@ -135,6 +145,63 @@ export default function ProfileScreen() {
     parsedAge === null ||
     (!Number.isNaN(parsedAge) && parsedAge >= 1 && parsedAge <= 120);
 
+  const saveSelectedProfilePhoto = useCallback(
+    async (asset: ImagePickerAsset) => {
+      if (!patientId || !phone) {
+        setErrorMessage(
+          'Your profile is still loading. The photo could not be saved yet.',
+        );
+        return;
+      }
+
+      const previousAvatarUrl = avatarUrl;
+      setPendingPhoto(asset);
+      setIsSavingPhoto(true);
+      setPhotoWasSaved(false);
+      setErrorMessage(undefined);
+
+      try {
+        const savedAvatarUrl = await saveProfilePhotoReliably({
+          discard: (uploadedUrl) =>
+            deleteProfilePhoto(patientId, uploadedUrl),
+          persist: async (uploadedUrl) => {
+            const patient = await updatePatientProfilePhoto(
+              phone,
+              uploadedUrl,
+            );
+            return patient.avatarUrl;
+          },
+          upload: () => uploadProfilePhoto(patientId, asset),
+          verify: async () => {
+            const patient = await getPatientByPhone(phone);
+            return patient?.avatarUrl ?? null;
+          },
+        });
+
+        await saveCachedAvatarUrl(phone, savedAvatarUrl).catch(
+          () => undefined,
+        );
+        setAvatarUrl(savedAvatarUrl);
+        setPendingPhoto(null);
+        setPhotoWasSaved(true);
+
+        if (previousAvatarUrl && previousAvatarUrl !== savedAvatarUrl) {
+          void deleteProfilePhoto(patientId, previousAvatarUrl).catch(
+            () => undefined,
+          );
+        }
+      } catch (error) {
+        console.error('Unable to save profile photo', error);
+        setErrorMessage(
+          'The photo could not be saved after automatic retries. Please check your connection.',
+        );
+      } finally {
+        setIsSavingPhoto(false);
+      }
+    },
+    [avatarUrl, patientId, phone],
+  );
+
   const selectProfilePhoto = async (source: 'camera' | 'gallery') => {
     try {
       if (!isNativeModuleAvailable('ExponentImagePicker')) {
@@ -186,8 +253,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      setPendingPhoto(asset);
-      setSavedAt(undefined);
+      await saveSelectedProfilePhoto(asset);
     } catch {
       Alert.alert(
         'Unable to open photos',
@@ -196,8 +262,62 @@ export default function ProfileScreen() {
     }
   };
 
+  useEffect(() => {
+    if (
+      !patientId ||
+      recoveredPickerResultHandled.current ||
+      !isNativeModuleAvailable('ExponentImagePicker')
+    ) {
+      return;
+    }
+
+    recoveredPickerResultHandled.current = true;
+    let cancelled = false;
+
+    void import('expo-image-picker')
+      .then(async (ImagePicker) => {
+        const recoveredResult = await ImagePicker.getPendingResultAsync();
+        if (!recoveredResult || cancelled) {
+          return;
+        }
+        if ('code' in recoveredResult) {
+          throw new Error(recoveredResult.message);
+        }
+        if (recoveredResult.canceled) {
+          return;
+        }
+
+        const recoveredAsset = recoveredResult.assets[0];
+        if (!recoveredAsset) {
+          return;
+        }
+        const validationMessage = validateProfilePhoto(recoveredAsset);
+        if (validationMessage) {
+          setErrorMessage(validationMessage);
+          return;
+        }
+
+        await saveSelectedProfilePhoto(recoveredAsset);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('Unable to recover selected profile photo', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId, saveSelectedProfilePhoto]);
+
   const removeStoredProfilePhoto = async () => {
-    if (!avatarUrl || !patientId || isRemovingPhoto || isSaving) {
+    if (
+      !avatarUrl ||
+      !patientId ||
+      isRemovingPhoto ||
+      isSaving ||
+      isSavingPhoto
+    ) {
       return;
     }
 
@@ -209,6 +329,7 @@ export default function ProfileScreen() {
       await saveCachedAvatarUrl(phone, null).catch(() => undefined);
       setAvatarUrl(null);
       setPendingPhoto(null);
+      setPhotoWasSaved(false);
       setSavedAt(undefined);
     } catch (error) {
       console.error('Unable to remove profile photo', error);
@@ -223,6 +344,7 @@ export default function ProfileScreen() {
   const handleRemovePhoto = () => {
     if (pendingPhoto) {
       setPendingPhoto(null);
+      setPhotoWasSaved(false);
       setSavedAt(undefined);
       return;
     }
@@ -261,6 +383,15 @@ export default function ProfileScreen() {
       ...(pendingPhoto
         ? [
             {
+              onPress: () => {
+                setTimeout(
+                  () => void saveSelectedProfilePhoto(pendingPhoto),
+                  250,
+                );
+              },
+              text: 'Retry saving photo',
+            },
+            {
               onPress: handleRemovePhoto,
               style: 'destructive' as const,
               text: 'Discard selected photo',
@@ -282,7 +413,7 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!isNameValid || !isAgeValid || isSaving) {
+    if (!isNameValid || !isAgeValid || isSaving || isSavingPhoto) {
       return;
     }
 
@@ -290,25 +421,12 @@ export default function ProfileScreen() {
     setErrorMessage(undefined);
 
     try {
-      let nextAvatarUrl = avatarUrl;
-      if (pendingPhoto) {
-        if (!patientId) {
-          throw new Error('Patient profile is unavailable.');
-        }
-        nextAvatarUrl = await uploadProfilePhoto(patientId, pendingPhoto);
-      }
-
       const patient = await updatePatientProfile(phone, {
         age: parsedAge,
-        avatar_url: nextAvatarUrl,
         gender,
         name: trimmedName,
       });
       await saveCachedPatientName(phone, patient.name).catch(() => undefined);
-      const savedAvatarUrl = patient.avatarUrl ?? nextAvatarUrl;
-      await saveCachedAvatarUrl(phone, savedAvatarUrl).catch(() => undefined);
-      setAvatarUrl(savedAvatarUrl);
-      setPendingPhoto(null);
       setSavedAt(Date.now());
     } catch (error) {
       console.error('Unable to save profile changes', error);
@@ -353,14 +471,15 @@ export default function ProfileScreen() {
                 accessibilityHint="Opens options to take, choose, or remove a photo"
                 accessibilityLabel="Change profile photo"
                 accessibilityRole="button"
-                disabled={isRemovingPhoto || isSaving}
+                disabled={isRemovingPhoto || isSaving || isSavingPhoto}
                 onPress={showPhotoOptions}
                 style={styles.avatarButton}
               >
                 <View style={styles.avatar}>
-                  {pendingPhoto?.uri || avatarUrl ? (
+                  {(pendingPhoto?.uri || avatarUrl) && !avatarFailed ? (
                     <Image
                       contentFit="cover"
+                      onError={() => setAvatarFailed(true)}
                       source={{ uri: pendingPhoto?.uri ?? avatarUrl ?? '' }}
                       style={styles.avatarImage}
                     />
@@ -369,7 +488,7 @@ export default function ProfileScreen() {
                   )}
                 </View>
                 <View style={styles.cameraBadge}>
-                  {isRemovingPhoto ? (
+                  {isRemovingPhoto || isSavingPhoto ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <Ionicons color="#FFFFFF" name="camera" size={15} />
@@ -381,6 +500,11 @@ export default function ProfileScreen() {
                 <Text style={styles.phoneText}>+91 {phone}</Text>
                 <VerifiedBadge />
               </View>
+              {isSavingPhoto ? (
+                <Text style={styles.photoStatus}>Saving photo…</Text>
+              ) : photoWasSaved ? (
+                <Text style={styles.photoStatusSaved}>Photo saved ✓</Text>
+              ) : null}
             </View>
 
             <Text style={styles.sectionLabel}>Personal Details</Text>
@@ -466,12 +590,17 @@ export default function ProfileScreen() {
 
             <PressableScale
               accessibilityLabel="Save changes"
-              disabled={!isNameValid || !isAgeValid || isSaving}
+              disabled={
+                !isNameValid || !isAgeValid || isSaving || isSavingPhoto
+              }
               onPress={handleSave}
               pressedScale={0.98}
               style={[
                 styles.saveButton,
-                (!isNameValid || !isAgeValid || isSaving) &&
+                (!isNameValid ||
+                  !isAgeValid ||
+                  isSaving ||
+                  isSavingPhoto) &&
                   styles.saveButtonDisabled,
               ]}
             >
@@ -663,6 +792,17 @@ const styles = StyleSheet.create({
   phoneText: {
     ...dashboardTypography.body,
     color: dashboardColors.textMuted,
+  },
+  photoStatus: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    marginTop: dashboardSpacing.xs,
+  },
+  photoStatusSaved: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.success,
+    fontFamily: 'Inter_600SemiBold',
+    marginTop: dashboardSpacing.xs,
   },
   sectionLabel: {
     ...dashboardTypography.caption,

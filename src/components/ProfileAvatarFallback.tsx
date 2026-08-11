@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
-import { dashboardColors } from '../dashboardTheme';
+const DEFAULT_PROFILE_IMAGE = require('../../assets/userprofile.png');
 
 type ProfileAvatarFallbackProps = {
   size?: number;
@@ -17,10 +17,12 @@ export function ProfileAvatarFallback({
         { borderRadius: size / 2, height: size, width: size },
       ]}
     >
-      <Ionicons
-        color={dashboardColors.primary}
-        name="person-outline"
-        size={Math.round(size * 0.48)}
+      <Image
+        accessibilityLabel="Default profile picture"
+        contentFit="cover"
+        source={DEFAULT_PROFILE_IMAGE}
+        style={{ height: size, width: size }}
+        transition={120}
       />
     </View>
   );
@@ -29,7 +31,8 @@ export function ProfileAvatarFallback({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
 });
