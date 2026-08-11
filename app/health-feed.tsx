@@ -42,6 +42,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { dashboardFonts, dashboardLayout } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import {
@@ -443,7 +444,11 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
 
   return (
     <View style={[styles.feedCard, { height }]}>
-      {post.media_type === 'video' ? <FeedVideo active={active} uri={post.media_url} /> : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
+      {post.media_type === 'video' ? (
+        <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />} onError={(videoError) => console.warn('Health feed video failed to render', videoError)}>
+          <FeedVideo active={active} uri={post.media_url} />
+        </ErrorBoundary>
+      ) : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
       <Pressable accessibilityHint="Double tap to like this post" accessibilityLabel={post.title} onPress={handleMediaTap} style={styles.mediaTapTarget} />
       <View pointerEvents="none" style={styles.mediaShade} />
       <Animated.View pointerEvents="none" style={[styles.doubleTapHeart, heartStyle]}>
@@ -511,7 +516,6 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const commentScrollOffsetRef = useRef(0);
   const sheetTranslateY = useSharedValue(0);
   const previewHeight = keyboardVisible
     ? Math.min(250, Math.max(205, height * 0.27))
@@ -527,7 +531,6 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
   useEffect(() => {
     if (!post) {
-      commentScrollOffsetRef.current = 0;
       sheetTranslateY.value = 0;
       setComments([]);
       setDraft('');
@@ -575,7 +578,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   }));
   const sheetDragResponder = useMemo(() => {
     const isDownwardSheetDrag = (dx: number, dy: number) => (
-      commentScrollOffsetRef.current <= 0 && dy > 6 && Math.abs(dy) > Math.abs(dx) * 1.2
+      dy > 6 && Math.abs(dy) > Math.abs(dx) * 1.2
     );
     return PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
@@ -677,7 +680,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
             >
               <View style={[styles.commentPreviewMedia, { height: previewMediaHeight, width: previewMediaWidth }]}>
                 {post.media_type === 'video'
-                  ? <FeedVideo active uri={post.media_url} />
+                  ? (
+                    <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />}>
+                      <FeedVideo active uri={post.media_url} />
+                    </ErrorBoundary>
+                  )
                   : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={160} />}
               </View>
             </Animated.View>
@@ -706,7 +713,6 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                 data={comments}
                 keyboardShouldPersistTaps="handled"
                 keyExtractor={(item) => item.id}
-                onScroll={(event) => { commentScrollOffsetRef.current = event.nativeEvent.contentOffset.y; }}
                 renderItem={({ item }) => (
                   <CommentRow
                     avatarUrl={item.is_owner ? authorAvatarUrl : null}
@@ -715,7 +721,6 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                     onDelete={item.is_owner ? () => confirmCommentDeletion(item) : undefined}
                   />
                 )}
-                scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 style={styles.commentListView}
               />
@@ -994,6 +999,7 @@ const styles = StyleSheet.create({
   headerTabText: { color: 'rgba(255,255,255,0.68)', fontFamily: dashboardFonts.medium, fontSize: 15 },
   headerTabTextActive: { color: '#FFFFFF', fontFamily: dashboardFonts.bold },
   headerTabs: { flexDirection: 'row', gap: 4 },
+  mediaFallback: { backgroundColor: '#111416' },
   mediaShade: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent', experimental_backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.82) 100%)' },
   mediaTapTarget: { ...StyleSheet.absoluteFill, zIndex: 1 },
   postCaption: { color: 'rgba(255,255,255,0.88)', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
