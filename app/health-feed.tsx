@@ -704,27 +704,33 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
               </ScrollView>
               <View style={styles.commentComposer}>
                 <CommentAvatar name={authorName} uri={authorAvatarUrl} />
-                <TextInput
-                  accessibilityLabel="Write a comment"
-                  maxLength={500}
-                  multiline
-                  onChangeText={setDraft}
-                  onFocus={() => setKeyboardVisible(true)}
-                  placeholder={`Comment as ${authorName}`}
-                  placeholderTextColor="#87919D"
-                  style={styles.commentInput}
-                  value={draft}
-                />
-                <Pressable
-                  accessibilityLabel="Post comment"
-                  accessibilityRole="button"
-                  disabled={!draft.trim() || submitting}
-                  hitSlop={8}
-                  onPress={() => void submit()}
-                  style={[styles.commentSend, (!draft.trim() || submitting) && styles.commentSendDisabled]}
-                >
-                  {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons color="#FFFFFF" name="arrow-up" size={20} />}
-                </Pressable>
+                <View style={styles.commentInputShell}>
+                  <TextInput
+                    accessibilityLabel="Write a comment"
+                    maxLength={500}
+                    multiline
+                    onChangeText={setDraft}
+                    onFocus={() => setKeyboardVisible(true)}
+                    placeholder={`Comment as ${authorName}`}
+                    placeholderTextColor="#87919D"
+                    style={styles.commentInput}
+                    value={draft}
+                  />
+                  {draft.trim() || submitting ? (
+                    <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(100)}>
+                      <Pressable
+                        accessibilityLabel="Post comment"
+                        accessibilityRole="button"
+                        disabled={submitting}
+                        hitSlop={6}
+                        onPress={() => void submit()}
+                        style={[styles.commentSend, submitting && styles.commentSendDisabled]}
+                      >
+                        {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons color="#FFFFFF" name="arrow-up" size={18} />}
+                      </Pressable>
+                    </Animated.View>
+                  ) : null}
+                </View>
               </View>
             </View>
           </View>
@@ -898,9 +904,10 @@ const styles = StyleSheet.create({
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, height: 5, width: 40 },
   commentHeader: { alignItems: 'center', borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
-  commentInput: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 18, color: '#18202A', flex: 1, fontFamily: dashboardFonts.medium, fontSize: 13, maxHeight: 100, minHeight: 40, paddingHorizontal: 14, paddingVertical: 10 },
+  commentInput: { color: '#18202A', flex: 1, fontFamily: dashboardFonts.medium, fontSize: 13, maxHeight: 92, minHeight: 34, paddingHorizontal: 0, paddingVertical: 7 },
   commentInputDock: { backgroundColor: '#FFFFFF', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, gap: 7, paddingTop: 4 },
-  commentKeyboard: { backgroundColor: '#050607', flex: 1 },
+  commentInputShell: { alignItems: 'flex-end', backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 22, flex: 1, flexDirection: 'row', gap: 7, minHeight: 42, paddingBottom: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 4 },
+  commentKeyboard: { backgroundColor: '#FFFFFF', flex: 1 },
   commentList: { flexGrow: 1, gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   commentListView: { flex: 1 },
   commentMeta: { alignItems: 'center', flexDirection: 'row', gap: 7 },
@@ -909,7 +916,7 @@ const styles = StyleSheet.create({
   commentPreview: { alignItems: 'center', backgroundColor: '#050607', justifyContent: 'center', paddingBottom: 10 },
   commentPreviewMedia: { backgroundColor: '#111416', borderCurve: 'continuous', borderRadius: 18, overflow: 'hidden' },
   commentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
-  commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   commentSendDisabled: { backgroundColor: '#AFBAC3' },
   commentSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, gap: 12, overflow: 'hidden', paddingTop: 10 },
   commentState: { alignItems: 'center', flex: 1, gap: 9, justifyContent: 'center', minHeight: 220, paddingHorizontal: 32 },
