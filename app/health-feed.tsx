@@ -571,11 +571,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const sheetDragStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
   }));
-  const sheetDragResponders = useMemo(() => {
+  const sheetDragResponder = useMemo(() => {
     const isDownwardSheetDrag = (dx: number, dy: number) => (
-      dy > 4 && Math.abs(dy) > Math.abs(dx)
+      dy > 1 && Math.abs(dy) >= Math.abs(dx)
     );
-    const createDragResponder = () => PanResponder.create({
+    return PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
       onMoveShouldSetPanResponderCapture: (_, gesture) => isDownwardSheetDrag(gesture.dx, gesture.dy),
       onPanResponderGrant: () => {
@@ -586,7 +586,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
         sheetTranslateY.value = Math.max(0, gesture.dy);
       },
       onPanResponderRelease: (_, gesture) => {
-        const shouldDismiss = gesture.dy > 32 || gesture.vy > 0.55;
+        const shouldDismiss = gesture.dy > 1 || gesture.vy > 0.05;
         if (shouldDismiss) {
           sheetTranslateY.value = withTiming(height, { duration: 190 }, (finished) => {
             if (finished) runOnJS(closeComments)();
@@ -599,12 +599,8 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
         sheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 260 });
       },
       onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     });
-    return {
-      content: createDragResponder(),
-      header: createDragResponder(),
-      input: createDragResponder(),
-    };
   }, [closeComments, height, sheetTranslateY]);
 
   const appendEmoji = (emoji: typeof COMMENT_EMOJIS[number]) => {
@@ -685,15 +681,24 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
               </View>
             </Animated.View>
           ) : null}
-          <Animated.View style={[styles.commentSheet, sheetDragStyle]}>
+          <Animated.View {...sheetDragResponder.panHandlers} style={[styles.commentSheet, sheetDragStyle]}>
             <View
-              {...sheetDragResponders.header.panHandlers}
               accessibilityLabel="Comments sheet. Swipe down to close."
               accessible
               onAccessibilityEscape={closeComments}
               style={styles.commentDragArea}
             >
-              <View style={styles.commentHandle} />
+              <Pressable
+                accessibilityLabel="Close comments"
+                accessibilityRole="button"
+                delayLongPress={120}
+                hitSlop={12}
+                onLongPress={closeComments}
+                onPress={closeComments}
+                style={styles.commentHandleButton}
+              >
+                <View style={styles.commentHandle} />
+              </Pressable>
               <View style={styles.commentHeader}>
                 <View>
                   <Text style={styles.commentHeading}>Comments</Text>
@@ -702,13 +707,14 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
               </View>
             </View>
 
-            <View {...sheetDragResponders.content.panHandlers} style={styles.commentGestureContent}>
+            <View style={styles.commentGestureContent}>
               {loading ? (
                 <View style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
               ) : comments.length ? (
                 <FlatList
                   contentContainerStyle={styles.commentList}
                   data={comments}
+                  disableScrollViewPanResponder
                   keyboardShouldPersistTaps="handled"
                   keyExtractor={(item) => item.id}
                   renderItem={({ item }) => (
@@ -732,9 +738,10 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
               {error ? <Text accessibilityRole="alert" selectable style={styles.commentError}>{error}</Text> : null}
             </View>
-            <View {...sheetDragResponders.input.panHandlers} style={[styles.commentInputDock, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 10) }]}>
+            <View style={[styles.commentInputDock, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 10) }]}>
               <ScrollView
                 contentContainerStyle={styles.commentEmojiContent}
+                disableScrollViewPanResponder
                 horizontal
                 keyboardShouldPersistTaps="always"
                 showsHorizontalScrollIndicator={false}
@@ -958,6 +965,7 @@ const styles = StyleSheet.create({
   commentError: { backgroundColor: '#FFF0F2', color: '#B4233A', fontFamily: dashboardFonts.semiBold, fontSize: 11, lineHeight: 16, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 9 },
   commentGestureContent: { flex: 1, gap: 8, minHeight: 0 },
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, flexShrink: 0, height: 5, width: 40 },
+  commentHandleButton: { alignItems: 'center', height: 18, justifyContent: 'center' },
   commentHeader: { borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0, paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
   commentInput: { backgroundColor: 'transparent', color: '#101828', fontFamily: dashboardFonts.medium, fontSize: 14, lineHeight: 19, maxHeight: 92, minHeight: 42, opacity: 1, paddingLeft: 14, paddingRight: 14, paddingVertical: 10, width: '100%' },
