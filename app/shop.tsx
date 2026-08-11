@@ -11,21 +11,27 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   SectionList,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
   FadeInDown,
   FadeOutUp,
   interpolate,
+  interpolateColor,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -89,10 +95,26 @@ const PLACEHOLDER_QUERIES = [
 ] as const;
 const PLACEHOLDER_ROTATION_MS = 2400;
 const ADDRESS_HEADER_HEIGHT = 64;
-const DELIVERY_AGENT_IMAGE = require('../assets/shop/delivery-agent.png');
 const AnimatedSectionList = Animated.createAnimatedComponent(
   SectionList<ShopProduct, ShopProductSection>,
 );
+const SHOP_BANNERS = [
+  {
+    accessibilityLabel: 'Shop headache medicines',
+    image: require('../assets/headachebanner.webp'),
+    sectionCode: 'headache',
+  },
+  {
+    accessibilityLabel: 'Shop fever medicines',
+    image: require('../assets/feverbanner.webp'),
+    sectionCode: 'fever',
+  },
+  {
+    accessibilityLabel: 'Shop multivitamins',
+    image: require('../assets/multivitaminsbanner.webp'),
+    sectionCode: 'vitamins',
+  },
+] as const;
 
 const SECTION_ICONS = {
   allergy_cough: 'medkit-outline',
@@ -165,6 +187,12 @@ export default function ShopScreen() {
   const routePhone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
   const insets = useSafeAreaInsets();
   const cart = useCart();
+  const sectionListRef = useRef<
+    SectionList<ShopProduct, ShopProductSection>
+  >(null);
+  const pendingSectionCode = useRef<
+    (typeof SHOP_BANNERS)[number]['sectionCode'] | null
+  >(null);
 
   const shopScrollOffset = useSharedValue(0);
   const shopScrollHandler = useAnimatedScrollHandler((event) => {
@@ -189,6 +217,13 @@ export default function ShopScreen() {
       transform: [{ translateY: -collapse * 0.45 }],
     };
   });
+  const searchHeaderStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      shopScrollOffset.value,
+      [0, ADDRESS_HEADER_HEIGHT],
+      [dashboardColors.primary, '#FFFFFF'],
+    ),
+  }));
 
   const [activeTab, setActiveTab] = useState<NavTabKey>('shop');
   const [activeOrderCount, setActiveOrderCount] = useState(0);
@@ -201,6 +236,16 @@ export default function ShopScreen() {
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [query, setQuery] = useState('');
   const [reminderNames, setReminderNames] = useState<string[]>([]);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+
+  useAnimatedReaction(
+    () => shopScrollOffset.value >= ADDRESS_HEADER_HEIGHT - 1,
+    (collapsed, previous) => {
+      if (collapsed !== previous) {
+        runOnJS(setIsHeaderCollapsed)(collapsed);
+      }
+    },
+  );
 
   useEffect(() => {
     if (routePhone) {
@@ -376,9 +421,37 @@ export default function ShopScreen() {
     [openProduct],
   );
 
+  const scrollToSection = useCallback(
+    (sectionCode: (typeof SHOP_BANNERS)[number]['sectionCode']) => {
+      const sectionIndex = sections.findIndex(
+        (section) => section.code === sectionCode,
+      );
+      if (sectionIndex < 0) {
+        return;
+      }
+
+      pendingSectionCode.current = sectionCode;
+      void Haptics.selectionAsync().catch(() => undefined);
+      sectionListRef.current?.scrollToLocation({
+        animated: true,
+        itemIndex: 0,
+        sectionIndex,
+        viewOffset: dashboardSpacing.xs,
+        viewPosition: 0,
+      });
+    },
+    [sections],
+  );
+
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <StatusBar style="light" />
+    <SafeAreaView
+      edges={['top']}
+      style={[
+        styles.safeArea,
+        isHeaderCollapsed && styles.safeAreaCollapsed,
+      ]}
+    >
+      <StatusBar style={isHeaderCollapsed ? 'dark' : 'light'} />
       <Animated.View
         pointerEvents="box-none"
         style={[styles.addressHeaderClip, addressHeaderStyle]}
@@ -432,7 +505,7 @@ export default function ShopScreen() {
         </View>
       </Animated.View>
 
-      <View style={styles.searchWrap}>
+      <Animated.View style={[styles.searchWrap, searchHeaderStyle]}>
         <View style={styles.searchBar}>
           <Ionicons
             color={dashboardColors.textFaint}
@@ -464,7 +537,7 @@ export default function ShopScreen() {
             ) : null}
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {isLoadingCatalogue ? (
         <View style={styles.centerState}>
@@ -493,7 +566,18 @@ export default function ShopScreen() {
         </View>
       ) : (
         <AnimatedSectionList
+          ref={sectionListRef}
           onScroll={shopScrollHandler}
+          onScrollToIndexFailed={(info) => {
+            sectionListRef.current?.getScrollResponder()?.scrollTo({
+              animated: true,
+              y: info.averageItemLength * info.index,
+            });
+            const sectionCode = pendingSectionCode.current;
+            if (sectionCode) {
+              setTimeout(() => scrollToSection(sectionCode), 280);
+            }
+          }}
           scrollEventThrottle={16}
           style={styles.listSurface}
           contentContainerStyle={[
@@ -508,6 +592,7 @@ export default function ShopScreen() {
             isSearching ? null : (
               <ShopListHeader
                 onOpenProduct={openProduct}
+                onSelectSection={scrollToSection}
                 reminderMedicines={reminderMedicines}
               />
             )
@@ -546,25 +631,18 @@ export default function ShopScreen() {
 
 function ShopListHeader({
   onOpenProduct,
+  onSelectSection,
   reminderMedicines,
 }: {
   onOpenProduct: (product: ShopProduct) => void;
+  onSelectSection: (
+    sectionCode: (typeof SHOP_BANNERS)[number]['sectionCode'],
+  ) => void;
   reminderMedicines: ReminderMedicineReorder[];
 }) {
   return (
     <View>
-      <View style={styles.heroRow}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroEyebrow}>DRJIVA HEALTH SHOP</Text>
-          <Text style={styles.heroTitle}>Everyday care, made simple.</Text>
-        </View>
-        <Image
-          accessibilityLabel="Masked medicine delivery agent"
-          contentFit="contain"
-          source={DELIVERY_AGENT_IMAGE}
-          style={styles.heroAgent}
-        />
-      </View>
+      <ShopBannerCarousel onSelectSection={onSelectSection} />
 
       <ReminderMedicineList
         medicines={reminderMedicines}
@@ -580,6 +658,76 @@ function ShopListHeader({
         <Text style={styles.guidanceText}>
           Use medicines only as directed by your clinician.
         </Text>
+      </View>
+    </View>
+  );
+}
+
+function ShopBannerCarousel({
+  onSelectSection,
+}: {
+  onSelectSection: (
+    sectionCode: (typeof SHOP_BANNERS)[number]['sectionCode'],
+  ) => void;
+}) {
+  const { width } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const availableWidth = Math.min(
+    width - dashboardSpacing.pagePadding * 2,
+    720,
+  );
+  const bannerWidth = Math.max(260, availableWidth - 28);
+  const snapInterval = bannerWidth + dashboardSpacing.md;
+
+  return (
+    <View style={styles.bannerCarousel}>
+      <FlatList
+        accessibilityLabel="Shop category offers"
+        contentContainerStyle={styles.bannerTrack}
+        data={SHOP_BANNERS}
+        decelerationRate="fast"
+        horizontal
+        keyExtractor={(item) => item.sectionCode}
+        onMomentumScrollEnd={(event) => {
+          const nextIndex = Math.round(
+            event.nativeEvent.contentOffset.x / snapInterval,
+          );
+          setActiveIndex(
+            Math.max(0, Math.min(SHOP_BANNERS.length - 1, nextIndex)),
+          );
+        }}
+        renderItem={({ item }) => (
+          <PressableScale
+            accessibilityLabel={item.accessibilityLabel}
+            onPress={() => onSelectSection(item.sectionCode)}
+            pressedScale={0.985}
+            style={[styles.bannerCard, { width: bannerWidth }]}
+          >
+            <Image
+              contentFit="cover"
+              source={item.image}
+              style={styles.bannerImage}
+              transition={150}
+            />
+          </PressableScale>
+        )}
+        showsHorizontalScrollIndicator={false}
+        snapToAlignment="start"
+        snapToInterval={snapInterval}
+      />
+      <View
+        accessibilityLabel={`Banner ${activeIndex + 1} of 3`}
+        style={styles.bannerDots}
+      >
+        {SHOP_BANNERS.map((banner, index) => (
+          <View
+            key={banner.sectionCode}
+            style={[
+              styles.bannerDot,
+              index === activeIndex && styles.bannerDotActive,
+            ]}
+          />
+        ))}
       </View>
     </View>
   );
@@ -712,6 +860,9 @@ const styles = StyleSheet.create({
     backgroundColor: dashboardColors.primary,
     flex: 1,
   },
+  safeAreaCollapsed: {
+    backgroundColor: '#FFFFFF',
+  },
   addressHeaderClip: {
     backgroundColor: dashboardColors.primary,
     height: ADDRESS_HEADER_HEIGHT,
@@ -791,7 +942,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   searchWrap: {
-    backgroundColor: dashboardColors.primary,
     paddingBottom: dashboardSpacing.sm,
     paddingHorizontal: dashboardSpacing.pagePadding,
     paddingTop: dashboardSpacing.xs,
@@ -848,40 +998,41 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: dashboardSpacing.pagePadding,
   },
-  heroRow: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primary,
-    borderRadius: 22,
-    flexDirection: 'row',
-    gap: dashboardSpacing.sm,
-    marginTop: dashboardSpacing.sm,
-    minHeight: 176,
+  bannerCarousel: {
+    marginTop: dashboardSpacing.md,
+  },
+  bannerTrack: {
+    gap: dashboardSpacing.md,
+    paddingRight: 28,
+  },
+  bannerCard: {
+    aspectRatio: 1.95,
+    backgroundColor: dashboardColors.card,
+    borderRadius: 20,
+    boxShadow: '0 5px 16px rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
-    paddingHorizontal: dashboardSpacing.gap,
   },
-  heroCopy: {
-    flex: 1,
-    minWidth: 0,
+  bannerImage: {
+    height: '100%',
+    width: '100%',
   },
-  heroEyebrow: {
-    color: '#D9E8F3',
-    fontFamily: 'Inter_700Bold',
-    fontSize: 9,
-    letterSpacing: 1.2,
+  bannerDots: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 28,
+    paddingTop: dashboardSpacing.sm,
   },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    lineHeight: 26,
-    marginTop: 5,
-    maxWidth: 210,
+  bannerDot: {
+    backgroundColor: '#CBD2DC',
+    borderRadius: 4,
+    height: 7,
+    width: 7,
   },
-  heroAgent: {
-    alignSelf: 'flex-end',
-    flexShrink: 0,
-    height: 168,
-    width: 112,
+  bannerDotActive: {
+    backgroundColor: dashboardColors.primary,
+    width: 24,
   },
   guidance: {
     alignItems: 'center',

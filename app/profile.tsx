@@ -196,24 +196,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const showPhotoOptions = () => {
-    Alert.alert('Profile photo', 'Choose a photo source.', [
-      {
-        onPress: () => {
-          setTimeout(() => void selectProfilePhoto('camera'), 250);
-        },
-        text: 'Camera',
-      },
-      {
-        onPress: () => {
-          setTimeout(() => void selectProfilePhoto('gallery'), 250);
-        },
-        text: 'Gallery',
-      },
-      { style: 'cancel', text: 'Cancel' },
-    ]);
-  };
-
   const removeStoredProfilePhoto = async () => {
     if (!avatarUrl || !patientId || isRemovingPhoto || isSaving) {
       return;
@@ -260,6 +242,43 @@ export default function ProfileScreen() {
         },
       ],
     );
+  };
+
+  const showPhotoOptions = () => {
+    Alert.alert('Profile photo', 'Choose a photo source.', [
+      {
+        onPress: () => {
+          setTimeout(() => void selectProfilePhoto('camera'), 250);
+        },
+        text: 'Camera',
+      },
+      {
+        onPress: () => {
+          setTimeout(() => void selectProfilePhoto('gallery'), 250);
+        },
+        text: 'Gallery',
+      },
+      ...(pendingPhoto
+        ? [
+            {
+              onPress: handleRemovePhoto,
+              style: 'destructive' as const,
+              text: 'Discard selected photo',
+            },
+          ]
+        : avatarUrl
+          ? [
+              {
+                onPress: () => {
+                  setTimeout(handleRemovePhoto, 250);
+                },
+                style: 'destructive' as const,
+                text: 'Remove photo',
+              },
+            ]
+          : []),
+      { style: 'cancel', text: 'Cancel' },
+    ]);
   };
 
   const handleSave = async () => {
@@ -331,7 +350,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.avatarCard}>
               <Pressable
-                accessibilityHint="Opens camera and gallery options"
+                accessibilityHint="Opens options to take, choose, or remove a photo"
                 accessibilityLabel="Change profile photo"
                 accessibilityRole="button"
                 disabled={isRemovingPhoto || isSaving}
@@ -350,7 +369,11 @@ export default function ProfileScreen() {
                   )}
                 </View>
                 <View style={styles.cameraBadge}>
-                  <Ionicons color="#FFFFFF" name="camera" size={15} />
+                  {isRemovingPhoto ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Ionicons color="#FFFFFF" name="camera" size={15} />
+                  )}
                 </View>
               </Pressable>
               <Text style={styles.avatarName}>{name || 'Your name'}</Text>
@@ -358,45 +381,6 @@ export default function ProfileScreen() {
                 <Text style={styles.phoneText}>+91 {phone}</Text>
                 <VerifiedBadge />
               </View>
-              {pendingPhoto || avatarUrl ? (
-                <Pressable
-                  accessibilityLabel={
-                    pendingPhoto
-                      ? 'Discard selected profile photo'
-                      : 'Remove profile photo'
-                  }
-                  accessibilityRole="button"
-                  disabled={isRemovingPhoto || isSaving}
-                  onPress={handleRemovePhoto}
-                  style={({ pressed }) => [
-                    styles.removePhotoButton,
-                    pressed &&
-                      !isRemovingPhoto &&
-                      !isSaving &&
-                      styles.removePhotoButtonPressed,
-                  ]}
-                >
-                  {isRemovingPhoto ? (
-                    <ActivityIndicator
-                      color={dashboardColors.error}
-                      size="small"
-                    />
-                  ) : (
-                    <Ionicons
-                      color={dashboardColors.error}
-                      name={
-                        pendingPhoto
-                          ? 'close-circle-outline'
-                          : 'trash-outline'
-                      }
-                      size={16}
-                    />
-                  )}
-                  <Text style={styles.removePhotoText}>
-                    {pendingPhoto ? 'Discard selected photo' : 'Remove photo'}
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
 
             <Text style={styles.sectionLabel}>Personal Details</Text>
@@ -679,22 +663,6 @@ const styles = StyleSheet.create({
   phoneText: {
     ...dashboardTypography.body,
     color: dashboardColors.textMuted,
-  },
-  removePhotoButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    minHeight: 36,
-    marginTop: dashboardSpacing.sm,
-    paddingHorizontal: dashboardSpacing.sm,
-  },
-  removePhotoButtonPressed: {
-    opacity: 0.65,
-  },
-  removePhotoText: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.error,
-    fontFamily: 'Inter_600SemiBold',
   },
   sectionLabel: {
     ...dashboardTypography.caption,

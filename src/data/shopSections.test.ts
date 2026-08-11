@@ -64,6 +64,16 @@ describe('shop sections', () => {
     ]);
   });
 
+  it('exposes the vitamins shelf as Multivitamins for banner navigation', () => {
+    const sections = buildShopSections([
+      product('vitamin-1', 'Vitamin One', { vitamins: 1 }),
+    ]);
+
+    expect(sections).toMatchObject([
+      { code: 'vitamins', title: 'Multivitamins' },
+    ]);
+  });
+
   it('never includes uncurated products outside of search', () => {
     const curated = product('fever-1', 'Fever One', { fever: 1 });
     const uncurated = product('generic-1', 'Generic One', {});

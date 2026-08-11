@@ -31,7 +31,7 @@ const SECTION_TITLES: Record<ShopSectionCode, string> = {
   heart_bp: 'Heart & BP',
   skin_care: 'Skin Care',
   stomach_pain: 'Stomach Pain',
-  vitamins: 'Vitamins & Supplements',
+  vitamins: 'Multivitamins',
 };
 
 function matchesProductSearch(
