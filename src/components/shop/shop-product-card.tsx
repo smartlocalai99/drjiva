@@ -273,15 +273,18 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
   chipRow: {
-    alignItems: "flex-end",
+    alignItems: "center",
     flexDirection: "row",
     gap: dashboardSpacing.sm,
     justifyContent: "space-between",
+    minHeight: 64,
     paddingBottom: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.md,
+    paddingTop: dashboardSpacing.xs,
   },
   priceStack: {
     flexShrink: 1,
+    gap: 1,
   },
   mrpRow: {
     alignItems: "center",
