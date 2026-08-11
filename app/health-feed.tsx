@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -66,6 +68,7 @@ import {
 type FeedTab = 'forYou' | 'following' | 'saved';
 
 const DOUBLE_TAP_HEART_SIZE = 96;
+const COMMENT_EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'] as const;
 
 export default function HealthFeedScreen() {
   const router = useRouter();
@@ -256,7 +259,7 @@ export default function HealthFeedScreen() {
           refreshControl={<RefreshControl onRefresh={() => void loadPosts(true)} refreshing={refreshing} tintColor="#FFFFFF" />}
           renderItem={({ item, index }) => (
             <FeedCard
-              active={item.id === activePostId || (!activePostId && index === 0)}
+              active={!commentPost && (item.id === activePostId || (!activePostId && index === 0))}
               followed={followedDoctors.has(item.doctor_phone)}
               height={itemHeight}
               liked={likedIds.has(item.id)}
@@ -497,12 +500,17 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   post: HealthFeedPost | null;
 }) {
   const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
   const [comments, setComments] = useState<HealthFeedComment[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const previewHeight = Math.min(380, Math.max(240, height * 0.39));
+  const previewMediaHeight = Math.max(178, previewHeight - insets.top - 20);
+  const previewMediaWidth = Math.min(width - 72, previewMediaHeight * 0.78);
 
   useEffect(() => {
     if (!post) {
@@ -510,6 +518,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       setDraft('');
       setDeletingIds(new Set());
       setError('');
+      setKeyboardVisible(false);
       return;
     }
 
@@ -528,6 +537,31 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       });
     return () => { cancelled = true; };
   }, [post]);
+
+  useEffect(() => {
+    if (!post) return undefined;
+    const keyboardShowEvent = process.env.EXPO_OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const keyboardHideEvent = process.env.EXPO_OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(keyboardShowEvent, () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [post]);
+
+  const closeComments = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
+  const appendEmoji = (emoji: typeof COMMENT_EMOJIS[number]) => {
+    setDraft((current) => {
+      const separator = current.length > 0 && !current.endsWith(' ') ? ' ' : '';
+      return `${current}${separator}${emoji}`.slice(0, 500);
+    });
+    void Haptics.selectionAsync().catch(() => undefined);
+  };
 
   const submit = async () => {
     if (!post || !draft.trim() || submitting) return;
@@ -582,18 +616,30 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   };
 
   return (
-    <Modal animationType="fade" onRequestClose={onClose} presentationStyle="overFullScreen" transparent visible={Boolean(post)}>
+    <Modal animationType="slide" onRequestClose={closeComments} presentationStyle="overFullScreen" visible={Boolean(post)}>
       <View style={styles.commentModal}>
-        <Pressable accessibilityLabel="Close comments" onPress={onClose} style={StyleSheet.absoluteFill} />
-        <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none" style={styles.commentKeyboard}>
-          <View style={[styles.commentSheet, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+        <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : 'height'} style={styles.commentKeyboard}>
+          {!keyboardVisible && post ? (
+            <Animated.View
+              entering={FadeIn.duration(180)}
+              exiting={FadeOut.duration(120)}
+              style={[styles.commentPreview, { height: previewHeight, paddingTop: insets.top + 8 }]}
+            >
+              <View style={[styles.commentPreviewMedia, { height: previewMediaHeight, width: previewMediaWidth }]}>
+                {post.media_type === 'video'
+                  ? <FeedVideo active uri={post.media_url} />
+                  : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={160} />}
+              </View>
+            </Animated.View>
+          ) : null}
+          <View style={styles.commentSheet}>
             <View style={styles.commentHandle} />
             <View style={styles.commentHeader}>
               <View>
                 <Text style={styles.commentHeading}>Comments</Text>
                 <Text numberOfLines={1} style={styles.commentPostTitle}>{post?.title}</Text>
               </View>
-              <Pressable accessibilityLabel="Close comments" hitSlop={10} onPress={onClose} style={styles.commentClose}>
+              <Pressable accessibilityLabel="Close comments" hitSlop={10} onPress={closeComments} style={styles.commentClose}>
                 <Ionicons color="#18202A" name="close" size={22} />
               </Pressable>
             </View>
@@ -615,6 +661,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                   />
                 )}
                 showsVerticalScrollIndicator={false}
+                style={styles.commentListView}
               />
             ) : (
               <View style={styles.commentState}>
@@ -625,28 +672,49 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
             )}
 
             {error ? <Text accessibilityRole="alert" selectable style={styles.commentError}>{error}</Text> : null}
-            <View style={styles.commentComposer}>
-              <CommentAvatar name={authorName} uri={authorAvatarUrl} />
-              <TextInput
-                accessibilityLabel="Write a comment"
-                maxLength={500}
-                multiline
-                onChangeText={setDraft}
-                placeholder={`Comment as ${authorName}`}
-                placeholderTextColor="#87919D"
-                style={styles.commentInput}
-                value={draft}
-              />
-              <Pressable
-                accessibilityLabel="Post comment"
-                accessibilityRole="button"
-                disabled={!draft.trim() || submitting}
-                hitSlop={8}
-                onPress={() => void submit()}
-                style={[styles.commentSend, (!draft.trim() || submitting) && styles.commentSendDisabled]}
+            <View style={[styles.commentInputDock, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 10) }]}>
+              <ScrollView
+                contentContainerStyle={styles.commentEmojiContent}
+                horizontal
+                keyboardShouldPersistTaps="always"
+                showsHorizontalScrollIndicator={false}
+                style={styles.commentEmojiBar}
               >
-                {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons color="#FFFFFF" name="arrow-up" size={20} />}
-              </Pressable>
+                {COMMENT_EMOJIS.map((emoji) => (
+                  <Pressable
+                    accessibilityLabel={`Add ${emoji} emoji`}
+                    accessibilityRole="button"
+                    key={emoji}
+                    onPress={() => appendEmoji(emoji)}
+                    style={styles.commentEmojiButton}
+                  >
+                    <Text style={styles.commentEmoji}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <View style={styles.commentComposer}>
+                <CommentAvatar name={authorName} uri={authorAvatarUrl} />
+                <TextInput
+                  accessibilityLabel="Write a comment"
+                  maxLength={500}
+                  multiline
+                  onChangeText={setDraft}
+                  placeholder={`Comment as ${authorName}`}
+                  placeholderTextColor="#87919D"
+                  style={styles.commentInput}
+                  value={draft}
+                />
+                <Pressable
+                  accessibilityLabel="Post comment"
+                  accessibilityRole="button"
+                  disabled={!draft.trim() || submitting}
+                  hitSlop={8}
+                  onPress={() => void submit()}
+                  style={[styles.commentSend, (!draft.trim() || submitting) && styles.commentSendDisabled]}
+                >
+                  {submitting ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons color="#FFFFFF" name="arrow-up" size={20} />}
+                </Pressable>
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -678,8 +746,8 @@ function CommentRow({ avatarUrl, comment, deleting, onDelete }: {
               style={styles.commentDelete}
             >
               {deleting
-                ? <ActivityIndicator color="#A43A4B" size="small" />
-                : <Ionicons color="#A43A4B" name="trash-outline" size={16} />}
+                ? <ActivityIndicator color="#697480" size="small" />
+                : <Ionicons color="#697480" name="close" size={18} />}
             </Pressable>
           ) : null}
         </View>
@@ -808,23 +876,31 @@ const styles = StyleSheet.create({
   commentBody: { color: '#36424E', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
   commentBubble: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, flex: 1, gap: 5, paddingHorizontal: 12, paddingVertical: 10 },
   commentClose: { alignItems: 'center', backgroundColor: '#F0F3F5', borderCurve: 'continuous', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
-  commentComposer: { alignItems: 'flex-end', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 9, paddingHorizontal: 16, paddingTop: 12 },
+  commentComposer: { alignItems: 'flex-end', flexDirection: 'row', gap: 9, paddingHorizontal: 16 },
   commentDelete: { alignItems: 'center', height: 24, justifyContent: 'center', marginLeft: 'auto', width: 24 },
+  commentEmoji: { fontSize: 25, lineHeight: 32 },
+  commentEmojiBar: { flexGrow: 0 },
+  commentEmojiButton: { alignItems: 'center', height: 42, justifyContent: 'center', width: 44 },
+  commentEmojiContent: { alignItems: 'center', flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 8 },
   commentEmptyIcon: { alignItems: 'center', backgroundColor: '#E7F2FA', borderCurve: 'continuous', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   commentError: { backgroundColor: '#FFF0F2', color: '#B4233A', fontFamily: dashboardFonts.semiBold, fontSize: 11, lineHeight: 16, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 9 },
   commentHandle: { alignSelf: 'center', backgroundColor: '#CBD1D6', borderRadius: 3, height: 5, width: 40 },
   commentHeader: { alignItems: 'center', borderBottomColor: '#E5E9ED', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 18 },
   commentHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18 },
   commentInput: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 18, color: '#18202A', flex: 1, fontFamily: dashboardFonts.medium, fontSize: 13, maxHeight: 100, minHeight: 40, paddingHorizontal: 14, paddingVertical: 10 },
-  commentKeyboard: { flex: 1, justifyContent: 'flex-end' },
-  commentList: { gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
+  commentInputDock: { backgroundColor: '#FFFFFF', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, gap: 7, paddingTop: 4 },
+  commentKeyboard: { backgroundColor: '#050607', flex: 1 },
+  commentList: { flexGrow: 1, gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
+  commentListView: { flex: 1 },
   commentMeta: { alignItems: 'center', flexDirection: 'row', gap: 7 },
-  commentModal: { backgroundColor: 'rgba(0,0,0,0.56)', flex: 1 },
+  commentModal: { backgroundColor: '#050607', flex: 1 },
   commentPostTitle: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 11, maxWidth: 260, paddingTop: 2 },
+  commentPreview: { alignItems: 'center', backgroundColor: '#050607', justifyContent: 'center', paddingBottom: 10 },
+  commentPreviewMedia: { backgroundColor: '#111416', borderCurve: 'continuous', borderRadius: 18, overflow: 'hidden' },
   commentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
   commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   commentSendDisabled: { backgroundColor: '#AFBAC3' },
-  commentSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, gap: 12, maxHeight: '82%', minHeight: '58%', paddingTop: 10 },
+  commentSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1, gap: 12, overflow: 'hidden', paddingTop: 10 },
   commentState: { alignItems: 'center', flex: 1, gap: 9, justifyContent: 'center', minHeight: 220, paddingHorizontal: 32 },
   commentStateText: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   commentStateTitle: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 15 },
