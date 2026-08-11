@@ -6,6 +6,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import {
   useCallback,
   useEffect,
@@ -24,6 +25,10 @@ import {
 import Animated, {
   FadeInDown,
   FadeOutUp,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
 } from 'react-native-reanimated';
 import {
   SafeAreaView,
@@ -77,13 +82,17 @@ import { getPatientByPhone } from '../src/lib/patients';
 import { getSessionPhone } from '../src/lib/session';
 
 const PLACEHOLDER_QUERIES = [
-  'Dolo-650',
+  'Dolo',
   'Paracetamol',
   'Cold relief',
   'Pain management',
 ] as const;
 const PLACEHOLDER_ROTATION_MS = 2400;
+const ADDRESS_HEADER_HEIGHT = 64;
 const DELIVERY_AGENT_IMAGE = require('../assets/shop/delivery-agent.png');
+const AnimatedSectionList = Animated.createAnimatedComponent(
+  SectionList<ShopProduct, ShopProductSection>,
+);
 
 const SECTION_ICONS = {
   allergy_cough: 'medkit-outline',
@@ -156,6 +165,30 @@ export default function ShopScreen() {
   const routePhone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
   const insets = useSafeAreaInsets();
   const cart = useCart();
+
+  const shopScrollOffset = useSharedValue(0);
+  const shopScrollHandler = useAnimatedScrollHandler((event) => {
+    'worklet';
+    shopScrollOffset.value = event.contentOffset.y;
+  });
+  const addressHeaderStyle = useAnimatedStyle(() => {
+    const collapse = interpolate(
+      shopScrollOffset.value,
+      [0, ADDRESS_HEADER_HEIGHT],
+      [0, ADDRESS_HEADER_HEIGHT],
+      'clamp',
+    );
+    return {
+      height: ADDRESS_HEADER_HEIGHT - collapse,
+      opacity: interpolate(
+        shopScrollOffset.value,
+        [0, ADDRESS_HEADER_HEIGHT * 0.7],
+        [1, 0],
+        'clamp',
+      ),
+      transform: [{ translateY: -collapse * 0.45 }],
+    };
+  });
 
   const [activeTab, setActiveTab] = useState<NavTabKey>('shop');
   const [activeOrderCount, setActiveOrderCount] = useState(0);
@@ -345,61 +378,59 @@ export default function ShopScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel={
-            deliveryAddress
-              ? 'Change delivery address'
-              : 'Add delivery address'
-          }
-          accessibilityRole="button"
-          onPress={openAddressSheet}
-          style={styles.addressTrigger}
-        >
-          <View style={styles.locationIcon}>
-            <Ionicons
-              color={dashboardColors.primary}
-              name="location"
-              size={18}
-            />
-          </View>
-          <View style={styles.addressTriggerCopy}>
-            <Text style={styles.deliverTo}>Deliver to</Text>
-            <View style={styles.addressValueRow}>
-              <Text numberOfLines={1} style={styles.addressValue}>
-                {formatAddressTrigger(deliveryAddress)}
-              </Text>
-              <Ionicons
-                color={dashboardColors.textMuted}
-                name="chevron-down"
-                size={15}
-              />
+      <StatusBar style="light" />
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.addressHeaderClip, addressHeaderStyle]}
+      >
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityLabel={
+              deliveryAddress
+                ? 'Change delivery address'
+                : 'Add delivery address'
+            }
+            accessibilityRole="button"
+            onPress={openAddressSheet}
+            style={styles.addressTrigger}
+          >
+            <View style={styles.locationIcon}>
+              <Ionicons color="#FFFFFF" name="location" size={18} />
             </View>
-          </View>
-        </Pressable>
+            <View style={styles.addressTriggerCopy}>
+              <Text style={styles.deliverTo}>Deliver to</Text>
+              <View style={styles.addressValueRow}>
+                <Text numberOfLines={1} style={styles.addressValue}>
+                  {formatAddressTrigger(deliveryAddress)}
+                </Text>
+                <Ionicons color="#FFFFFF" name="chevron-down" size={15} />
+              </View>
+            </View>
+          </Pressable>
 
-        <PressableScale
-          accessibilityLabel={`Orders, ${activeOrderCount} active`}
-          onPress={() =>
-            router.push({ params: { phone }, pathname: '/orders' })
-          }
-          pressedScale={0.94}
-          style={styles.bagButton}
-        >
-          <Ionicons
-            color={dashboardColors.text}
-            name="receipt-outline"
-            size={23}
-          />
-          {activeOrderCount > 0 ? (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>
-                {activeOrderCount > 99 ? '99+' : activeOrderCount}
-              </Text>
-            </View>
-          ) : null}
-        </PressableScale>
-      </View>
+          <PressableScale
+            accessibilityLabel={`Orders, ${activeOrderCount} active`}
+            onPress={() =>
+              router.push({ params: { phone }, pathname: '/orders' })
+            }
+            pressedScale={0.94}
+            style={styles.bagButton}
+          >
+            <Ionicons
+              color={dashboardColors.text}
+              name="receipt-outline"
+              size={23}
+            />
+            {activeOrderCount > 0 ? (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>
+                  {activeOrderCount > 99 ? '99+' : activeOrderCount}
+                </Text>
+              </View>
+            ) : null}
+          </PressableScale>
+        </View>
+      </Animated.View>
 
       <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
@@ -419,15 +450,17 @@ export default function ShopScreen() {
               value={query}
             />
             {!query ? (
-              <Animated.Text
-                entering={FadeInDown.duration(220)}
-                exiting={FadeOutUp.duration(160)}
-                key={placeholderIndex}
-                pointerEvents="none"
-                style={styles.searchPlaceholder}
-              >
-                Search “{PLACEHOLDER_QUERIES[placeholderIndex]}”
-              </Animated.Text>
+              <View pointerEvents="none" style={styles.searchPlaceholderRow}>
+                <Text style={styles.searchPlaceholderPrefix}>Search for </Text>
+                <Animated.Text
+                  entering={FadeInDown.duration(220)}
+                  exiting={FadeOutUp.duration(160)}
+                  key={placeholderIndex}
+                  style={styles.searchPlaceholderQuery}
+                >
+                  {PLACEHOLDER_QUERIES[placeholderIndex]}
+                </Animated.Text>
+              </View>
             ) : null}
           </View>
         </View>
@@ -459,7 +492,10 @@ export default function ShopScreen() {
           </PressableScale>
         </View>
       ) : (
-        <SectionList
+        <AnimatedSectionList
+          onScroll={shopScrollHandler}
+          scrollEventThrottle={16}
+          style={styles.listSurface}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: listBottomPadding },
@@ -673,15 +709,22 @@ function formatAddressTrigger(address: SavedAddress | undefined): string {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#F5F7FB',
+    backgroundColor: dashboardColors.primary,
     flex: 1,
+  },
+  addressHeaderClip: {
+    backgroundColor: dashboardColors.primary,
+    height: ADDRESS_HEADER_HEIGHT,
+    overflow: 'hidden',
   },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.pagePadding,
-    paddingTop: dashboardSpacing.sm,
+    height: ADDRESS_HEADER_HEIGHT,
+    paddingBottom: dashboardSpacing.xs,
+    paddingTop: dashboardSpacing.xs,
   },
   addressTrigger: {
     alignItems: 'center',
@@ -692,7 +735,7 @@ const styles = StyleSheet.create({
   },
   locationIcon: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
@@ -703,7 +746,7 @@ const styles = StyleSheet.create({
   },
   deliverTo: {
     ...dashboardTypography.caption,
-    color: dashboardColors.textMuted,
+    color: '#D9E8F3',
     fontSize: 10,
   },
   addressValueRow: {
@@ -713,7 +756,7 @@ const styles = StyleSheet.create({
   },
   addressValue: {
     ...dashboardTypography.body,
-    color: dashboardColors.text,
+    color: '#FFFFFF',
     flexShrink: 1,
     fontFamily: 'Inter_700Bold',
     fontSize: 13,
@@ -748,9 +791,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   searchWrap: {
+    backgroundColor: dashboardColors.primary,
     paddingBottom: dashboardSpacing.sm,
     paddingHorizontal: dashboardSpacing.pagePadding,
-    paddingTop: dashboardSpacing.sm,
+    paddingTop: dashboardSpacing.xs,
   },
   searchBar: {
     alignItems: 'center',
@@ -781,12 +825,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
   },
-  searchPlaceholder: {
+  searchPlaceholderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    left: 0,
+    position: 'absolute',
+  },
+  searchPlaceholderPrefix: {
     ...dashboardTypography.body,
     color: dashboardColors.textFaint,
     fontSize: 14,
-    left: 0,
-    position: 'absolute',
+  },
+  searchPlaceholderQuery: {
+    ...dashboardTypography.body,
+    color: dashboardColors.text,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  listSurface: {
+    backgroundColor: '#F5F7FB',
   },
   listContent: {
     paddingHorizontal: dashboardSpacing.pagePadding,
@@ -908,6 +965,7 @@ const styles = StyleSheet.create({
   },
   centerState: {
     alignItems: 'center',
+    backgroundColor: '#F5F7FB',
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: dashboardSpacing.xl,
