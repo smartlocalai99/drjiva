@@ -79,6 +79,14 @@ module.exports = ({ config }) => {
   if (
     !plugins.some(
       (plugin) =>
+        (Array.isArray(plugin) ? plugin[0] : plugin) === 'expo-video',
+    )
+  ) {
+    plugins.push('expo-video');
+  }
+  if (
+    !plugins.some(
+      (plugin) =>
         (Array.isArray(plugin) ? plugin[0] : plugin) === 'expo-dev-client',
     )
   ) {
