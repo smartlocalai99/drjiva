@@ -10,6 +10,8 @@ type ProfileAvatarFallbackProps = {
 export function ProfileAvatarFallback({
   size = 40,
 }: ProfileAvatarFallbackProps) {
+  const fittedImageSize = Math.round(size * 0.76);
+
   return (
     <View
       style={[
@@ -19,9 +21,9 @@ export function ProfileAvatarFallback({
     >
       <Image
         accessibilityLabel="Default profile picture"
-        contentFit="cover"
+        contentFit="contain"
         source={DEFAULT_PROFILE_IMAGE}
-        style={{ height: size, width: size }}
+        style={{ height: fittedImageSize, width: fittedImageSize }}
         transition={120}
       />
     </View>
