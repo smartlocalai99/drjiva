@@ -42,7 +42,6 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
-import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { dashboardFonts, dashboardLayout } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import {
@@ -444,11 +443,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
 
   return (
     <View style={[styles.feedCard, { height }]}>
-      {post.media_type === 'video' ? (
-        <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />} onError={(videoError) => console.warn('Health feed video failed to render', videoError)}>
-          <FeedVideo active={active} uri={post.media_url} />
-        </ErrorBoundary>
-      ) : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
+      {post.media_type === 'video' ? <FeedVideo active={active} uri={post.media_url} /> : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
       <Pressable accessibilityHint="Double tap to like this post" accessibilityLabel={post.title} onPress={handleMediaTap} style={styles.mediaTapTarget} />
       <View pointerEvents="none" style={styles.mediaShade} />
       <Animated.View pointerEvents="none" style={[styles.doubleTapHeart, heartStyle]}>
@@ -680,11 +675,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
             >
               <View style={[styles.commentPreviewMedia, { height: previewMediaHeight, width: previewMediaWidth }]}>
                 {post.media_type === 'video'
-                  ? (
-                    <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />}>
-                      <FeedVideo active uri={post.media_url} />
-                    </ErrorBoundary>
-                  )
+                  ? <FeedVideo active uri={post.media_url} />
                   : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={160} />}
               </View>
             </Animated.View>
@@ -999,7 +990,6 @@ const styles = StyleSheet.create({
   headerTabText: { color: 'rgba(255,255,255,0.68)', fontFamily: dashboardFonts.medium, fontSize: 15 },
   headerTabTextActive: { color: '#FFFFFF', fontFamily: dashboardFonts.bold },
   headerTabs: { flexDirection: 'row', gap: 4 },
-  mediaFallback: { backgroundColor: '#111416' },
   mediaShade: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent', experimental_backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.82) 100%)' },
   mediaTapTarget: { ...StyleSheet.absoluteFill, zIndex: 1 },
   postCaption: { color: 'rgba(255,255,255,0.88)', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
