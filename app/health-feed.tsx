@@ -17,9 +17,11 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type GestureResponderEvent,
   type ViewToken,
 } from 'react-native';
 import Animated, {
+  cancelAnimation,
   FadeIn,
   FadeOut,
   useAnimatedStyle,
@@ -51,6 +53,8 @@ import { normalizeRoutePhone } from '../src/lib/routePhone';
 import { getCachedPatientName } from '../src/lib/session';
 
 type FeedTab = 'forYou' | 'following' | 'saved';
+
+const DOUBLE_TAP_HEART_SIZE = 130;
 
 export default function HealthFeedScreen() {
   const router = useRouter();
@@ -273,13 +277,24 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   post: HealthFeedPost;
   saved: boolean;
 }) {
+  const { width } = useWindowDimensions();
   const heartOpacity = useSharedValue(0);
   const heartScale = useSharedValue(0.45);
+  const heartX = useSharedValue(0);
+  const heartY = useSharedValue(0);
+  const heartDriftX = useSharedValue(0);
+  const heartRise = useSharedValue(0);
+  const heartRotation = useSharedValue(0);
   const actionHeartScale = useSharedValue(1);
   const lastTapRef = useRef(0);
   const heartStyle = useAnimatedStyle(() => ({
     opacity: heartOpacity.value,
-    transform: [{ scale: heartScale.value }],
+    transform: [
+      { translateX: heartX.value + heartDriftX.value },
+      { translateY: heartY.value + heartRise.value },
+      { rotate: `${heartRotation.value}deg` },
+      { scale: heartScale.value },
+    ],
   }));
   const actionHeartStyle = useAnimatedStyle(() => ({
     transform: [{ scale: actionHeartScale.value }],
@@ -293,7 +308,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
     );
   }, [actionHeartScale, liked]);
 
-  const handleMediaTap = () => {
+  const handleMediaTap = (event: GestureResponderEvent) => {
     const now = Date.now();
     if (now - lastTapRef.current > 300) {
       lastTapRef.current = now;
@@ -301,17 +316,34 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
     }
 
     lastTapRef.current = 0;
+    const { locationX, locationY } = event.nativeEvent;
+    const driftDirection = locationX <= width / 2 ? 1 : -1;
+
+    cancelAnimation(heartOpacity);
+    cancelAnimation(heartScale);
+    cancelAnimation(heartDriftX);
+    cancelAnimation(heartRise);
+    cancelAnimation(heartRotation);
+
+    heartX.value = locationX - DOUBLE_TAP_HEART_SIZE / 2;
+    heartY.value = locationY - DOUBLE_TAP_HEART_SIZE / 2;
+    heartDriftX.value = 0;
+    heartRise.value = 0;
+    heartRotation.value = driftDirection * -7;
     heartOpacity.value = 0;
     heartScale.value = 0.45;
     heartOpacity.value = withSequence(
       withTiming(1, { duration: 70 }),
-      withDelay(430, withTiming(0, { duration: 170 })),
+      withDelay(360, withTiming(0, { duration: 190 })),
     );
     heartScale.value = withSequence(
       withSpring(1.18, { damping: 8, stiffness: 230 }),
       withTiming(1, { duration: 90 }),
-      withDelay(330, withTiming(0.72, { duration: 170 })),
+      withDelay(260, withTiming(0.72, { duration: 190 })),
     );
+    heartDriftX.value = withDelay(90, withTiming(driftDirection * 18, { duration: 520 }));
+    heartRise.value = withDelay(70, withTiming(-58, { duration: 540 }));
+    heartRotation.value = withTiming(driftDirection * 5, { duration: 520 });
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     onDoubleLike();
   };
@@ -623,7 +655,7 @@ const styles = StyleSheet.create({
   doctorRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   doctorSpecialty: { color: 'rgba(255,255,255,0.72)', fontFamily: dashboardFonts.medium, fontSize: 11, paddingTop: 2 },
   doctorText: { flex: 1 },
-  doubleTapHeart: { alignItems: 'center', height: 130, justifyContent: 'center', left: '50%', marginLeft: -65, marginTop: -65, position: 'absolute', top: '46%', width: 130, zIndex: 2 },
+  doubleTapHeart: { alignItems: 'center', height: DOUBLE_TAP_HEART_SIZE, justifyContent: 'center', left: 0, position: 'absolute', top: 0, width: DOUBLE_TAP_HEART_SIZE, zIndex: 2 },
   feedCard: { backgroundColor: '#111416', overflow: 'hidden', position: 'relative' },
   followButton: { borderColor: 'rgba(255,255,255,0.55)', borderRadius: 8, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6 },
   followButtonActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
