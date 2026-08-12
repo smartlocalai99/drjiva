@@ -709,7 +709,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
             <View style={styles.commentGestureContent}>
               {loading ? (
-                <View style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
+                <View {...sheetDragResponder.panHandlers} style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
               ) : comments.length ? (
                 <FlatList
                   contentContainerStyle={styles.commentList}
@@ -729,7 +729,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                   style={styles.commentListView}
                 />
               ) : (
-                <View style={styles.commentState}>
+                <View
+                  {...sheetDragResponder.panHandlers}
+                  accessibilityLabel="No comments yet. Swipe down to close comments."
+                  style={styles.commentState}
+                >
                   <View style={styles.commentEmptyIcon}><Ionicons color="#2E7EBC" name="chatbubble-ellipses-outline" size={25} /></View>
                   <Text style={styles.commentStateTitle}>No comments yet</Text>
                   <Text style={styles.commentStateText}>Be the first to share a helpful comment.</Text>
