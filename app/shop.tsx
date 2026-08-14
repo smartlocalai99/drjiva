@@ -379,13 +379,6 @@ export default function ShopScreen() {
     () => buildReminderMedicineReorders(reminderNames, products),
     [products, reminderNames],
   );
-  const dhruvaProductCount = useMemo(
-    () =>
-      products.filter(
-        (product) => getShopHospitalCode(product.hospitalName) === 'dhruva',
-      ).length,
-    [products],
-  );
   const isSearching = query.trim().length > 0;
   const deliveryAddress = useMemo(
     () => getDefaultAddress(addresses),
@@ -557,10 +550,12 @@ export default function ShopScreen() {
             ) : null}
           </View>
         </View>
-        <HospitalFilter
-          onSelect={setHospitalFilter}
-          selected={hospitalFilter}
-        />
+        {isSearching ? (
+          <HospitalFilter
+            onSelect={setHospitalFilter}
+            selected={hospitalFilter}
+          />
+        ) : null}
       </Animated.View>
 
       {isLoadingCatalogue ? (
@@ -615,14 +610,11 @@ export default function ShopScreen() {
             <EmptySearch hospitalFilter={hospitalFilter} query={query} />
           }
           ListHeaderComponent={
-            isSearching || hospitalFilter === 'dhruva' ? null : (
+            isSearching ? null : (
               <ShopListHeader
-                dhruvaProductCount={dhruvaProductCount}
-                onBrowseDhruva={() => setHospitalFilter('dhruva')}
                 onOpenProduct={openProduct}
                 onSelectSection={scrollToSection}
                 reminderMedicines={reminderMedicines}
-                showDhruvaDiscovery={hospitalFilter === 'all'}
               />
             )
           }
@@ -659,54 +651,18 @@ export default function ShopScreen() {
 }
 
 function ShopListHeader({
-  dhruvaProductCount,
-  onBrowseDhruva,
   onOpenProduct,
   onSelectSection,
   reminderMedicines,
-  showDhruvaDiscovery,
 }: {
-  dhruvaProductCount: number;
-  onBrowseDhruva: () => void;
   onOpenProduct: (product: ShopProduct) => void;
   onSelectSection: (
     sectionCode: (typeof SHOP_BANNERS)[number]['sectionCode'],
   ) => void;
   reminderMedicines: ReminderMedicineReorder[];
-  showDhruvaDiscovery: boolean;
 }) {
   return (
     <View>
-      {showDhruvaDiscovery && dhruvaProductCount > 0 ? (
-        <PressableScale
-          accessibilityLabel={`Browse ${dhruvaProductCount} Dhruva Hospitals medicines`}
-          onPress={onBrowseDhruva}
-          pressedScale={0.985}
-          style={styles.dhruvaDiscovery}
-        >
-          <View style={styles.dhruvaDiscoveryLogoWrap}>
-            <Image
-              accessibilityLabel="Dhruva Hospitals"
-              cachePolicy="memory"
-              contentFit="contain"
-              source={DHRUVA_LOGO}
-              style={styles.dhruvaDiscoveryLogo}
-            />
-          </View>
-          <View style={styles.dhruvaDiscoveryCopy}>
-            <Text style={styles.dhruvaDiscoveryTitle}>
-              Dhruva medicine catalogue
-            </Text>
-            <Text style={styles.dhruvaDiscoveryMeta}>
-              {dhruvaProductCount} medicines with verified photos
-            </Text>
-          </View>
-          <View style={styles.dhruvaDiscoveryArrow}>
-            <Ionicons color="#2467A6" name="arrow-forward" size={18} />
-          </View>
-        </PressableScale>
-      ) : null}
-
       <ShopBannerCarousel onSelectSection={onSelectSection} />
 
       <ReminderMedicineList

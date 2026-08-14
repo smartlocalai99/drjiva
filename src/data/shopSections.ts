@@ -7,11 +7,7 @@ import type {
   ShopProduct,
   ShopSectionCode,
 } from './shopProductModel';
-import {
-  DHRUVA_HOSPITAL_NAME,
-  getShopHospitalCode,
-  SHOP_SECTION_CODES,
-} from './shopProductModel';
+import { getShopHospitalCode, SHOP_SECTION_CODES } from './shopProductModel';
 
 export type ShopSectionKey = ShopSectionCode | 'dhruva' | 'search';
 
@@ -58,8 +54,14 @@ export function buildShopSections(
 ): ShopProductSection[] {
   const normalizedQuery = normalizeMedicineSearch(query);
   if (normalizedQuery) {
+    // Hospital tabs narrow search results — with many hospitals onboarded,
+    // this is where picking one matters, not on the default browse view.
+    const searchableProducts = products.filter((product) => {
+      const hospitalCode = getShopHospitalCode(product.hospitalName);
+      return hospitalFilter === 'all' || hospitalCode === hospitalFilter;
+    });
     const result = searchMedicineCatalogue(
-      products,
+      searchableProducts,
       normalizedQuery,
       80,
       getProductSearchText,
@@ -76,19 +78,13 @@ export function buildShopSections(
     ];
   }
 
-  const filteredProducts = products.filter((product) => {
-    const hospitalCode = getShopHospitalCode(product.hospitalName);
-    return hospitalFilter === 'all' || hospitalCode === hospitalFilter;
-  });
-
-  const asianSections = SHOP_SECTION_CODES.map((code) => ({
+  // Default browse view: the same general medicine categories across every
+  // hospital's catalogue, not split per hospital — doesn't scale once more
+  // hospitals are onboarded, and matches how the shop looked before.
+  return SHOP_SECTION_CODES.map((code) => ({
     code,
-    data: filteredProducts
-      .filter(
-        (product) =>
-          getShopHospitalCode(product.hospitalName) === 'asian' &&
-          product.sectionRanks[code] !== undefined,
-      )
+    data: products
+      .filter((product) => product.sectionRanks[code] !== undefined)
       .sort(
         (left, right) =>
           (left.sectionRanks[code] ?? Number.MAX_SAFE_INTEGER) -
@@ -97,19 +93,6 @@ export function buildShopSections(
       ),
     title: SECTION_TITLES[code],
   })).filter((section) => section.data.length > 0);
-
-  const dhruvaProducts = filteredProducts
-    .filter(
-      (product) => getShopHospitalCode(product.hospitalName) === 'dhruva',
-    )
-    .sort((left, right) => left.name.localeCompare(right.name));
-
-  return [
-    ...asianSections,
-    ...(dhruvaProducts.length > 0
-      ? [{ code: 'dhruva' as const, data: dhruvaProducts, title: DHRUVA_HOSPITAL_NAME }]
-      : []),
-  ];
 }
 
 export function getUniqueReminderMedicineNames(
