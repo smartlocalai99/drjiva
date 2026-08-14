@@ -7,6 +7,7 @@ type UnmatchedRow = {
   medicine_name: string;
   hospital_name: string | null;
   mobile: string | null;
+  reason: 'medicine_not_found' | 'no_image';
   created_at: string;
 };
 
@@ -18,18 +19,36 @@ function formatIst(iso: string): string {
   });
 }
 
-function buildEmailText(rows: UnmatchedRow[]): string {
-  const lines = rows.map(
-    (row, i) =>
-      `${i + 1}. ${row.medicine_name}\n` +
-      `   Hospital: ${row.hospital_name || 'Unknown'}\n` +
-      `   Patient mobile: ${row.mobile || 'Unknown'}\n` +
-      `   Billed at: ${formatIst(row.created_at)}`,
-  );
+function formatRow(row: UnmatchedRow, index: number): string {
   return (
-    `${rows.length} medicine${rows.length === 1 ? '' : 's'} from today's hospital bills weren't found in the DrJiva catalog:\n\n` +
-    lines.join('\n\n') +
-    `\n\nAdd these to the medicine catalog so future bills for them are recognized automatically.`
+    `${index + 1}. ${row.medicine_name}\n` +
+    `   Hospital: ${row.hospital_name || 'Unknown'}\n` +
+    `   Patient mobile: ${row.mobile || 'Unknown'}\n` +
+    `   Billed at: ${formatIst(row.created_at)}`
+  );
+}
+
+function buildEmailText(rows: UnmatchedRow[]): string {
+  const notFound = rows.filter((r) => r.reason === 'medicine_not_found');
+  const noImage = rows.filter((r) => r.reason === 'no_image');
+  const sections: string[] = [];
+
+  if (notFound.length > 0) {
+    sections.push(
+      `NOT IN CATALOG (${notFound.length}) — these medicines don't exist in DrJiva yet, add them:\n\n` +
+        notFound.map(formatRow).join('\n\n'),
+    );
+  }
+  if (noImage.length > 0) {
+    sections.push(
+      `MISSING A PHOTO (${noImage.length}) — these matched an existing medicine but it has no photo:\n\n` +
+        noImage.map(formatRow).join('\n\n'),
+    );
+  }
+
+  return (
+    `${rows.length} medicine${rows.length === 1 ? '' : 's'} from today's hospital bills need attention:\n\n` +
+    sections.join('\n\n---\n\n')
   );
 }
 
@@ -61,7 +80,7 @@ Deno.serve(async (request) => {
 
   const { data: rows, error: fetchError } = await supabase
     .from('unmatched_medicine_requests')
-    .select('id, medicine_name, hospital_name, mobile, created_at')
+    .select('id, medicine_name, hospital_name, mobile, reason, created_at')
     .is('notification_sent_at', null)
     .order('created_at', { ascending: true });
 
@@ -84,7 +103,7 @@ Deno.serve(async (request) => {
       body: JSON.stringify({
         from: 'DrJiva Alerts <onboarding@resend.dev>',
         to: [ALERT_TO_EMAIL],
-        subject: `${rows.length} medicine${rows.length === 1 ? '' : 's'} to add to DrJiva — ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
+        subject: `${rows.length} medicine${rows.length === 1 ? '' : 's'} to review — ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
         text: buildEmailText(rows as UnmatchedRow[]),
       }),
     });
