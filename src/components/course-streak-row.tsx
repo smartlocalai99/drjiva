@@ -1,9 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 
-import type { MedicineStreakDay } from '../data/medicineCourse';
+import {
+  isMedicineStreakDayComplete,
+  type MedicineStreakDay,
+} from '../data/medicineCourse';
 import {
   dashboardColors,
+  dashboardSpacing,
   dashboardTypography,
 } from '../dashboardTheme';
 import { formatDateOnly } from '../lib/medicineCalendar';
@@ -21,6 +26,34 @@ export function CourseStreakRow({
   days,
   ongoing = false,
 }: CourseStreakRowProps) {
+  const [now, setNow] = useState(Date.now);
+  const nextCompletionTime = useMemo(
+    () =>
+      days.reduce<number | null>((next, day) => {
+        if (isMedicineStreakDayComplete(day, now) || !day.completesAt) {
+          return next;
+        }
+        const completionTime = new Date(day.completesAt).getTime();
+        if (Number.isNaN(completionTime) || completionTime <= now) {
+          return next;
+        }
+        return next === null || completionTime < next
+          ? completionTime
+          : next;
+      }, null),
+    [days, now],
+  );
+
+  useEffect(() => {
+    if (nextCompletionTime === null) return;
+    const remaining = Math.max(0, nextCompletionTime - Date.now());
+    const timeout = setTimeout(
+      () => setNow(Date.now()),
+      Math.min(remaining + 50, 2_147_483_647),
+    );
+    return () => clearTimeout(timeout);
+  }, [nextCompletionTime]);
+
   if (days.length === 0) return null;
 
   const today = formatDateOnly(new Date());
@@ -37,11 +70,12 @@ export function CourseStreakRow({
       <View style={styles.days}>
         {days.map((day) => {
           const isToday = day.date === today;
+          const isCompleted = isMedicineStreakDayComplete(day, now);
 
           return (
             <View
               accessibilityLabel={`${day.weekday} ${day.day}${
-                day.completed
+                isCompleted
                   ? ', completed'
                   : day.scheduled
                     ? ', scheduled'
@@ -70,7 +104,7 @@ export function CourseStreakRow({
                   },
                 ]}
               >
-                {day.completed ? (
+                {isCompleted ? (
                   <Ionicons
                     color={dashboardColors.warning}
                     name="flame"
@@ -101,7 +135,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.72)',
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: dashboardSpacing.pagePadding,
     paddingVertical: 8,
   },
   heading: {
@@ -122,8 +156,8 @@ const styles = StyleSheet.create({
   },
   day: {
     alignItems: 'center',
-    flex: 1,
     gap: 3,
+    width: 28,
   },
   weekday: {
     ...dashboardTypography.caption,

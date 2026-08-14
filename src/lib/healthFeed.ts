@@ -54,6 +54,11 @@ export type HealthFeedCountResult = {
   count: number;
 };
 
+export type HealthFeedPostRealtimeUpdate = Partial<Omit<HealthFeedPost, 'doctor'>> & {
+  id: string;
+  status?: string;
+};
+
 export async function fetchHealthFeed(): Promise<HealthFeedPost[]> {
   const { data, error } = await supabase
     .from('health_posts')
@@ -184,15 +189,10 @@ export async function setHealthDoctorFollowed(doctorPhone: string, followed: boo
 }
 
 export async function recordHealthPostView(postId: string): Promise<HealthFeedCountResult> {
-  const ownerUserId = await ensureSecureReportSession();
-  const { error } = await supabase
-    .from('health_post_views')
-    .upsert(
-      { owner_user_id: ownerUserId, post_id: postId },
-      { ignoreDuplicates: true, onConflict: 'post_id,owner_user_id' },
-    );
+  await ensureSecureReportSession();
+  const { data, error } = await supabase.rpc('record_health_post_view', { p_post_id: postId });
   if (error) throw new Error('Unable to record this post view.');
-  return readPostCount(postId, 'views_count');
+  return { count: Number(data || 0) };
 }
 
 export async function fetchHealthPostComments(postId: string): Promise<HealthFeedComment[]> {
@@ -269,17 +269,41 @@ async function readPostCount(
   return { count: Number((data as Record<string, unknown>)[field] || 0) };
 }
 
-export function subscribeToPublishedHealthPosts(onChange: () => void) {
+export function subscribeToPublishedHealthPosts({
+  onFeedStructureChange,
+  onPostUpdate,
+}: {
+  onFeedStructureChange: () => void;
+  onPostUpdate: (post: HealthFeedPostRealtimeUpdate) => void;
+}) {
   const channel = supabase
     .channel('published-health-posts')
     .on(
       'postgres_changes',
       {
-        event: '*',
+        event: 'UPDATE',
         schema: 'public',
         table: 'health_posts',
       },
-      onChange,
+      (payload) => onPostUpdate(payload.new as HealthFeedPostRealtimeUpdate),
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'health_posts',
+      },
+      onFeedStructureChange,
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'health_posts',
+      },
+      onFeedStructureChange,
     )
     .subscribe();
 

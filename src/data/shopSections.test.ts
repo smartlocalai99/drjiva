@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ShopProduct } from './shopProductModel';
+import { DHRUVA_HOSPITAL_NAME } from './shopProductModel';
 import {
   buildReminderMedicineReorders,
   buildShopSections,
@@ -90,6 +91,80 @@ describe('shop sections', () => {
     expect(buildShopSections([uncurated])).toEqual([]);
   });
 
+  it('shows Dhruva medicines alphabetically in the Dhruva filter', () => {
+    const sections = buildShopSections(
+      [
+        product('asian', 'Asian medicine', { fever: 1 }),
+        product('dhruva-z', 'Zed medicine', {}, {
+          hospitalName: DHRUVA_HOSPITAL_NAME,
+        }),
+        product('dhruva-a', 'Alpha medicine', {}, {
+          hospitalName: DHRUVA_HOSPITAL_NAME,
+        }),
+      ],
+      '',
+      'dhruva',
+    );
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toMatchObject({
+      code: 'dhruva',
+      title: DHRUVA_HOSPITAL_NAME,
+    });
+    expect(sections[0]?.data.map((item) => item.id)).toEqual([
+      'dhruva-a',
+      'dhruva-z',
+    ]);
+  });
+
+  it('appends Dhruva medicines to the curated Asian shelves in All', () => {
+    const sections = buildShopSections([
+      product('asian', 'Asian medicine', { fever: 1 }),
+      product('dhruva', 'Dhruva medicine', {}, {
+        hospitalName: DHRUVA_HOSPITAL_NAME,
+      }),
+    ]);
+
+    expect(sections.map((section) => section.code)).toEqual([
+      'fever',
+      'dhruva',
+    ]);
+  });
+
+  it('searches every hospital even when a browse filter is selected', () => {
+    const products = [
+      product('asian', 'Paracetamol Asian', { fever: 1 }),
+      product('dhruva', 'Paracetamol Dhruva', {}, {
+        hospitalName: DHRUVA_HOSPITAL_NAME,
+      }),
+    ];
+
+    expect(
+      buildShopSections(products, 'paracetamol', 'asian')[0]?.data.map(
+        (item) => item.id,
+      ),
+    ).toEqual(['asian', 'dhruva']);
+    expect(
+      buildShopSections(products, 'paracetamol', 'dhruva')[0]?.data.map(
+        (item) => item.id,
+      ),
+    ).toEqual(['asian', 'dhruva']);
+  });
+
+  it('returns the closest medicine for a misspelled search', () => {
+    const sections = buildShopSections(
+      [
+        product('para', 'Paracetamol', { fever: 1 }),
+        product('amox', 'Amoxicillin', {}),
+      ],
+      'paracetmol',
+      'asian',
+    );
+
+    expect(sections[0]).toMatchObject({ title: 'Closest matches' });
+    expect(sections[0]?.data[0]?.id).toBe('para');
+  });
+
   it('keeps a price-pending product discoverable through search', () => {
     const products = [
       product('dolo', 'Dolo-650', { fever: 1 }, {
@@ -111,13 +186,18 @@ describe('shop sections', () => {
     ).toEqual(expect.arrayContaining(['dolo', 'generic']));
   });
 
-  it('returns no sections when a medicine search has no matches', () => {
+  it('returns closest matches when a medicine search has no direct matches', () => {
     expect(
       buildShopSections(
         [product('dolo', 'Dolo-650', { fever: 1 })],
         'amoxicillin',
       ),
-    ).toEqual([]);
+    ).toEqual([
+      expect.objectContaining({
+        data: [expect.objectContaining({ id: 'dolo' })],
+        title: 'Closest matches',
+      }),
+    ]);
   });
 
   it('deduplicates reminder medicine names without using images', () => {

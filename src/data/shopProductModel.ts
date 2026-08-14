@@ -1,7 +1,16 @@
 import { normalizeMedicineSearch } from '../lib/medicineSearch';
 import { getShopProductFallbackCopy } from './shop-product-copy';
 
-export const ASIAN_HOSPITAL_NAME = 'ASIAN MULTI SPECIALITY HOSPITALS';
+export const SHOP_HOSPITALS = {
+  asian: 'ASIAN MULTI SPECIALITY HOSPITALS',
+  dhruva: 'Dhruva Hospitals',
+} as const;
+
+export type ShopHospitalCode = keyof typeof SHOP_HOSPITALS;
+export type ShopHospitalFilter = 'all' | ShopHospitalCode;
+
+export const ASIAN_HOSPITAL_NAME = SHOP_HOSPITALS.asian;
+export const DHRUVA_HOSPITAL_NAME = SHOP_HOSPITALS.dhruva;
 
 export const SHOP_SECTION_CODES = [
   'headache',
@@ -79,8 +88,14 @@ function formatDosageForm(value: string | null): string {
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function isAsianHospital(value: string | null): boolean {
-  return (value ?? '').trim().toUpperCase() === ASIAN_HOSPITAL_NAME;
+export function getShopHospitalCode(
+  value: string | null,
+): ShopHospitalCode | null {
+  const normalized = (value ?? '').trim().toUpperCase();
+  const entry = Object.entries(SHOP_HOSPITALS).find(
+    ([, hospitalName]) => hospitalName.toUpperCase() === normalized,
+  );
+  return (entry?.[0] as ShopHospitalCode | undefined) ?? null;
 }
 
 function parsePrice(value: number | string | null): number | null {
@@ -102,18 +117,22 @@ export function mapMedicineRowsToShopProducts(
   rows: readonly ShopMedicineRow[],
 ): ShopProduct[] {
   const unique = new Map<string, ShopProduct>();
+  const nameCounts = new Map<string, number>();
 
   for (const row of rows) {
     const name = row.name.trim();
     const imageUrl = row.image_url?.trim() ?? '';
     const normalizedName = normalizeMedicineSearch(name);
-    if (!name || !imageUrl || !normalizedName || !isAsianHospital(row.hospital_name)) {
+    const hospitalCode = getShopHospitalCode(row.hospital_name);
+    if (!name || !imageUrl || !normalizedName || !hospitalCode) {
       continue;
     }
 
-    const existingProduct = unique.get(normalizedName);
+    nameCounts.set(normalizedName, (nameCounts.get(normalizedName) ?? 0) + 1);
+    const productKey = `${hospitalCode}:${normalizedName}`;
+    const existingProduct = unique.get(productKey);
     if (existingProduct) {
-      unique.set(normalizedName, {
+      unique.set(productKey, {
         ...existingProduct,
         hasUniqueCatalogueName: false,
       });
@@ -144,14 +163,14 @@ export function mapMedicineRowsToShopProducts(
       dosageForm,
     });
 
-    unique.set(normalizedName, {
+    unique.set(productKey, {
       category,
       commonUses: nonEmpty(row.shop_common_uses) ?? fallback.commonUses,
       composition,
       fullDescription:
         nonEmpty(row.shop_full_description) ?? fallback.fullDescription,
       hasUniqueCatalogueName: true,
-      hospitalName: ASIAN_HOSPITAL_NAME,
+      hospitalName: SHOP_HOSPITALS[hospitalCode],
       id: row.id,
       imageUrl,
       informationReviewedAt: nonEmpty(row.shop_information_reviewed_at),
@@ -167,7 +186,16 @@ export function mapMedicineRowsToShopProducts(
     });
   }
 
-  return [...unique.values()].sort((left, right) =>
-    left.name.localeCompare(right.name),
-  );
+  return [...unique.values()]
+    .map((product) => ({
+      ...product,
+      hasUniqueCatalogueName:
+        product.hasUniqueCatalogueName &&
+        nameCounts.get(normalizeMedicineSearch(product.name)) === 1,
+    }))
+    .sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) ||
+        left.hospitalName.localeCompare(right.hospitalName),
+    );
 }

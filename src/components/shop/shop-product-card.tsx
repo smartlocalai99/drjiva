@@ -15,6 +15,7 @@ import {
   SHOP_DISCOUNT_PERCENT,
 } from "../../lib/currency";
 import { getShopProductRating } from "../../lib/shop-product-rating";
+import { HospitalLogo } from "../HospitalLogo";
 import { ProductQuantityControl } from "./product-quantity-control";
 
 export function ShopProductCard({
@@ -66,6 +67,12 @@ export function ShopProductCard({
           <Text numberOfLines={1} style={styles.meta}>
             {product.packSize}
           </Text>
+          <View style={styles.supplierRow}>
+            <HospitalLogo hospitalName={product.hospitalName} size={18} />
+            <Text numberOfLines={1} style={styles.supplier}>
+              {product.hospitalName}
+            </Text>
+          </View>
           <View style={styles.ratingRow}>
             <View style={styles.ratingBadge}>
               <Text style={styles.ratingValue}>{rating.label}</Text>
@@ -181,6 +188,19 @@ const styles = StyleSheet.create({
     color: dashboardColors.textMuted,
     fontSize: 11,
     marginTop: 3,
+  },
+  supplierRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 5,
+  },
+  supplier: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.primary,
+    flex: 1,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
   },
   ratingRow: {
     alignItems: "center",

@@ -183,6 +183,7 @@ export async function fetchMedicinesForDate(
               course.start_date,
               course.duration_days ?? 7,
               streakEventsByCourse.get(course.id) ?? [],
+              date,
             ),
       tabletsPerDose: Number(course.tablets_per_dose),
     } satisfies DoseRow];

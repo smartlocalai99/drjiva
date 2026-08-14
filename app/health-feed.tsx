@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer, VideoView, type VideoThumbnail } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +15,7 @@ import {
   PanResponder,
   Pressable,
   RefreshControl,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -42,6 +43,8 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { VerifiedBadge } from '../src/components/VerifiedBadge';
 import { dashboardFonts, dashboardLayout } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import {
@@ -56,7 +59,9 @@ import {
   setHealthPostSaved,
   subscribeToPublishedHealthPosts,
   type HealthFeedComment,
+  type HealthFeedDoctor,
   type HealthFeedPost,
+  type HealthFeedPostRealtimeUpdate,
 } from '../src/lib/healthFeed';
 import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
@@ -73,6 +78,9 @@ type FeedTab = 'forYou' | 'following' | 'saved';
 const DOUBLE_TAP_HEART_SIZE = 96;
 const COMMENT_EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'] as const;
 
+type DoctorProfile = { doctor: HealthFeedDoctor; posts: HealthFeedPost[] };
+type ReelViewer = { initialIndex: number; key: string; posts: HealthFeedPost[]; title: string };
+
 export default function HealthFeedScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
@@ -82,6 +90,8 @@ export default function HealthFeedScreen() {
   const [posts, setPosts] = useState<HealthFeedPost[]>([]);
   const [activePostId, setActivePostId] = useState('');
   const [activeTab, setActiveTab] = useState<FeedTab>('forYou');
+  const [profileDoctorPhone, setProfileDoctorPhone] = useState<string | null>(null);
+  const [reelViewer, setReelViewer] = useState<ReelViewer | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const [followedDoctors, setFollowedDoctors] = useState<Set<string>>(() => new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
@@ -95,8 +105,7 @@ export default function HealthFeedScreen() {
   const pendingLikesRef = useRef(new Set<string>());
   const pendingSavesRef = useRef(new Set<string>());
   const pendingFollowsRef = useRef(new Set<string>());
-  const recordedViewsRef = useRef(new Set<string>());
-  const itemHeight = height - insets.top;
+  const itemHeight = height;
 
   const loadPosts = useCallback(async (refresh = false, silent = false) => {
     if (refresh) setRefreshing(true);
@@ -120,7 +129,10 @@ export default function HealthFeedScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void loadPosts(); }, [loadPosts]));
-  useEffect(() => subscribeToPublishedHealthPosts(() => { void loadPosts(false, true); }), [loadPosts]);
+  useEffect(() => subscribeToPublishedHealthPosts({
+    onFeedStructureChange: () => { void loadPosts(false, true); },
+    onPostUpdate: (post) => applyRealtimePostUpdate(setPosts, post),
+  }), [loadPosts]);
   useEffect(() => {
     let cancelled = false;
     const unsubscribeAvatar = subscribeCachedAvatarUrl(phone, (avatarUrl) => {
@@ -163,11 +175,22 @@ export default function HealthFeedScreen() {
     return () => clearTimeout(timer);
   }, [actionError]);
 
-  const visiblePosts = activeTab === 'saved'
-    ? posts.filter((post) => savedIds.has(post.id))
-    : activeTab === 'following'
-      ? posts.filter((post) => followedDoctors.has(post.doctor_phone))
-      : posts;
+  const savedPosts = useMemo(
+    () => posts.filter((post) => savedIds.has(post.id)),
+    [posts, savedIds],
+  );
+  const followedProfiles = useMemo(
+    () => groupDoctorProfiles(posts, followedDoctors),
+    [posts, followedDoctors],
+  );
+  const profile = profileDoctorPhone
+    ? followedProfiles.find((item) => item.doctor.phone_number === profileDoctorPhone) ?? null
+    : null;
+  const viewerPosts = useMemo(() => (
+    reelViewer
+      ? reelViewer.posts.map((viewerPost) => posts.find((post) => post.id === viewerPost.id) ?? viewerPost)
+      : []
+  ), [posts, reelViewer]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<HealthFeedPost>[] }) => {
@@ -176,17 +199,51 @@ export default function HealthFeedScreen() {
   }).current;
 
   useEffect(() => {
-    if (!activePostId || recordedViewsRef.current.has(activePostId)) return;
-    recordedViewsRef.current.add(activePostId);
-    void recordHealthPostView(activePostId)
-      .then(({ count }) => updatePostCount(setPosts, activePostId, 'views_count', count))
-      .catch(() => recordedViewsRef.current.delete(activePostId));
+    if (!activePostId) return undefined;
+    const viewedPostId = activePostId;
+    const viewTimer = setTimeout(() => {
+      void recordHealthPostView(viewedPostId)
+        .then(({ count }) => updatePostViewCount(setPosts, viewedPostId, count))
+        .catch(() => undefined);
+    }, 750);
+    return () => clearTimeout(viewTimer);
   }, [activePostId]);
 
   const handleSelectTab = (tab: NavTabKey) => {
     if (tab === 'healthFeed') return;
     const route = getTabRoute(tab);
     if (route) router.replace({ params: { phone }, pathname: route });
+  };
+
+  const selectFeedTab = (tab: FeedTab) => {
+    setActiveTab(tab);
+    setProfileDoctorPhone(null);
+    setReelViewer(null);
+    setActivePostId('');
+  };
+
+  const openReels = (collection: HealthFeedPost[], postId: string, title: string) => {
+    const initialIndex = Math.max(0, collection.findIndex((post) => post.id === postId));
+    setActivePostId(collection[initialIndex]?.id ?? '');
+    setReelViewer({
+      initialIndex,
+      key: `${title}-${postId}`,
+      posts: collection,
+      title,
+    });
+  };
+
+  const sharePost = async (post: HealthFeedPost) => {
+    const link = post.source_url || post.media_url;
+    try {
+      await Share.share({
+        message: `${post.title}\nBy ${post.doctor.display_name}\n\n${link}`,
+        title: post.title,
+        url: link,
+      });
+    } catch (shareError) {
+      setActionError(shareError instanceof Error ? shareError.message : 'Unable to open sharing.');
+    }
   };
 
   const likePost = async (postId: string, desiredState?: boolean) => {
@@ -248,14 +305,21 @@ export default function HealthFeedScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <StatusBar style="light" />
-      <FeedHeader activeTab={activeTab} onSelect={setActiveTab} />
-      {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={() => void loadPosts()} /> : visiblePosts.length ? (
+      {reelViewer ? (
+        <ReelViewerHeader insetTop={insets.top} onBack={() => { setReelViewer(null); setActivePostId(''); }} title={reelViewer.title} />
+      ) : (
+        <FeedHeader activeTab={activeTab} insetTop={insets.top} onSelect={selectFeedTab} />
+      )}
+      {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={() => void loadPosts()} /> : reelViewer ? (
         <FlatList
-          contentInsetAdjustmentBehavior="automatic"
-          data={visiblePosts}
+          contentInsetAdjustmentBehavior="never"
+          data={viewerPosts}
           decelerationRate="fast"
+          getItemLayout={(_, index) => ({ index, length: itemHeight, offset: itemHeight * index })}
+          initialScrollIndex={reelViewer.initialIndex}
+          key={reelViewer.key}
           keyExtractor={(item) => item.id}
           onViewableItemsChanged={onViewableItemsChanged}
           pagingEnabled
@@ -271,12 +335,63 @@ export default function HealthFeedScreen() {
               onFollow={() => void followDoctor(item.doctor_phone)}
               onLike={() => void likePost(item.id)}
               onSave={() => void savePost(item.id)}
+              onShare={() => void sharePost(item)}
               post={item}
               saved={savedIds.has(item.id)}
             />
           )}
           showsVerticalScrollIndicator={false}
           viewabilityConfig={viewabilityConfig}
+        />
+      ) : activeTab === 'forYou' && posts.length ? (
+        <FlatList
+          contentInsetAdjustmentBehavior="never"
+          data={posts}
+          decelerationRate="fast"
+          getItemLayout={(_, index) => ({ index, length: itemHeight, offset: itemHeight * index })}
+          keyExtractor={(item) => item.id}
+          onViewableItemsChanged={onViewableItemsChanged}
+          pagingEnabled
+          refreshControl={<RefreshControl onRefresh={() => void loadPosts(true)} refreshing={refreshing} tintColor="#FFFFFF" />}
+          renderItem={({ item, index }) => (
+            <FeedCard
+              active={!commentPost && (item.id === activePostId || (!activePostId && index === 0))}
+              followed={followedDoctors.has(item.doctor_phone)}
+              height={itemHeight}
+              liked={likedIds.has(item.id)}
+              onComments={() => setCommentPost(item)}
+              onDoubleLike={() => void likePost(item.id, true)}
+              onFollow={() => void followDoctor(item.doctor_phone)}
+              onLike={() => void likePost(item.id)}
+              onSave={() => void savePost(item.id)}
+              onShare={() => void sharePost(item)}
+              post={item}
+              saved={savedIds.has(item.id)}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          viewabilityConfig={viewabilityConfig}
+        />
+      ) : activeTab === 'saved' ? (
+        savedPosts.length ? (
+          <ReelGrid contentTop={insets.top + 60} onOpen={(postId) => openReels(savedPosts, postId, 'Saved')} posts={savedPosts} />
+        ) : <EmptyFeed tab="saved" />
+      ) : profile ? (
+        <DoctorProfileGrid
+          followed={followedDoctors.has(profile.doctor.phone_number)}
+          onBack={() => setProfileDoctorPhone(null)}
+          onFollow={() => void followDoctor(profile.doctor.phone_number)}
+          onOpen={(postId) => openReels(profile.posts, postId, profile.doctor.display_name)}
+          profile={profile}
+          topInset={insets.top + 60}
+        />
+      ) : followedProfiles.length ? (
+        <FollowingDoctors
+          onOpen={(doctorPhone) => setProfileDoctorPhone(doctorPhone)}
+          onRefresh={() => void loadPosts(true)}
+          profiles={followedProfiles}
+          refreshing={refreshing}
+          topInset={insets.top + 60}
         />
       ) : <EmptyFeed tab={activeTab} />}
       {actionError ? <ActionToast message={actionError} /> : null}
@@ -287,19 +402,19 @@ export default function HealthFeedScreen() {
         onCommentCountChanged={(postId, count) => updatePostCount(setPosts, postId, 'comments_count', count)}
         post={commentPost}
       />
-      <BottomNav activeTab="healthFeed" bottomOffset={insets.bottom + dashboardLayout.navBottomGap} onSelectTab={handleSelectTab} />
+      <BottomNav activeTab="healthFeed" bottomOffset={insets.bottom + dashboardLayout.navBottomGap} onSelectTab={handleSelectTab} overMedia />
     </SafeAreaView>
   );
 }
 
-function FeedHeader({ activeTab, onSelect }: { activeTab: FeedTab; onSelect: (tab: FeedTab) => void }) {
+function FeedHeader({ activeTab, insetTop, onSelect }: { activeTab: FeedTab; insetTop: number; onSelect: (tab: FeedTab) => void }) {
   const tabs: { key: FeedTab; label: string }[] = [
     { key: 'forYou', label: 'For You' },
     { key: 'following', label: 'Following' },
     { key: 'saved', label: 'Saved' },
   ];
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { top: insetTop }]}>
       <View accessibilityRole="tablist" style={styles.headerTabs}>
         {tabs.map((tab) => (
           <Pressable accessibilityRole="tab" accessibilityState={{ selected: activeTab === tab.key }} key={tab.key} onPress={() => onSelect(tab.key)} style={styles.headerTab}>
@@ -308,12 +423,23 @@ function FeedHeader({ activeTab, onSelect }: { activeTab: FeedTab; onSelect: (ta
           </Pressable>
         ))}
       </View>
-      <Ionicons color="#FFFFFF" name="search" size={25} />
     </View>
   );
 }
 
-function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, onFollow, onLike, onSave, post, saved }: {
+function ReelViewerHeader({ insetTop, onBack, title }: { insetTop: number; onBack: () => void; title: string }) {
+  return (
+    <View style={[styles.reelViewerHeader, { top: insetTop }]}>
+      <Pressable accessibilityLabel="Back" hitSlop={8} onPress={onBack} style={styles.headerBackButton}>
+        <Ionicons color="#FFFFFF" name="chevron-back" size={25} />
+      </Pressable>
+      <Text numberOfLines={1} style={styles.reelViewerTitle}>{title}</Text>
+      <View style={styles.headerBackButton} />
+    </View>
+  );
+}
+
+function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, onFollow, onLike, onSave, onShare, post, saved }: {
   active: boolean;
   followed: boolean;
   height: number;
@@ -323,6 +449,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   onFollow: () => void;
   onLike: () => void;
   onSave: () => void;
+  onShare: () => void;
   post: HealthFeedPost;
   saved: boolean;
 }) {
@@ -333,7 +460,9 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   const heartArcHeight = useSharedValue(54);
   const heartRotation = useSharedValue(0);
   const actionHeartScale = useSharedValue(1);
+  const [userPaused, setUserPaused] = useState(false);
   const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likeArrivalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartStyle = useAnimatedStyle(() => {
     const progress = heartProgress.value;
@@ -390,16 +519,34 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
 
   useEffect(() => () => {
     if (likeArrivalTimerRef.current) clearTimeout(likeArrivalTimerRef.current);
+    if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!active) setUserPaused(false);
+  }, [active]);
 
   const handleMediaTap = (event: GestureResponderEvent) => {
     const now = Date.now();
     if (now - lastTapRef.current > 300) {
       lastTapRef.current = now;
+      if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = setTimeout(() => {
+        if (post.media_type === 'video') {
+          setUserPaused((paused) => !paused);
+          void Haptics.selectionAsync().catch(() => undefined);
+        }
+        lastTapRef.current = 0;
+        singleTapTimerRef.current = null;
+      }, 300);
       return;
     }
 
     lastTapRef.current = 0;
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+    }
     const webTapEvent = event.nativeEvent as typeof event.nativeEvent & {
       offsetX?: number;
       offsetY?: number;
@@ -443,17 +590,31 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
 
   return (
     <View style={[styles.feedCard, { height }]}>
-      {post.media_type === 'video' ? <FeedVideo active={active} uri={post.media_url} /> : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
-      <Pressable accessibilityHint="Double tap to like this post" accessibilityLabel={post.title} onPress={handleMediaTap} style={styles.mediaTapTarget} />
+      {post.media_type === 'video' ? (
+        <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />} onError={(videoError) => console.warn('Health feed video failed to render', videoError)}>
+          <FeedVideo active={active && !userPaused} uri={post.media_url} />
+        </ErrorBoundary>
+      ) : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
+      <Pressable
+        accessibilityHint={post.media_type === 'video' ? 'Single tap to pause or play. Double tap to like.' : 'Double tap to like this post.'}
+        accessibilityLabel={post.title}
+        onPress={handleMediaTap}
+        style={styles.mediaTapTarget}
+      />
       <View pointerEvents="none" style={styles.mediaShade} />
       <Animated.View pointerEvents="none" style={[styles.doubleTapHeart, heartStyle]}>
         <Ionicons color="#FF3158" name="heart" size={78} />
       </Animated.View>
+      {post.media_type === 'video' && userPaused ? (
+        <Animated.View entering={FadeIn.duration(120)} pointerEvents="none" style={styles.pauseIndicator}>
+          <Ionicons color="#FFFFFF" name="play" size={36} />
+        </Animated.View>
+      ) : null}
       <View style={styles.postCopy}>
         <View style={styles.doctorRow}>
           <DoctorAvatar name={post.doctor.display_name} uri={post.doctor.avatar_url} />
           <View style={styles.doctorText}>
-            <View style={styles.doctorNameRow}><Text numberOfLines={1} style={styles.doctorName}>{post.doctor.display_name}</Text>{post.doctor.verification_status === 'verified' ? <Ionicons color="#65A9FF" name="checkmark-circle" size={16} /> : null}</View>
+            <View style={styles.doctorNameRow}><Text numberOfLines={1} style={styles.doctorName}>{post.doctor.display_name}</Text>{post.doctor.verification_status === 'verified' ? <VerifiedBadge accessibilityLabel="Verified doctor" size={16} /> : null}</View>
             <Text numberOfLines={1} style={styles.doctorSpecialty}>{post.doctor.specialty} · {post.doctor.hospital_name}</Text>
           </View>
           <Pressable accessibilityLabel={followed ? `Unfollow ${post.doctor.display_name}` : `Follow ${post.doctor.display_name}`} onPress={onFollow} style={[styles.followButton, followed && styles.followButtonActive]}><Text style={[styles.followButtonText, followed && styles.followButtonTextActive]}>{followed ? 'Following' : 'Follow'}</Text></Pressable>
@@ -467,6 +628,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
         <FeedAction active={liked} animatedStyle={actionHeartStyle} count={post.likes_count} icon={liked ? 'heart' : 'heart-outline'} label="Like" onPress={onLike} />
         <FeedAction count={post.comments_count} icon="chatbubble-outline" label="Comments" onPress={onComments} />
         <FeedAction active={saved} count={post.saves_count} icon={saved ? 'bookmark' : 'bookmark-outline'} label="Save" onPress={onSave} />
+        <FeedAction icon="paper-plane-outline" label="Share" onPress={onShare} />
       </View>
     </View>
   );
@@ -475,7 +637,156 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
 function FeedVideo({ active, uri }: { active: boolean; uri: string }) {
   const player = useVideoPlayer({ uri, useCaching: true }, (instance) => { instance.loop = true; });
   useEffect(() => { if (active) player.play(); else player.pause(); }, [active, player]);
-  return <VideoView contentFit="cover" nativeControls={false} player={player} style={StyleSheet.absoluteFill} />;
+  return <VideoView contentFit="cover" nativeControls={false} player={player} style={StyleSheet.absoluteFill} surfaceType="textureView" />;
+}
+
+function ReelGrid({ contentTop, onOpen, posts }: { contentTop: number; onOpen: (postId: string) => void; posts: HealthFeedPost[] }) {
+  return (
+    <FlatList
+      contentContainerStyle={[styles.gridContent, { paddingTop: contentTop }]}
+      data={posts}
+      keyExtractor={(post) => post.id}
+      numColumns={3}
+      renderItem={({ item }) => <ReelGridTile onPress={() => onOpen(item.id)} post={item} />}
+      showsVerticalScrollIndicator={false}
+    />
+  );
+}
+
+function ReelGridTile({ onPress, post }: { onPress: () => void; post: HealthFeedPost }) {
+  return (
+    <Pressable
+      accessibilityHint="Opens this reel"
+      accessibilityLabel={post.title}
+      onPress={onPress}
+      style={styles.gridTile}
+    >
+      {post.media_type === 'image' ? (
+        <Image cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} />
+      ) : <VideoGridThumbnail uri={post.media_url} />}
+      <View pointerEvents="none" style={styles.gridTileShade} />
+      {post.media_type === 'video' ? <Ionicons color="#FFFFFF" name="play" size={17} style={styles.gridPlayIcon} /> : null}
+      <View style={styles.gridViewCount}>
+        <Ionicons color="#FFFFFF" name="play" size={10} />
+        <Text style={styles.gridViewText}>{formatCompactCount(post.views_count)}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function VideoGridThumbnail({ uri }: { uri: string }) {
+  const [thumbnail, setThumbnail] = useState<VideoThumbnail | null>(null);
+  const player = useVideoPlayer({ uri, useCaching: true });
+
+  useEffect(() => {
+    if (process.env.EXPO_OS === 'web') return undefined;
+    let cancelled = false;
+    let requested = false;
+    const createThumbnail = () => {
+      if (requested || player.status !== 'readyToPlay') return;
+      requested = true;
+      void player.generateThumbnailsAsync(0.1, { maxHeight: 480, maxWidth: 320 })
+        .then(([result]) => { if (!cancelled && result) setThumbnail(result); })
+        .catch(() => undefined);
+    };
+    createThumbnail();
+    const subscription = player.addListener('statusChange', createThumbnail);
+    return () => { cancelled = true; subscription.remove(); };
+  }, [player]);
+
+  if (thumbnail) return <Image contentFit="cover" source={thumbnail} style={StyleSheet.absoluteFill} />;
+  if (process.env.EXPO_OS === 'web') {
+    return <VideoView contentFit="cover" nativeControls={false} player={player} style={StyleSheet.absoluteFill} />;
+  }
+  return <View style={[StyleSheet.absoluteFill, styles.gridVideoFallback]}><ActivityIndicator color="#FFFFFF" size="small" /></View>;
+}
+
+function FollowingDoctors({ onOpen, onRefresh, profiles, refreshing, topInset }: {
+  onOpen: (doctorPhone: string) => void;
+  onRefresh: () => void;
+  profiles: DoctorProfile[];
+  refreshing: boolean;
+  topInset: number;
+}) {
+  return (
+    <FlatList
+      contentContainerStyle={[styles.doctorListContent, { paddingTop: topInset }]}
+      data={profiles}
+      keyExtractor={(profile) => profile.doctor.phone_number}
+      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={refreshing} tintColor="#FFFFFF" />}
+      renderItem={({ item }) => (
+        <Pressable
+          accessibilityHint="Opens this doctor's profile and reels"
+          accessibilityLabel={item.doctor.display_name}
+          onPress={() => onOpen(item.doctor.phone_number)}
+          style={styles.doctorListCard}
+        >
+          <DoctorAvatar name={item.doctor.display_name} uri={item.doctor.avatar_url} />
+          <View style={styles.doctorListText}>
+            <View style={styles.doctorListNameRow}>
+              <Text numberOfLines={1} style={styles.doctorListName}>{item.doctor.display_name}</Text>
+              {item.doctor.verification_status === 'verified' ? <VerifiedBadge accessibilityLabel="Verified doctor" size={17} /> : null}
+            </View>
+            <Text numberOfLines={1} style={styles.doctorListSpecialty}>{item.doctor.specialty}</Text>
+            <Text numberOfLines={1} style={styles.doctorListHospital}>{item.doctor.hospital_name}</Text>
+          </View>
+          <View style={styles.doctorPostCount}>
+            <Text style={styles.doctorPostCountValue}>{item.posts.length}</Text>
+            <Text style={styles.doctorPostCountLabel}>reels</Text>
+          </View>
+          <Ionicons color="rgba(255,255,255,0.52)" name="chevron-forward" size={20} />
+        </Pressable>
+      )}
+      showsVerticalScrollIndicator={false}
+    />
+  );
+}
+
+function DoctorProfileGrid({ followed, onBack, onFollow, onOpen, profile, topInset }: {
+  followed: boolean;
+  onBack: () => void;
+  onFollow: () => void;
+  onOpen: (postId: string) => void;
+  profile: DoctorProfile;
+  topInset: number;
+}) {
+  const { doctor, posts } = profile;
+  return (
+    <FlatList
+      ListHeaderComponent={(
+        <View style={[styles.profileHeader, { paddingTop: topInset }]}>
+          <Pressable accessibilityLabel="Back to followed doctors" hitSlop={8} onPress={onBack} style={styles.profileBackButton}>
+            <Ionicons color="#FFFFFF" name="chevron-back" size={24} />
+          </Pressable>
+          <View style={styles.profileIdentity}>
+            <DoctorAvatar name={doctor.display_name} uri={doctor.avatar_url} />
+            <View style={styles.profileIdentityText}>
+              <View style={styles.doctorListNameRow}>
+                <Text numberOfLines={1} style={styles.profileName}>{doctor.display_name}</Text>
+                {doctor.verification_status === 'verified' ? <VerifiedBadge accessibilityLabel="Verified doctor" size={18} /> : null}
+              </View>
+              <Text numberOfLines={1} style={styles.profileSpecialty}>{doctor.specialty} · {doctor.experience_years} yrs</Text>
+              <Text numberOfLines={1} style={styles.profileHospital}>{doctor.hospital_name}</Text>
+            </View>
+          </View>
+          {doctor.bio ? <Text numberOfLines={3} style={styles.profileBio}>{doctor.bio}</Text> : null}
+          <Pressable onPress={onFollow} style={[styles.profileFollowButton, followed && styles.profileFollowButtonActive]}>
+            <Text style={[styles.profileFollowText, followed && styles.profileFollowTextActive]}>{followed ? 'Following' : 'Follow'}</Text>
+          </Pressable>
+          <View style={styles.profileReelsTitle}>
+            <Ionicons color="#FFFFFF" name="grid-outline" size={16} />
+            <Text style={styles.profileReelsText}>Reels</Text>
+          </View>
+        </View>
+      )}
+      contentContainerStyle={styles.profileGridContent}
+      data={posts}
+      keyExtractor={(post) => post.id}
+      numColumns={3}
+      renderItem={({ item }) => <ReelGridTile onPress={() => onOpen(item.id)} post={item} />}
+      showsVerticalScrollIndicator={false}
+    />
+  );
 }
 
 function DoctorAvatar({ name, uri }: { name: string; uri: string }) {
@@ -512,6 +823,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const [error, setError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const sheetTranslateY = useSharedValue(0);
+  const emptyStateDragDismissedRef = useRef(false);
   const previewHeight = keyboardVisible
     ? Math.min(250, Math.max(205, height * 0.27))
     : Math.min(380, Math.max(240, height * 0.39));
@@ -602,6 +914,34 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       onShouldBlockNativeResponder: () => true,
     });
   }, [closeComments, height, sheetTranslateY]);
+  const emptyStateDragResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponderCapture: () => true,
+    onPanResponderGrant: () => {
+      emptyStateDragDismissedRef.current = false;
+      Keyboard.dismiss();
+      cancelAnimation(sheetTranslateY);
+    },
+    onPanResponderMove: (_, gesture) => {
+      if (gesture.dy <= 0 || emptyStateDragDismissedRef.current) return;
+      emptyStateDragDismissedRef.current = true;
+      sheetTranslateY.value = withTiming(height, { duration: 190 }, (finished) => {
+        if (finished) runOnJS(closeComments)();
+      });
+    },
+    onPanResponderRelease: () => {
+      if (!emptyStateDragDismissedRef.current) {
+        sheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 260 });
+      }
+    },
+    onPanResponderTerminate: () => {
+      if (!emptyStateDragDismissedRef.current) {
+        sheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 260 });
+      }
+    },
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+  }), [closeComments, height, sheetTranslateY]);
 
   const appendEmoji = (emoji: typeof COMMENT_EMOJIS[number]) => {
     setDraft((current) => {
@@ -676,7 +1016,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
             >
               <View style={[styles.commentPreviewMedia, { height: previewMediaHeight, width: previewMediaWidth }]}>
                 {post.media_type === 'video'
-                  ? <FeedVideo active uri={post.media_url} />
+                  ? (
+                    <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />}>
+                      <FeedVideo active uri={post.media_url} />
+                    </ErrorBoundary>
+                  )
                   : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={160} />}
               </View>
             </Animated.View>
@@ -709,7 +1053,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
             <View style={styles.commentGestureContent}>
               {loading ? (
-                <View {...sheetDragResponder.panHandlers} style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
+                <View {...emptyStateDragResponder.panHandlers} style={styles.commentState}><ActivityIndicator color="#2E7EBC" /><Text style={styles.commentStateText}>Loading comments…</Text></View>
               ) : comments.length ? (
                 <FlatList
                   contentContainerStyle={styles.commentList}
@@ -730,7 +1074,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                 />
               ) : (
                 <View
-                  {...sheetDragResponder.panHandlers}
+                  {...emptyStateDragResponder.panHandlers}
                   accessibilityLabel="No comments yet. Swipe down to close comments."
                   style={styles.commentState}
                 >
@@ -914,6 +1258,57 @@ function updatePostCount(
   )));
 }
 
+function updatePostViewCount(
+  setter: Dispatch<SetStateAction<HealthFeedPost[]>>,
+  postId: string,
+  count: number,
+) {
+  setter((current) => current.map((post) => (
+    post.id === postId
+      ? { ...post, views_count: Math.max(post.views_count, count) }
+      : post
+  )));
+}
+
+function applyRealtimePostUpdate(
+  setter: Dispatch<SetStateAction<HealthFeedPost[]>>,
+  update: HealthFeedPostRealtimeUpdate,
+) {
+  setter((current) => {
+    if (update.status && update.status !== 'published') {
+      return current.filter((post) => post.id !== update.id);
+    }
+    return current.map((post) => {
+      if (post.id !== update.id) return post;
+      const nextPost = { ...post, ...update, doctor: post.doctor };
+      if (typeof update.views_count === 'number') {
+        nextPost.views_count = Math.max(post.views_count, update.views_count);
+      }
+      return nextPost;
+    });
+  });
+}
+
+function groupDoctorProfiles(posts: HealthFeedPost[], followedDoctors: Set<string>): DoctorProfile[] {
+  const profiles = new Map<string, DoctorProfile>();
+  posts.forEach((post) => {
+    if (!followedDoctors.has(post.doctor_phone)) return;
+    const existing = profiles.get(post.doctor_phone);
+    if (existing) existing.posts.push(post);
+    else profiles.set(post.doctor_phone, { doctor: post.doctor, posts: [post] });
+  });
+  return Array.from(profiles.values());
+}
+
+const compactNumberFormatter = new Intl.NumberFormat('en', {
+  maximumFractionDigits: 1,
+  notation: 'compact',
+});
+
+function formatCompactCount(value: number) {
+  return compactNumberFormatter.format(value);
+}
+
 function getInitial(value: string) {
   return value.trim().charAt(0).toUpperCase() || 'P';
 }
@@ -938,15 +1333,15 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 }
 
 function EmptyFeed({ tab }: { tab: FeedTab }) {
-  const copy = tab === 'following' ? 'Follow a doctor to see their posts here.' : tab === 'saved' ? 'Posts you save will appear here.' : 'Your doctors have not published any posts yet.';
-  return <View style={styles.centerState}><Ionicons color="#FFFFFF" name="pulse-outline" size={44} /><Text style={styles.stateTitle}>Nothing Here Yet</Text><Text style={styles.stateText}>{copy}</Text></View>;
+  const copy = tab === 'following' ? 'Doctors you follow will appear here.' : tab === 'saved' ? 'Posts you save will appear here.' : 'Your doctors have not published any posts yet.';
+  return <View style={styles.centerState}><Ionicons color="#FFFFFF" name="medkit-outline" size={44} /><Text style={styles.stateTitle}>Nothing Here Yet</Text><Text style={styles.stateText}>{copy}</Text></View>;
 }
 
 const styles = StyleSheet.create({
   actionButton: { alignItems: 'center', gap: 3, minHeight: 48, minWidth: 44 },
   actionCount: { color: '#FFFFFF', fontFamily: dashboardFonts.semiBold, fontSize: 11, fontVariant: ['tabular-nums'] },
-  actionRail: { bottom: 126, gap: 18, position: 'absolute', right: 18, zIndex: 4 },
-  actionToast: { alignItems: 'center', backgroundColor: 'rgba(24,32,42,0.96)', borderCurve: 'continuous', borderRadius: 14, bottom: 116, boxShadow: '0 8px 30px rgba(0,0,0,0.28)', flexDirection: 'row', gap: 9, left: 18, paddingHorizontal: 14, paddingVertical: 12, position: 'absolute', right: 18, zIndex: 30 },
+  actionRail: { bottom: 104, gap: 14, position: 'absolute', right: 18, zIndex: 4 },
+  actionToast: { alignItems: 'center', backgroundColor: 'rgba(24,32,42,0.96)', borderCurve: 'continuous', borderRadius: 14, bottom: 94, boxShadow: '0 8px 30px rgba(0,0,0,0.28)', flexDirection: 'row', gap: 9, left: 18, paddingHorizontal: 14, paddingVertical: 12, position: 'absolute', right: 18, zIndex: 30 },
   actionToastText: { color: '#FFFFFF', flex: 1, fontFamily: dashboardFonts.semiBold, fontSize: 12, lineHeight: 17 },
   avatar: { borderColor: '#FFFFFF', borderRadius: 23, borderWidth: 2, height: 46, width: 46 },
   avatarFallback: { alignItems: 'center', backgroundColor: '#2E7EBC', borderColor: '#FFFFFF', borderRadius: 23, borderWidth: 2, height: 46, justifyContent: 'center', width: 46 },
@@ -998,6 +1393,16 @@ const styles = StyleSheet.create({
   doctorRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   doctorSpecialty: { color: 'rgba(255,255,255,0.72)', fontFamily: dashboardFonts.medium, fontSize: 11, paddingTop: 2 },
   doctorText: { flex: 1 },
+  doctorListCard: { alignItems: 'center', backgroundColor: '#15191D', borderColor: 'rgba(255,255,255,0.08)', borderCurve: 'continuous', borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, minHeight: 82, padding: 14 },
+  doctorListContent: { gap: 11, paddingBottom: 104, paddingHorizontal: 16, paddingTop: 76 },
+  doctorListHospital: { color: 'rgba(255,255,255,0.48)', fontFamily: dashboardFonts.medium, fontSize: 11, paddingTop: 2 },
+  doctorListName: { color: '#FFFFFF', flexShrink: 1, fontFamily: dashboardFonts.bold, fontSize: 15 },
+  doctorListNameRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  doctorListSpecialty: { color: '#9BCBFF', fontFamily: dashboardFonts.semiBold, fontSize: 12, paddingTop: 3 },
+  doctorListText: { flex: 1, minWidth: 0 },
+  doctorPostCount: { alignItems: 'center', minWidth: 36 },
+  doctorPostCountLabel: { color: 'rgba(255,255,255,0.48)', fontFamily: dashboardFonts.medium, fontSize: 9 },
+  doctorPostCountValue: { color: '#FFFFFF', fontFamily: dashboardFonts.bold, fontSize: 14, fontVariant: ['tabular-nums'] },
   doubleTapHeart: { alignItems: 'center', height: DOUBLE_TAP_HEART_SIZE, justifyContent: 'center', left: 0, position: 'absolute', top: 0, width: DOUBLE_TAP_HEART_SIZE, zIndex: 5 },
   feedCard: { backgroundColor: '#111416', overflow: 'hidden', position: 'relative' },
   followButton: { borderColor: 'rgba(255,255,255,0.55)', borderRadius: 8, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6 },
@@ -1005,17 +1410,44 @@ const styles = StyleSheet.create({
   followButtonText: { color: '#FFFFFF', fontFamily: dashboardFonts.semiBold, fontSize: 11 },
   followButtonTextActive: { color: '#101214' },
   hashtags: { color: '#9BCBFF', fontFamily: dashboardFonts.semiBold, fontSize: 12, lineHeight: 18 },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', left: 20, position: 'absolute', right: 20, top: 14, zIndex: 10 },
-  headerTab: { alignItems: 'center', gap: 7, paddingHorizontal: 8, paddingVertical: 7 },
+  header: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', height: 52, justifyContent: 'center', left: 0, position: 'absolute', right: 0, zIndex: 10 },
+  headerBackButton: { alignItems: 'center', height: 42, justifyContent: 'center', width: 42 },
+  headerTab: { alignItems: 'center', gap: 5, minHeight: 48, paddingHorizontal: 8, paddingVertical: 7 },
   headerTabLine: { backgroundColor: '#FFFFFF', borderRadius: 2, height: 3, width: 24 },
-  headerTabText: { color: 'rgba(255,255,255,0.68)', fontFamily: dashboardFonts.medium, fontSize: 15 },
+  headerTabText: { color: 'rgba(255,255,255,0.78)', fontFamily: dashboardFonts.bold, fontSize: 15, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 4 },
   headerTabTextActive: { color: '#FFFFFF', fontFamily: dashboardFonts.bold },
   headerTabs: { flexDirection: 'row', gap: 4 },
+  gridContent: { paddingBottom: 104, paddingTop: 72 },
+  gridPlayIcon: { left: '50%', marginLeft: -8, marginTop: -8, position: 'absolute', top: '50%' },
+  gridTile: { aspectRatio: 0.75, backgroundColor: '#15191D', borderColor: '#090B0D', borderWidth: 1, flex: 1, maxWidth: '33.333%', overflow: 'hidden', position: 'relative' },
+  gridTileShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.12)' },
+  gridVideoFallback: { alignItems: 'center', backgroundColor: '#20262C', justifyContent: 'center' },
+  gridViewCount: { alignItems: 'center', bottom: 7, flexDirection: 'row', gap: 4, left: 7, position: 'absolute' },
+  gridViewText: { color: '#FFFFFF', fontFamily: dashboardFonts.semiBold, fontSize: 10, fontVariant: ['tabular-nums'] },
+  mediaFallback: { backgroundColor: '#111416' },
   mediaShade: { ...StyleSheet.absoluteFill, backgroundColor: 'transparent', experimental_backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.82) 100%)' },
   mediaTapTarget: { ...StyleSheet.absoluteFill, zIndex: 1 },
+  pauseIndicator: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.52)', borderRadius: 36, height: 72, justifyContent: 'center', left: '50%', marginLeft: -36, marginTop: -36, position: 'absolute', top: '50%', width: 72, zIndex: 4 },
   postCaption: { color: 'rgba(255,255,255,0.88)', fontFamily: dashboardFonts.medium, fontSize: 13, lineHeight: 19 },
-  postCopy: { bottom: 116, gap: 8, left: 18, paddingRight: 62, position: 'absolute', right: 18, zIndex: 3 },
+  postCopy: { bottom: 94, gap: 8, left: 18, paddingRight: 62, position: 'absolute', right: 18, zIndex: 3 },
   postTitle: { color: '#FFFFFF', fontFamily: dashboardFonts.bold, fontSize: 21, lineHeight: 27 },
+  profileBackButton: { alignItems: 'center', height: 40, justifyContent: 'center', marginLeft: -10, width: 40 },
+  profileBio: { color: 'rgba(255,255,255,0.70)', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 18 },
+  profileFollowButton: { alignItems: 'center', borderColor: '#FFFFFF', borderCurve: 'continuous', borderRadius: 10, borderWidth: 1, paddingVertical: 9 },
+  profileFollowButtonActive: { backgroundColor: '#FFFFFF' },
+  profileFollowText: { color: '#FFFFFF', fontFamily: dashboardFonts.bold, fontSize: 12 },
+  profileFollowTextActive: { color: '#101214' },
+  profileGridContent: { paddingBottom: 104 },
+  profileHeader: { gap: 12, paddingBottom: 14, paddingHorizontal: 18, paddingTop: 68 },
+  profileHospital: { color: 'rgba(255,255,255,0.50)', fontFamily: dashboardFonts.medium, fontSize: 11, paddingTop: 3 },
+  profileIdentity: { alignItems: 'center', flexDirection: 'row', gap: 13 },
+  profileIdentityText: { flex: 1, minWidth: 0 },
+  profileName: { color: '#FFFFFF', flexShrink: 1, fontFamily: dashboardFonts.bold, fontSize: 18 },
+  profileReelsText: { color: '#FFFFFF', fontFamily: dashboardFonts.bold, fontSize: 13 },
+  profileReelsTitle: { alignItems: 'center', borderTopColor: 'rgba(255,255,255,0.12)', borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 7, justifyContent: 'center', marginHorizontal: -18, marginTop: 4, paddingTop: 13 },
+  profileSpecialty: { color: '#9BCBFF', fontFamily: dashboardFonts.semiBold, fontSize: 12, paddingTop: 3 },
+  reelViewerHeader: { alignItems: 'center', flexDirection: 'row', height: 52, justifyContent: 'space-between', left: 0, paddingHorizontal: 8, position: 'absolute', right: 0, zIndex: 10 },
+  reelViewerTitle: { color: '#FFFFFF', flex: 1, fontFamily: dashboardFonts.bold, fontSize: 15, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.65)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 4 },
   retryButton: { backgroundColor: '#FFFFFF', borderRadius: 12, marginTop: 6, paddingHorizontal: 18, paddingVertical: 11 },
   retryText: { color: '#101214', fontFamily: dashboardFonts.bold, fontSize: 13 },
   safeArea: { backgroundColor: '#090B0D', flex: 1 },

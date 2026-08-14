@@ -1,13 +1,19 @@
 import {
   normalizeMedicineSearch,
+  searchMedicineCatalogue,
 } from '../lib/medicineSearch';
 import type {
+  ShopHospitalFilter,
   ShopProduct,
   ShopSectionCode,
 } from './shopProductModel';
-import { SHOP_SECTION_CODES } from './shopProductModel';
+import {
+  DHRUVA_HOSPITAL_NAME,
+  getShopHospitalCode,
+  SHOP_SECTION_CODES,
+} from './shopProductModel';
 
-export type ShopSectionKey = ShopSectionCode | 'search';
+export type ShopSectionKey = ShopSectionCode | 'dhruva' | 'search';
 
 export type ShopProductSection = {
   code: ShopSectionKey;
@@ -34,59 +40,55 @@ const SECTION_TITLES: Record<ShopSectionCode, string> = {
   vitamins: 'Multivitamins',
 };
 
-function matchesProductSearch(
-  product: ShopProduct,
-  normalizedQuery: string,
-): boolean {
-  if (!normalizedQuery) {
-    return true;
-  }
-
-  const searchable = normalizeMedicineSearch(
-    [
-      product.name,
-      product.composition,
-      product.category,
-      product.hospitalName,
-      product.shortDescription,
-      product.commonUses ?? '',
-    ].join(' '),
-  );
-  return normalizedQuery
-    .split(' ')
-    .every((token) => searchable.includes(token));
+function getProductSearchText(product: ShopProduct): string {
+  return [
+    product.name,
+    product.composition,
+    product.category,
+    product.hospitalName,
+    product.shortDescription,
+    product.commonUses ?? '',
+  ].join(' ');
 }
 
 export function buildShopSections(
   products: readonly ShopProduct[],
   query = '',
+  hospitalFilter: ShopHospitalFilter = 'all',
 ): ShopProductSection[] {
   const normalizedQuery = normalizeMedicineSearch(query);
   if (normalizedQuery) {
-    const data = products
-      .filter((product) =>
-        matchesProductSearch(product, normalizedQuery),
-      )
-      .sort((left, right) => left.name.localeCompare(right.name))
-      .slice(0, 80);
-
-    if (data.length === 0) {
-      return [];
-    }
+    const result = searchMedicineCatalogue(
+      products,
+      normalizedQuery,
+      80,
+      getProductSearchText,
+    );
 
     return [
       {
         code: 'search',
-        data,
-        title: 'Search results',
+        data: result.items,
+        title: result.usedNearestFallback
+          ? 'Closest matches'
+          : 'Search results',
       },
     ];
   }
 
-  return SHOP_SECTION_CODES.map((code) => ({
+  const filteredProducts = products.filter((product) => {
+    const hospitalCode = getShopHospitalCode(product.hospitalName);
+    return hospitalFilter === 'all' || hospitalCode === hospitalFilter;
+  });
+
+  const asianSections = SHOP_SECTION_CODES.map((code) => ({
     code,
-    data: products
-      .filter((product) => product.sectionRanks[code] !== undefined)
+    data: filteredProducts
+      .filter(
+        (product) =>
+          getShopHospitalCode(product.hospitalName) === 'asian' &&
+          product.sectionRanks[code] !== undefined,
+      )
       .sort(
         (left, right) =>
           (left.sectionRanks[code] ?? Number.MAX_SAFE_INTEGER) -
@@ -95,6 +97,19 @@ export function buildShopSections(
       ),
     title: SECTION_TITLES[code],
   })).filter((section) => section.data.length > 0);
+
+  const dhruvaProducts = filteredProducts
+    .filter(
+      (product) => getShopHospitalCode(product.hospitalName) === 'dhruva',
+    )
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return [
+    ...asianSections,
+    ...(dhruvaProducts.length > 0
+      ? [{ code: 'dhruva' as const, data: dhruvaProducts, title: DHRUVA_HOSPITAL_NAME }]
+      : []),
+  ];
 }
 
 export function getUniqueReminderMedicineNames(

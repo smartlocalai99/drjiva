@@ -8,6 +8,7 @@ import { formatScheduledTime12Hour } from '../lib/medicineTime';
 
 export type MedicineStreakDay = {
   completed: boolean;
+  completesAt: string | null;
   date: string;
   day: number;
   scheduled: boolean;
@@ -60,10 +61,62 @@ function titleCase(value: string): string {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
+function getAsOfTime(asOf: Date | string): number {
+  const asOfDate =
+    typeof asOf === 'string'
+      ? parseDateOnly(asOf) ?? new Date(asOf)
+      : new Date(asOf);
+  return asOfDate.getTime();
+}
+
+function getStreakCompletion(
+  events: readonly CourseStreakEvent[],
+  asOfTime: number,
+): Pick<MedicineStreakDay, 'completed' | 'completesAt'> {
+  const pendingTimes = events
+    .filter((event) => event.status !== 'completed')
+    .map((event) => ({
+      iso: event.scheduledFor,
+      time: new Date(event.scheduledFor).getTime(),
+    }))
+    .filter((event) => !Number.isNaN(event.time));
+  const completesAt = pendingTimes.reduce<
+    { iso: string; time: number } | undefined
+  >(
+    (latest, event) => !latest || event.time > latest.time ? event : latest,
+    undefined,
+  );
+
+  return {
+    completed:
+      pendingTimes.length === 0 ||
+      (!Number.isNaN(asOfTime) &&
+        pendingTimes.every((event) => event.time <= asOfTime)),
+    completesAt: completesAt?.iso ?? null,
+  };
+}
+
+export function isMedicineStreakDayComplete(
+  day: MedicineStreakDay,
+  asOf: Date | number = Date.now(),
+): boolean {
+  if (day.completed) return true;
+  if (!day.completesAt) return false;
+
+  const asOfTime = typeof asOf === 'number' ? asOf : asOf.getTime();
+  const completionTime = new Date(day.completesAt).getTime();
+  return (
+    !Number.isNaN(asOfTime) &&
+    !Number.isNaN(completionTime) &&
+    completionTime <= asOfTime
+  );
+}
+
 export function buildMedicineStreak(
   startDate: string,
   durationDays: number,
   events: readonly CourseStreakEvent[],
+  asOf: Date | string = new Date(),
 ): MedicineStreakDay[] {
   const firstDate = parseDateOnly(startDate);
   if (!firstDate || !Number.isInteger(durationDays) || durationDays <= 0) {
@@ -71,6 +124,7 @@ export function buildMedicineStreak(
   }
 
   const courseEndDate = addCalendarDays(startDate, durationDays);
+  const asOfTime = getAsOfTime(asOf);
   const eventsByDate = new Map<string, CourseStreakEvent[]>();
   for (const event of events) {
     const eventDate = new Date(event.scheduledFor);
@@ -91,9 +145,10 @@ export function buildMedicineStreak(
     .slice(0, 7)
     .map(([date, dateEvents]) => {
       const parsed = parseDateOnly(date)!;
+      const completion = getStreakCompletion(dateEvents, asOfTime);
 
       return {
-        completed: dateEvents.every((event) => event.status === 'completed'),
+        ...completion,
         date,
         day: parsed.getDate(),
         scheduled: true,
@@ -110,6 +165,7 @@ export function buildCurrentWeekMedicineStreak(
   const asOfDate = typeof asOf === 'string' ? parseDateOnly(asOf) : new Date(asOf);
   const courseStart = parseDateOnly(startDate);
   if (!asOfDate || !courseStart) return [];
+  const asOfTime = asOfDate.getTime();
   const mondayOffset = (asOfDate.getDay() + 6) % 7;
   const weekStart = new Date(asOfDate);
   weekStart.setDate(asOfDate.getDate() - mondayOffset);
@@ -128,10 +184,11 @@ export function buildCurrentWeekMedicineStreak(
     const key = formatDateOnly(date);
     const dateEvents = eventsByDate.get(key) ?? [];
     const scheduled = key >= startDate && dateEvents.length > 0;
+    const completion = scheduled
+      ? getStreakCompletion(dateEvents, asOfTime)
+      : { completed: false, completesAt: null };
     return {
-      completed:
-        scheduled &&
-        dateEvents.every((event) => event.status === 'completed'),
+      ...completion,
       date: key,
       day: date.getDate(),
       scheduled,
@@ -181,7 +238,7 @@ export function selectNearestMedicine(
   const pending = medicines.filter((medicine) => !medicine.completed);
   const upcoming = pending
     .filter(
-      (medicine) => new Date(medicine.scheduledFor).getTime() >= nowTime,
+      (medicine) => new Date(medicine.scheduledFor).getTime() > nowTime,
     )
     .sort(
       (left, right) =>

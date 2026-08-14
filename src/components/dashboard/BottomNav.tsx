@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
 import {
   dashboardColors,
   dashboardLayout,
-  dashboardRadii,
-  dashboardTypography,
 } from '../../dashboardTheme';
 import { useLanguage, type TranslationKey } from '../../lib/i18n';
 
@@ -26,8 +25,8 @@ const TAB_DEFS: {
     labelKey: 'documents',
   },
   {
-    activeIcon: 'pulse',
-    icon: 'pulse-outline',
+    activeIcon: 'medkit',
+    icon: 'medkit-outline',
     key: 'healthFeed',
     labelKey: 'healthFeed',
   },
@@ -38,10 +37,28 @@ type BottomNavProps = {
   activeTab: NavTabKey | null;
   bottomOffset: number;
   onSelectTab: (tab: NavTabKey) => void;
+  overMedia?: boolean;
 };
 
-export function BottomNav({ activeTab, bottomOffset, onSelectTab }: BottomNavProps) {
+export function BottomNav({ activeTab, bottomOffset, onSelectTab, overMedia = false }: BottomNavProps) {
   const { t } = useLanguage();
+  const colorScheme = useColorScheme();
+  const liquidGlass = process.env.EXPO_OS === 'ios'
+    && isGlassEffectAPIAvailable()
+    && isLiquidGlassAvailable();
+  const dark = colorScheme === 'dark';
+  const content = TAB_DEFS.map((tab) => (
+    <NavItem
+      activeIcon={tab.activeIcon}
+      activeColor={overMedia ? '#FFFFFF' : dashboardColors.primary}
+      icon={tab.icon}
+      inactiveColor={overMedia ? '#FFFFFF' : dark ? '#CBD5E1' : dashboardColors.textFaint}
+      isActive={tab.key === activeTab}
+      key={tab.key}
+      label={t(tab.labelKey)}
+      onPress={() => handlePress(tab.key)}
+    />
+  ));
 
   const handlePress = (tab: NavTabKey) => {
     if (tab !== activeTab) {
@@ -50,52 +67,59 @@ export function BottomNav({ activeTab, bottomOffset, onSelectTab }: BottomNavPro
     onSelectTab(tab);
   };
 
+  if (liquidGlass) {
+    return (
+      <GlassView
+        colorScheme="auto"
+        glassEffectStyle="regular"
+        style={[styles.wrapper, styles.glassWrapper, overMedia && styles.glassWrapperOverMedia, { bottom: bottomOffset }]}
+      >
+        {content}
+      </GlassView>
+    );
+  }
+
   return (
-    <View style={[styles.wrapper, { bottom: bottomOffset }]}>
-      {TAB_DEFS.map((tab) => (
-        <NavItem
-          activeIcon={tab.activeIcon}
-          icon={tab.icon}
-          isActive={tab.key === activeTab}
-          key={tab.key}
-          label={t(tab.labelKey)}
-          onPress={() => handlePress(tab.key)}
-        />
-      ))}
+    <View
+      style={[
+        styles.wrapper,
+        styles.fallbackWrapper,
+        overMedia
+          ? styles.fallbackWrapperOverMedia
+          : dark ? styles.fallbackWrapperDark : styles.fallbackWrapperLight,
+        { bottom: bottomOffset },
+      ]}
+    >
+      {content}
     </View>
   );
 }
 
 type NavItemProps = {
   activeIcon: keyof typeof Ionicons.glyphMap;
+  activeColor: string;
   icon: keyof typeof Ionicons.glyphMap;
+  inactiveColor: string;
   isActive: boolean;
   label: string;
   onPress: () => void;
 };
 
-function NavItem({ activeIcon, icon, isActive, label, onPress }: NavItemProps) {
+function NavItem({ activeColor, activeIcon, icon, inactiveColor, isActive, label, onPress }: NavItemProps) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="tab"
       accessibilityState={{ selected: isActive }}
       hitSlop={6}
       onPress={onPress}
-      style={styles.item}
+      style={[styles.item, isActive && styles.itemActive, isActive && activeColor === '#FFFFFF' && styles.itemActiveOverMedia]}
     >
       <Ionicons
-        color={isActive ? dashboardColors.primary : dashboardColors.textFaint}
+        color={isActive ? activeColor : inactiveColor}
         name={isActive ? activeIcon : icon}
-        size={22}
+        size={24}
       />
-      <Text
-        adjustsFontSizeToFit
-        minimumFontScale={0.78}
-        numberOfLines={1}
-        style={[styles.label, isActive && styles.labelActive]}
-      >
-        {label}
-      </Text>
     </Pressable>
   );
 }
@@ -103,37 +127,32 @@ function NavItem({ activeIcon, icon, isActive, label, onPress }: NavItemProps) {
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    backgroundColor: dashboardColors.card,
-    borderRadius: dashboardRadii.card,
+    borderCurve: 'continuous',
+    borderRadius: 29,
     flexDirection: 'row',
     height: dashboardLayout.bottomNavHeight,
     justifyContent: 'space-around',
-    left: 20,
+    left: 44,
+    overflow: 'hidden',
     position: 'absolute',
-    right: 20,
-    ...Platform.select({
-      android: {
-        elevation: 10,
-      },
-      ios: {
-        shadowColor: dashboardColors.shadow,
-        shadowOffset: { height: 8, width: 0 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-      },
-    }),
+    right: 44,
+    zIndex: 20,
   },
+  glassWrapper: { borderColor: 'rgba(255,255,255,0.32)', borderWidth: StyleSheet.hairlineWidth },
+  glassWrapperOverMedia: { borderColor: 'rgba(255,255,255,0.46)' },
+  fallbackWrapper: { borderWidth: StyleSheet.hairlineWidth, boxShadow: '0 8px 28px rgba(15,23,42,0.16)' },
+  fallbackWrapperDark: { backgroundColor: 'rgba(24,28,34,0.94)', borderColor: 'rgba(255,255,255,0.16)' },
+  fallbackWrapperLight: { backgroundColor: 'rgba(255,255,255,0.94)', borderColor: 'rgba(255,255,255,0.78)' },
+  fallbackWrapperOverMedia: { backgroundColor: 'rgba(12,16,21,0.58)', borderColor: 'rgba(255,255,255,0.38)', boxShadow: '0 8px 30px rgba(0,0,0,0.24)' },
   item: {
     alignItems: 'center',
+    borderCurve: 'continuous',
+    borderRadius: 21,
     flex: 1,
-    gap: 4,
+    height: 42,
     justifyContent: 'center',
+    marginHorizontal: 3,
   },
-  label: {
-    ...dashboardTypography.caption,
-    color: dashboardColors.textFaint,
-  },
-  labelActive: {
-    color: dashboardColors.primary,
-  },
+  itemActive: { backgroundColor: 'rgba(42,107,165,0.13)' },
+  itemActiveOverMedia: { backgroundColor: 'rgba(255,255,255,0.18)' },
 });

@@ -17,6 +17,10 @@ import {
 } from '../src/components/PhoneInput';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { copy } from '../src/copy';
+import {
+  claimHospitalMedicineCourses,
+  linkPatientDevice,
+} from '../src/lib/hospitalMedicineClaims';
 import { checkPatientExists } from '../src/lib/patients';
 import { ensureSecureReportSession } from '../src/lib/reportAuth';
 import {
@@ -57,6 +61,14 @@ export default function LoginScreen() {
       }
 
       const normalizedSessionPhone = sessionPhone.replace(/\D/g, '').slice(-10);
+      const claimPromise = ensureSecureReportSession()
+        .then(() =>
+          Promise.all([
+            linkPatientDevice(normalizedSessionPhone),
+            claimHospitalMedicineCourses(normalizedSessionPhone),
+          ]),
+        )
+        .catch(() => undefined);
       const cachedPatientName = await getCachedPatientName(
         normalizedSessionPhone,
       ).catch(() => null);
@@ -66,6 +78,15 @@ export default function LoginScreen() {
       }
 
       if (cachedPatientName) {
+        await Promise.race([
+          claimPromise,
+          new Promise((resolve) => {
+            setTimeout(resolve, SESSION_LOOKUP_TIMEOUT_MS);
+          }),
+        ]);
+        if (!isMountedRef.current) {
+          return;
+        }
         router.replace({
           params: { phone: normalizedSessionPhone },
           pathname: '/home',
@@ -77,6 +98,12 @@ export default function LoginScreen() {
         checkPatientExists(sessionPhone).catch(() => null),
         new Promise<null>((resolve) => {
           setTimeout(() => resolve(null), SESSION_LOOKUP_TIMEOUT_MS);
+        }),
+      ]);
+      await Promise.race([
+        claimPromise,
+        new Promise((resolve) => {
+          setTimeout(resolve, SESSION_LOOKUP_TIMEOUT_MS);
         }),
       ]);
 
@@ -116,16 +143,24 @@ export default function LoginScreen() {
 
     const mobile = submittedPhone.replace(/\D/g, '').slice(-10);
     void saveSessionPhone(mobile).catch(() => undefined);
-    void ensureSecureReportSession().catch(() => undefined);
 
-    void checkPatientExists(mobile)
-      .catch(() => false)
-      .then((patientExists) => {
-        router.replace({
-          params: { phone: mobile },
-          pathname: patientExists ? '/home' : '/add-patient-details',
-        });
+    void Promise.allSettled([
+      ensureSecureReportSession().then(() =>
+        Promise.all([
+          linkPatientDevice(mobile),
+          claimHospitalMedicineCourses(mobile),
+        ]),
+      ),
+      checkPatientExists(mobile).catch(() => false),
+    ]).then(([, patientExistsResult]) => {
+      const patientExists =
+        patientExistsResult.status === 'fulfilled' &&
+        patientExistsResult.value;
+      router.replace({
+        params: { phone: mobile },
+        pathname: patientExists ? '/home' : '/add-patient-details',
       });
+    });
   }, [router]);
 
   useEffect(() => {

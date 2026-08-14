@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { ensureSessionMock, fromMock, upsertMock, commentInsertMock } = vi.hoisted(() => ({
+const { channelMock, commentInsertMock, ensureSessionMock, fromMock, removeChannelMock, rpcMock, upsertMock } = vi.hoisted(() => ({
+  channelMock: vi.fn(),
+  commentInsertMock: vi.fn(),
   ensureSessionMock: vi.fn(async () => 'patient-user-id'),
   fromMock: vi.fn(),
+  removeChannelMock: vi.fn(),
+  rpcMock: vi.fn(),
   upsertMock: vi.fn(async () => ({ error: null })),
-  commentInsertMock: vi.fn(),
 }));
 
 vi.mock('./reportAuth', () => ({
@@ -13,7 +16,10 @@ vi.mock('./reportAuth', () => ({
 
 vi.mock('./supabase', () => ({
   supabase: {
+    channel: channelMock,
     from: fromMock,
+    removeChannel: removeChannelMock,
+    rpc: rpcMock,
   },
 }));
 
@@ -22,13 +28,18 @@ import {
   deleteHealthPostComment,
   fetchHealthPostComments,
   fetchHealthFeedViewerState,
+  recordHealthPostView,
   setHealthPostLike,
+  subscribeToPublishedHealthPosts,
 } from './healthFeed';
 
 describe('Health Feed interactions', () => {
   beforeEach(() => {
     ensureSessionMock.mockClear();
     fromMock.mockReset();
+    channelMock.mockReset();
+    removeChannelMock.mockReset();
+    rpcMock.mockReset();
     upsertMock.mockClear();
     commentInsertMock.mockReset();
   });
@@ -73,6 +84,37 @@ describe('Health Feed interactions', () => {
       { owner_user_id: 'patient-user-id', post_id: 'post-1' },
       { ignoreDuplicates: true, onConflict: 'post_id,owner_user_id' },
     );
+  });
+
+  it('records every qualified view through the atomic database function', async () => {
+    rpcMock.mockResolvedValue({ data: 12, error: null });
+
+    await expect(recordHealthPostView('post-1')).resolves.toEqual({ count: 12 });
+    expect(ensureSessionMock).toHaveBeenCalledOnce();
+    expect(rpcMock).toHaveBeenCalledWith('record_health_post_view', { p_post_id: 'post-1' });
+  });
+
+  it('patches post updates live without refetching the full feed', () => {
+    const handlers: Array<{ event: string; handler: (payload: { new: Record<string, unknown> }) => void }> = [];
+    const channel = {
+      on: vi.fn((_: string, filter: { event: string }, handler: (payload: { new: Record<string, unknown> }) => void) => {
+        handlers.push({ event: filter.event, handler });
+        return channel;
+      }),
+      subscribe: vi.fn(() => channel),
+    };
+    channelMock.mockReturnValue(channel);
+    const onFeedStructureChange = vi.fn();
+    const onPostUpdate = vi.fn();
+
+    const unsubscribe = subscribeToPublishedHealthPosts({ onFeedStructureChange, onPostUpdate });
+    handlers.find(({ event }) => event === 'UPDATE')?.handler({ new: { id: 'post-1', views_count: 18 } });
+    handlers.find(({ event }) => event === 'INSERT')?.handler({ new: { id: 'post-2' } });
+
+    expect(onPostUpdate).toHaveBeenCalledWith({ id: 'post-1', views_count: 18 });
+    expect(onFeedStructureChange).toHaveBeenCalledOnce();
+    unsubscribe();
+    expect(removeChannelMock).toHaveBeenCalledWith(channel);
   });
 
   it('trims comments and returns the synchronized comment count', async () => {

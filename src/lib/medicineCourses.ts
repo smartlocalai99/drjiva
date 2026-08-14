@@ -154,6 +154,18 @@ export async function createMedicineCourse(input: {
   durationDays: number | null;
 }): Promise<{ courseId: string; eventIds: string[] }> {
   const ownerUserId = await ensureSecureReportSession();
+  const { data: patientRow } = await supabase
+    .from('patients')
+    .select('mobile')
+    .eq('id', input.patientId)
+    .maybeSingle();
+  if (patientRow?.mobile) {
+    try {
+      await supabase.rpc('link_patient_device', { p_mobile: patientRow.mobile });
+    } catch {
+      // best-effort — course creation proceeds either way
+    }
+  }
   const eventIds: string[] = [];
   const repository = {
     insertCourse: async (course: Record<string, unknown>) => {

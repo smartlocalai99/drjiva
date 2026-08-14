@@ -1,12 +1,20 @@
-The bundled custom medicine reminder recordings are:
+The bundled custom medicine reminder files are:
 
 `reminder.caf` (iOS) and `rec.wav` (Android)
 
-Keep each under 30 seconds. `app.config.js` detects these exact
+Medicine reminders play the aggressively mastered ringtone from
+`finalstartingtone.mp3`, immediately followed by the complete original
+3.318-second Telugu medicine message twice. The Telugu source comes from commit
+`c463cd8`, before the later starter-tone and play-twice processing. No silence
+is inserted between segments. The Android WAV and iOS CAF contain the same
+sequence.
+
+`success.wav` contains only the short mastered ringtone. It is used for
+reminder-created and checkout success feedback, as well as the
+order-confirmation notification.
+
+Keep each sound under 30 seconds. `app.config.js` detects these exact
 filenames at build time and bundles them automatically — iOS plays
-`reminder.caf` by filename, Android plays `rec.wav` by its res/raw
-resource name ("rec"). Both currently play the same clip back-to-back
-with a short gap, so the reminder sound is heard twice. A loud alternating
-attention tone plays first, and the spoken reminder is boosted with a
-look-ahead limiter so it stays clear without digital clipping. Rebuild and
-reinstall the native app after replacing either file.
+`reminder.caf` by filename, while Android plays `rec.wav` by its `res/raw`
+resource name (`rec`). Rebuild and reinstall the native app after replacing
+either file.

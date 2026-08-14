@@ -653,7 +653,12 @@ export default function AddMedicineScreen() {
 
           {workflow.step === 'medicine' ? (
             <Animated.View entering={FadeIn} style={styles.stack}>
-              <Text style={styles.eyebrow}>{hospitalName}</Text>
+              <View style={styles.selectedHospitalHeader}>
+                <HospitalLogo hospitalName={hospitalName} size={32} />
+                <Text numberOfLines={1} style={styles.eyebrow}>
+                  {hospitalName}
+                </Text>
+              </View>
               {selectedMedicines.length > 0 ? (
                 <SelectedMedicineStrip medicines={selectedMedicines} />
               ) : null}
@@ -905,7 +910,7 @@ export default function AddMedicineScreen() {
                           </View>
 
                           <View style={styles.reviewHospitalCell}>
-                            <HospitalLogo size={28} />
+                            <HospitalLogo hospitalName={hospitalName} size={28} />
                             <Text
                               numberOfLines={1}
                               style={styles.reviewHospitalName}
@@ -1320,7 +1325,21 @@ const styles = StyleSheet.create({
   eyebrow: {
     ...dashboardTypography.caption,
     color: dashboardColors.primary,
-    textAlign: 'center',
+    flexShrink: 1,
+    fontFamily: 'Inter_700Bold',
+  },
+  selectedHospitalHeader: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.track,
+    borderRadius: dashboardRadii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.sm,
+    maxWidth: '100%',
+    paddingHorizontal: dashboardSpacing.md,
+    paddingVertical: 6,
   },
   textInput: {
     ...dashboardTypography.body,

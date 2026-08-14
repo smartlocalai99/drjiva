@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ASIAN_HOSPITAL_NAME,
+  DHRUVA_HOSPITAL_NAME,
   mapMedicineRowsToShopProducts,
   type ShopProduct,
 } from './shopProductModel';
@@ -95,7 +96,49 @@ describe('shop product catalogue', () => {
     );
   });
 
-  it('excludes rows from other hospitals even when priced and imaged', () => {
+  it('includes Dhruva products with a real image', () => {
+    expect(
+      mapMedicineRowsToShopProducts([
+        {
+          ...BASE_ROW,
+          hospital_name: DHRUVA_HOSPITAL_NAME,
+          id: 'dhruva-product',
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        hospitalName: DHRUVA_HOSPITAL_NAME,
+        id: 'dhruva-product',
+      }),
+    ]);
+  });
+
+  it('keeps same-name products from different supported hospitals and marks the name ambiguous', () => {
+    const products = mapMedicineRowsToShopProducts([
+      BASE_ROW,
+      {
+        ...BASE_ROW,
+        hospital_name: DHRUVA_HOSPITAL_NAME,
+        id: 'dhruva-ab-flo',
+      },
+    ]);
+
+    expect(products).toHaveLength(2);
+    expect(products).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          hasUniqueCatalogueName: false,
+          hospitalName: ASIAN_HOSPITAL_NAME,
+        }),
+        expect.objectContaining({
+          hasUniqueCatalogueName: false,
+          hospitalName: DHRUVA_HOSPITAL_NAME,
+        }),
+      ]),
+    );
+  });
+
+  it('excludes rows from unsupported hospitals even when priced and imaged', () => {
     expect(
       mapMedicineRowsToShopProducts([
         { ...BASE_ROW, hospital_name: 'Some Other Hospital', id: 'other' },

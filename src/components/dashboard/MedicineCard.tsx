@@ -82,14 +82,23 @@ export function MedicineCard({
               <Ionicons
                 color={slotTheme.accent}
                 name={slotTheme.icon}
-                size={12}
+                size={15}
               />
-              <Text
-                numberOfLines={1}
-                style={[styles.timingText, { color: slotTheme.accent }]}
-              >
-                {medicine.timing} · {medicine.nextReminderTime}
-              </Text>
+              <View style={styles.timingCopy}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.timingTitle, { color: slotTheme.accent }]}
+                >
+                  {medicine.timing}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  selectable
+                  style={[styles.timingTime, { color: slotTheme.accent }]}
+                >
+                  {medicine.nextReminderTime}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -131,7 +140,11 @@ export function MedicineCard({
 
         <View style={[styles.peopleRow, { backgroundColor: slotTheme.tint }]}>
           <View style={styles.hospitalGroup}>
-            <HospitalLogo roundedSquare size={60} />
+            <HospitalLogo
+              hospitalName={medicine.hospitalName}
+              roundedSquare
+              size={60}
+            />
             <Text numberOfLines={2} selectable style={styles.hospitalName}>
               {medicine.hospitalName}
             </Text>
@@ -170,16 +183,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
-    gap: 4,
-    maxWidth: '43%',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    gap: 6,
+    maxWidth: '46%',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  timingText: {
-    ...dashboardTypography.caption,
+  timingCopy: {
+    flexShrink: 1,
+  },
+  timingTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 14,
+    lineHeight: 17,
+  },
+  timingTime: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    lineHeight: 15,
   },
   completedBadge: {
     alignItems: 'center',
@@ -188,7 +209,7 @@ const styles = StyleSheet.create({
     bottom: 10,
     flexDirection: 'row',
     gap: 4,
-    left: 10,
+    left: dashboardSpacing.pagePadding,
     paddingHorizontal: 9,
     paddingVertical: 5,
     position: 'absolute',
@@ -201,7 +222,7 @@ const styles = StyleSheet.create({
   cardBody: {
     backgroundColor: dashboardColors.card,
     gap: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: dashboardSpacing.pagePadding,
     paddingVertical: 8,
   },
   titleRow: {
@@ -226,7 +247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: dashboardSpacing.md,
+    paddingHorizontal: dashboardSpacing.pagePadding,
     paddingVertical: 14,
   },
   hospitalGroup: {

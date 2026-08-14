@@ -18,17 +18,17 @@ describe('buildMedicineStreak', () => {
     const week = buildCurrentWeekMedicineStreak(
       '2026-07-20',
       [
-        { scheduledFor: '2026-07-27T08:00:00.000Z', status: 'completed' },
-        { scheduledFor: '2026-07-28T08:00:00.000Z', status: 'scheduled' },
+        { scheduledFor: localScheduledFor(27, 8), status: 'completed' },
+        { scheduledFor: localScheduledFor(28, 8), status: 'scheduled' },
       ],
-      '2026-08-01',
+      new Date(2026, 6, 28, 7, 59),
     );
     expect(week).toHaveLength(7);
     expect(week[0]).toMatchObject({ date: '2026-07-27', completed: true });
     expect(week[1]).toMatchObject({ date: '2026-07-28', completed: false });
   });
 
-  it('shows the ongoing-course flame only after every reminder is completed', () => {
+  it('shows the ongoing-course flame after every reminder time is reached', () => {
     const events = [
       { scheduledFor: localScheduledFor(30, 8), status: 'scheduled' },
       { scheduledFor: localScheduledFor(30, 20), status: 'scheduled' },
@@ -38,19 +38,15 @@ describe('buildMedicineStreak', () => {
       buildCurrentWeekMedicineStreak(
         '2026-07-20',
         events,
-        new Date(2026, 6, 30, 20, 1),
+        new Date(2026, 6, 30, 19, 59),
       ).find((day) => day.date === '2026-07-30')?.completed,
     ).toBe(false);
 
-    const completedEvents = events.map((event) => ({
-      ...event,
-      status: 'completed',
-    }));
     expect(
       buildCurrentWeekMedicineStreak(
         '2026-07-20',
-        completedEvents,
-        new Date(2026, 6, 30, 20, 1),
+        events,
+        new Date(2026, 6, 30, 20),
       ).find((day) => day.date === '2026-07-30')?.completed,
     ).toBe(true);
   });
@@ -64,11 +60,13 @@ describe('buildMedicineStreak', () => {
         { scheduledFor: localScheduledFor(30, 8), status: 'completed' },
         { scheduledFor: localScheduledFor(30, 20), status: 'scheduled' },
       ],
+      new Date(2026, 6, 30, 19, 59),
     );
 
     expect(streak).toEqual([
       {
         completed: true,
+        completesAt: null,
         date: '2026-07-28',
         day: 28,
         scheduled: true,
@@ -76,6 +74,7 @@ describe('buildMedicineStreak', () => {
       },
       {
         completed: false,
+        completesAt: localScheduledFor(30, 20),
         date: '2026-07-30',
         day: 30,
         scheduled: true,
@@ -94,18 +93,19 @@ describe('buildMedicineStreak', () => {
     expect(buildMedicineStreak('2026-07-28', 10, events)).toHaveLength(7);
   });
 
-  it('keeps the date when a reminder was not completed, even after that day passes', () => {
+  it('turns a scheduled course day into a streak after that day passes', () => {
     const streak = buildMedicineStreak(
       '2026-07-30',
       2,
       [{ scheduledFor: localScheduledFor(30, 8), status: 'scheduled' }],
+      '2026-07-31',
     );
 
-    expect(streak[0]?.completed).toBe(false);
+    expect(streak[0]?.completed).toBe(true);
   });
 
-  it('replaces the date with a streak only when its reminder is completed', () => {
-    const scheduledEvent = {
+  it('replaces today’s date with a streak when its reminder time is reached', () => {
+    const event = {
       scheduledFor: localScheduledFor(30, 8),
       status: 'scheduled',
     };
@@ -114,21 +114,23 @@ describe('buildMedicineStreak', () => {
       buildMedicineStreak(
         '2026-07-30',
         1,
-        [scheduledEvent],
+        [event],
+        new Date(2026, 6, 30, 7, 59),
       )[0]?.completed,
     ).toBe(false);
     expect(
       buildMedicineStreak(
         '2026-07-30',
         1,
-        [{ ...scheduledEvent, status: 'completed' }],
+        [event],
+        new Date(2026, 6, 30, 8),
       )[0]?.completed,
     ).toBe(true);
   });
 
-  it('waits for every reminder on a course day to be completed', () => {
+  it('waits for every scheduled time on a course day before showing its streak', () => {
     const events = [
-      { scheduledFor: localScheduledFor(30, 8), status: 'completed' },
+      { scheduledFor: localScheduledFor(30, 8), status: 'scheduled' },
       { scheduledFor: localScheduledFor(30, 20), status: 'scheduled' },
     ];
 
@@ -137,19 +139,45 @@ describe('buildMedicineStreak', () => {
         '2026-07-30',
         1,
         events,
+        new Date(2026, 6, 30, 9),
       )[0]?.completed,
     ).toBe(false);
     expect(
       buildMedicineStreak(
         '2026-07-30',
         1,
-        events.map((event) => ({ ...event, status: 'completed' })),
+        events,
+        new Date(2026, 6, 30, 20),
       )[0]?.completed,
     ).toBe(true);
   });
 });
 
 describe('mapDoseRows', () => {
+  it('keeps the Dhruva catalogue image and hospital on Today', () => {
+    expect(
+      mapDoseRows([
+        {
+          completed: false,
+          courseId: 'dhruva-course',
+          eventId: 'dhruva-event',
+          hospitalName: 'Dhruva Hospitals',
+          imageUrl: 'https://db.test/dhruva/medicine.jpg',
+          medicineName: 'AB NORM-100',
+          scheduledFor: '2026-08-13T08:00:00.000Z',
+          slot: 'morning',
+          tabletsPerDose: 1,
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        hospitalName: 'Dhruva Hospitals',
+        imageUrl: 'https://db.test/dhruva/medicine.jpg',
+        name: 'AB NORM-100',
+      }),
+    ]);
+  });
+
   it('keeps stored dose values and the database medicine image', () => {
     expect(
       mapDoseRows([
@@ -276,6 +304,17 @@ describe('selectNearestMedicine', () => {
     {
       completed: false,
       courseId: 'course-2',
+      eventId: 'afternoon',
+      hospitalName: 'Hospital',
+      imageUrl: '',
+      medicineName: 'Afternoon medicine',
+      scheduledFor: '2026-07-28T13:00:00+05:30',
+      slot: 'afternoon',
+      tabletsPerDose: 1,
+    },
+    {
+      completed: false,
+      courseId: 'course-3',
       eventId: 'night',
       hospitalName: 'Hospital',
       imageUrl: '',
@@ -291,6 +330,36 @@ describe('selectNearestMedicine', () => {
       selectNearestMedicine(
         medicines,
         new Date('2026-07-28T12:00:00+05:30'),
+      )?.id,
+    ).toBe('afternoon');
+  });
+
+  it('advances from morning to afternoon when the morning time is reached', () => {
+    expect(
+      selectNearestMedicine(
+        medicines,
+        new Date('2026-07-28T07:59:59+05:30'),
+      )?.id,
+    ).toBe('morning');
+    expect(
+      selectNearestMedicine(
+        medicines,
+        new Date('2026-07-28T08:00:00+05:30'),
+      )?.id,
+    ).toBe('afternoon');
+  });
+
+  it('advances from afternoon to night when the afternoon time is reached', () => {
+    expect(
+      selectNearestMedicine(
+        medicines,
+        new Date('2026-07-28T12:59:59+05:30'),
+      )?.id,
+    ).toBe('afternoon');
+    expect(
+      selectNearestMedicine(
+        medicines,
+        new Date('2026-07-28T13:00:00+05:30'),
       )?.id,
     ).toBe('night');
   });

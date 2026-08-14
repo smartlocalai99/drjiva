@@ -45,6 +45,7 @@ import {
   BottomNav,
   type NavTabKey,
 } from '../src/components/dashboard/BottomNav';
+import { DHRUVA_LOGO } from '../src/components/HospitalLogo';
 import { PressableScale } from '../src/components/PressableScale';
 import { ReminderMedicineList } from '../src/components/shop/reminder-medicine-list';
 import { ShopProductCard } from '../src/components/shop/shop-product-card';
@@ -62,6 +63,10 @@ import {
   fetchShopProducts,
   type ShopProduct,
 } from '../src/data/shopProducts';
+import {
+  getShopHospitalCode,
+  type ShopHospitalFilter,
+} from '../src/data/shopProductModel';
 import {
   buildReminderMedicineReorders,
   buildShopSections,
@@ -122,6 +127,7 @@ const SECTION_ICONS = {
   body_pains: 'body-outline',
   cold: 'snow-outline',
   diabetes_care: 'water-outline',
+  dhruva: 'business-outline',
   fever: 'thermometer-outline',
   headache: 'happy-outline',
   heart_bp: 'heart-outline',
@@ -147,6 +153,10 @@ const SECTION_TINTS = {
   diabetes_care: {
     backgroundColor: dashboardColors.primaryTint,
     color: dashboardColors.primary,
+  },
+  dhruva: {
+    backgroundColor: '#EAF3FF',
+    color: '#3569A8',
   },
   fever: {
     backgroundColor: dashboardColors.errorTint,
@@ -236,6 +246,8 @@ export default function ShopScreen() {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [query, setQuery] = useState('');
+  const [hospitalFilter, setHospitalFilter] =
+    useState<ShopHospitalFilter>('all');
   const [reminderNames, setReminderNames] = useState<string[]>([]);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
@@ -360,12 +372,19 @@ export default function ShopScreen() {
   );
 
   const sections = useMemo(
-    () => buildShopSections(products, query),
-    [products, query],
+    () => buildShopSections(products, query, hospitalFilter),
+    [hospitalFilter, products, query],
   );
   const reminderMedicines = useMemo(
     () => buildReminderMedicineReorders(reminderNames, products),
     [products, reminderNames],
+  );
+  const dhruvaProductCount = useMemo(
+    () =>
+      products.filter(
+        (product) => getShopHospitalCode(product.hospitalName) === 'dhruva',
+      ).length,
+    [products],
   );
   const isSearching = query.trim().length > 0;
   const deliveryAddress = useMemo(
@@ -538,6 +557,10 @@ export default function ShopScreen() {
             ) : null}
           </View>
         </View>
+        <HospitalFilter
+          onSelect={setHospitalFilter}
+          selected={hospitalFilter}
+        />
       </Animated.View>
 
       {isLoadingCatalogue ? (
@@ -588,13 +611,18 @@ export default function ShopScreen() {
           initialNumToRender={8}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={<EmptySearch query={query} />}
+          ListEmptyComponent={
+            <EmptySearch hospitalFilter={hospitalFilter} query={query} />
+          }
           ListHeaderComponent={
-            isSearching ? null : (
+            isSearching || hospitalFilter === 'dhruva' ? null : (
               <ShopListHeader
+                dhruvaProductCount={dhruvaProductCount}
+                onBrowseDhruva={() => setHospitalFilter('dhruva')}
                 onOpenProduct={openProduct}
                 onSelectSection={scrollToSection}
                 reminderMedicines={reminderMedicines}
+                showDhruvaDiscovery={hospitalFilter === 'all'}
               />
             )
           }
@@ -631,18 +659,54 @@ export default function ShopScreen() {
 }
 
 function ShopListHeader({
+  dhruvaProductCount,
+  onBrowseDhruva,
   onOpenProduct,
   onSelectSection,
   reminderMedicines,
+  showDhruvaDiscovery,
 }: {
+  dhruvaProductCount: number;
+  onBrowseDhruva: () => void;
   onOpenProduct: (product: ShopProduct) => void;
   onSelectSection: (
     sectionCode: (typeof SHOP_BANNERS)[number]['sectionCode'],
   ) => void;
   reminderMedicines: ReminderMedicineReorder[];
+  showDhruvaDiscovery: boolean;
 }) {
   return (
     <View>
+      {showDhruvaDiscovery && dhruvaProductCount > 0 ? (
+        <PressableScale
+          accessibilityLabel={`Browse ${dhruvaProductCount} Dhruva Hospitals medicines`}
+          onPress={onBrowseDhruva}
+          pressedScale={0.985}
+          style={styles.dhruvaDiscovery}
+        >
+          <View style={styles.dhruvaDiscoveryLogoWrap}>
+            <Image
+              accessibilityLabel="Dhruva Hospitals"
+              cachePolicy="memory"
+              contentFit="contain"
+              source={DHRUVA_LOGO}
+              style={styles.dhruvaDiscoveryLogo}
+            />
+          </View>
+          <View style={styles.dhruvaDiscoveryCopy}>
+            <Text style={styles.dhruvaDiscoveryTitle}>
+              Dhruva medicine catalogue
+            </Text>
+            <Text style={styles.dhruvaDiscoveryMeta}>
+              {dhruvaProductCount} medicines with verified photos
+            </Text>
+          </View>
+          <View style={styles.dhruvaDiscoveryArrow}>
+            <Ionicons color="#2467A6" name="arrow-forward" size={18} />
+          </View>
+        </PressableScale>
+      ) : null}
+
       <ShopBannerCarousel onSelectSection={onSelectSection} />
 
       <ReminderMedicineList
@@ -787,21 +851,37 @@ function ShopSectionHeader({
   section: ShopProductSection;
 }) {
   const tint = SECTION_TINTS[section.code];
+  const isDhruvaSection = section.code === 'dhruva';
   return (
     <View style={styles.sectionHeader}>
-      <View
-        style={[
-          styles.sectionIcon,
-          { backgroundColor: tint.backgroundColor },
-        ]}
-      >
-        <Ionicons
-          color={tint.color}
-          name={SECTION_ICONS[section.code]}
-          size={17}
-        />
-      </View>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
+      {isDhruvaSection ? (
+        <View style={styles.dhruvaSectionLogoWrap}>
+          <Image
+            accessibilityLabel="Dhruva Hospitals"
+            cachePolicy="memory"
+            contentFit="contain"
+            source={DHRUVA_LOGO}
+            style={styles.dhruvaSectionLogo}
+          />
+        </View>
+      ) : (
+        <>
+          <View
+            style={[
+              styles.sectionIcon,
+              { backgroundColor: tint.backgroundColor },
+            ]}
+          >
+            <Ionicons
+              color={tint.color}
+              name={SECTION_ICONS[section.code]}
+              size={17}
+            />
+          </View>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+        </>
+      )}
+      {isDhruvaSection ? <View style={styles.sectionTitleSpacer} /> : null}
       <Text style={styles.sectionCount}>{section.data.length}</Text>
     </View>
   );
@@ -867,7 +947,65 @@ function CheckoutBar({
   );
 }
 
-function EmptySearch({ query }: { query: string }) {
+function HospitalFilter({
+  onSelect,
+  selected,
+}: {
+  onSelect: (filter: ShopHospitalFilter) => void;
+  selected: ShopHospitalFilter;
+}) {
+  const options: Array<{ key: ShopHospitalFilter; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'asian', label: 'Asian' },
+    { key: 'dhruva', label: 'Dhruva' },
+  ];
+  return (
+    <View accessibilityRole="tablist" style={styles.hospitalFilters}>
+      {options.map((option) => {
+        const active = selected === option.key;
+        return (
+          <Pressable
+            accessibilityLabel={`Show ${option.label} hospital medicines`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            key={option.key}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => undefined);
+              onSelect(option.key);
+            }}
+            style={[
+              styles.hospitalFilter,
+              active && styles.hospitalFilterActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.hospitalFilterText,
+                active && styles.hospitalFilterTextActive,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function EmptySearch({
+  hospitalFilter,
+  query,
+}: {
+  hospitalFilter: ShopHospitalFilter;
+  query: string;
+}) {
+  const supplier =
+    hospitalFilter === 'dhruva'
+      ? 'Dhruva Hospitals'
+      : hospitalFilter === 'asian'
+        ? 'Asian Hospitals'
+        : 'Asian and Dhruva Hospitals';
   return (
     <View style={styles.emptySearch}>
       <View style={styles.stateIcon}>
@@ -882,8 +1020,8 @@ function EmptySearch({ query }: { query: string }) {
       </Text>
       <Text style={styles.stateText}>
         {query
-          ? 'Try a different medicine name or active ingredient.'
-          : 'Asian Hospitals medicines with a real photo will appear here.'}
+          ? `Try another name or ingredient in ${supplier}.`
+          : `${supplier} medicines with a real photo will appear here.`}
       </Text>
     </View>
   );
@@ -994,6 +1132,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: dashboardSpacing.pagePadding,
     paddingTop: dashboardSpacing.xs,
   },
+  hospitalFilters: {
+    backgroundColor: dashboardColors.card,
+    borderColor: '#E4E8F0',
+    borderRadius: dashboardRadii.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 3,
+    marginTop: dashboardSpacing.sm,
+    padding: 3,
+  },
+  hospitalFilter: {
+    alignItems: 'center',
+    borderRadius: dashboardRadii.pill,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 34,
+    paddingHorizontal: dashboardSpacing.sm,
+  },
+  hospitalFilterActive: {
+    backgroundColor: dashboardColors.primary,
+    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.14)',
+  },
+  hospitalFilterText: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+  },
+  hospitalFilterTextActive: {
+    color: '#FFFFFF',
+  },
   searchBar: {
     alignItems: 'center',
     backgroundColor: dashboardColors.card,
@@ -1045,6 +1214,60 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: dashboardSpacing.pagePadding,
+  },
+  dhruvaDiscovery: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E7F7',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: dashboardSpacing.md,
+    marginTop: dashboardSpacing.md,
+    minHeight: 84,
+    padding: dashboardSpacing.md,
+    shadowColor: '#174E7D',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+  },
+  dhruvaDiscoveryLogoWrap: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E4EDF5',
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 54,
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    width: 88,
+  },
+  dhruvaDiscoveryLogo: {
+    height: 44,
+    width: 78,
+  },
+  dhruvaDiscoveryCopy: {
+    flex: 1,
+  },
+  dhruvaDiscoveryTitle: {
+    ...dashboardTypography.body,
+    color: '#174E7D',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+  },
+  dhruvaDiscoveryMeta: {
+    ...dashboardTypography.caption,
+    color: dashboardColors.textMuted,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  dhruvaDiscoveryArrow: {
+    alignItems: 'center',
+    backgroundColor: '#EAF3FF',
+    borderRadius: 17,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
   bannerCarousel: {
     marginTop: dashboardSpacing.md,
@@ -1114,6 +1337,24 @@ const styles = StyleSheet.create({
     color: dashboardColors.primary,
     flex: 1,
     fontSize: 18,
+  },
+  sectionTitleSpacer: {
+    flex: 1,
+  },
+  dhruvaSectionLogoWrap: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E7F7',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    width: 124,
+  },
+  dhruvaSectionLogo: {
+    height: 34,
+    width: 110,
   },
   sectionCount: {
     ...dashboardTypography.caption,

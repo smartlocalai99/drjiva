@@ -42,3 +42,8 @@ yarn-error.*
 
 # Local isolated feature worktrees
 /.worktrees/
+
+# Local tool output/caches
+/.playwright-cli/
+/output/
+/tmp/

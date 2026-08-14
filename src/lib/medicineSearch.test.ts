@@ -6,6 +6,7 @@ import {
   hasMedicineImage,
   matchesMedicineSearch,
   normalizeMedicineSearch,
+  searchMedicineCatalogue,
 } from './medicineSearch';
 
 describe('medicine search', () => {
@@ -65,6 +66,43 @@ describe('medicine search', () => {
 
     expect(filterMedicineCatalogue(medicines, '', 20)).toHaveLength(20);
     expect(medicines).toHaveLength(30);
+  });
+
+  it('falls back to the nearest medicine for an adjacent-letter typo', () => {
+    const medicines = [
+      { id: 'dolo', name: 'Dolo 650' },
+      { id: 'doxy', name: 'Doxycycline' },
+      { id: 'amox', name: 'Amoxicillin' },
+    ];
+
+    expect(searchMedicineCatalogue(medicines, 'dloo', 2)).toEqual({
+      items: [medicines[0], medicines[1]],
+      usedNearestFallback: true,
+    });
+  });
+
+  it('finds a medicine when one letter is missing', () => {
+    const medicines = [
+      { id: 'para', name: 'Paracetamol' },
+      { id: 'preg', name: 'Pregabalin' },
+    ];
+
+    expect(
+      searchMedicineCatalogue(medicines, 'paracetmol', 1).items,
+    ).toEqual([medicines[0]]);
+  });
+
+  it('does not mix nearest suggestions into direct results', () => {
+    const medicines = [
+      { id: 'dolo', name: 'Dolo 650' },
+      { id: 'doxy', name: 'Doxycycline' },
+      { id: 'amox', name: 'Amoxicillin' },
+    ];
+
+    expect(searchMedicineCatalogue(medicines, 'dolo', 20)).toEqual({
+      items: [medicines[0]],
+      usedNearestFallback: false,
+    });
   });
 
   it('keeps only medicines that have a usable image', () => {

@@ -51,7 +51,7 @@ export const dashboardLayout = {
   toggleHeight: 30,
   toggleKnobSize: 24,
   floatingButtonHeight: 56,
-  bottomNavHeight: 76,
+  bottomNavHeight: 58,
   navBottomGap: 6,
 } as const;
 

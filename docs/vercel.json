@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/android-privacy.html",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/android-privacy",
+      "destination": "/privacy.html"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { ensureSecureReportSession } from '../lib/reportAuth';
 import { supabase } from '../lib/supabase';
 import {
-  ASIAN_HOSPITAL_NAME,
+  SHOP_HOSPITALS,
   mapMedicineRowsToShopProducts,
   type ShopMedicineRow,
   type ShopProduct,
@@ -81,7 +81,7 @@ export async function fetchShopProducts(
     let request = supabase
       .from('medicines')
       .select(SHOP_MEDICINE_COLUMNS)
-      .ilike('hospital_name', ASIAN_HOSPITAL_NAME)
+      .in('hospital_name', Object.values(SHOP_HOSPITALS))
       .not('image_url', 'is', null)
       .neq('image_url', '')
       .order('name')

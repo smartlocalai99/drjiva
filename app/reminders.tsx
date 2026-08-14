@@ -293,13 +293,22 @@ function ReminderCard({
           <View
             style={[styles.slotBadge, { backgroundColor: slotTheme.tint }]}
           >
-            <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={12} />
-            <Text
-              numberOfLines={1}
-              style={[styles.slotBadgeText, { color: slotTheme.accent }]}
-            >
-              {medicine.timing} · {medicine.nextReminderTime}
-            </Text>
+            <Ionicons color={slotTheme.accent} name={slotTheme.icon} size={15} />
+            <View style={styles.slotBadgeCopy}>
+              <Text
+                numberOfLines={1}
+                style={[styles.slotBadgeTitle, { color: slotTheme.accent }]}
+              >
+                {medicine.timing}
+              </Text>
+              <Text
+                numberOfLines={1}
+                selectable
+                style={[styles.slotBadgeTime, { color: slotTheme.accent }]}
+              >
+                {medicine.nextReminderTime}
+              </Text>
+            </View>
           </View>
 
           <Pressable
@@ -361,7 +370,7 @@ function ReminderCard({
 
       <View style={[styles.peopleRow, { backgroundColor: slotTheme.tint }]}>
         <View style={styles.hospitalGroup}>
-          <HospitalLogo size={44} />
+          <HospitalLogo hospitalName={medicine.hospitalName} size={44} />
           <Text numberOfLines={2} selectable style={styles.hospitalName}>
             {medicine.hospitalName}
           </Text>
@@ -490,7 +499,7 @@ const styles = StyleSheet.create({
     bottom: 10,
     flexDirection: 'row',
     gap: 4,
-    left: 10,
+    left: dashboardSpacing.pagePadding,
     paddingHorizontal: 9,
     paddingVertical: 5,
     position: 'absolute',
@@ -503,7 +512,7 @@ const styles = StyleSheet.create({
   cardBody: {
     backgroundColor: dashboardColors.card,
     gap: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: dashboardSpacing.pagePadding,
     paddingVertical: 8,
   },
   titleRow: {
@@ -528,16 +537,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: dashboardRadii.pill,
     flexDirection: 'row',
-    gap: 4,
-    maxWidth: '36%',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    gap: 6,
+    maxWidth: '40%',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  slotBadgeText: {
-    ...dashboardTypography.caption,
+  slotBadgeCopy: {
+    flexShrink: 1,
+  },
+  slotBadgeTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 14,
+    lineHeight: 17,
+  },
+  slotBadgeTime: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    lineHeight: 15,
   },
   peopleRow: {
     alignItems: 'center',
@@ -545,7 +562,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: dashboardSpacing.md,
+    paddingHorizontal: dashboardSpacing.pagePadding,
     paddingVertical: 12,
   },
   hospitalGroup: {
