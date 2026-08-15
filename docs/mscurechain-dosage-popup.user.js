@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MSCureChain — Dosage Timing Popup before Save & Print
 // @namespace    dhruva-pharmacy
-// @version      2.8
+// @version      2.9
 // @description  When mobile no. is filled, ask Morning/Afternoon/Night + course days per medicine, capturing hospital/doctor/patient too, and save it to DrJiva so the patient's reminders pick it up
 // @match        https://www.mscurechain.com/*
 // @match        https://mscurechain.com/*
@@ -25,9 +25,51 @@
   // DrJiva Supabase project — publishable/anon key only, safe to ship in browser code.
   const SUPABASE_URL      = 'https://jlvjnnltynebenflkcua.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_LXzMM6HjPlwUmbMQfqyYXw_QthfwjsU';
+
+  // Non-medicine cart items (surgical supplies, fees, etc.) — never show these
+  // in the popup, never ask timing for them. Kept in sync with the same list
+  // in create_hospital_medicine_course; anything your team marks "Not a
+  // medicine" in Triage is fetched live below and skipped too.
+  const BUILTIN_NON_MEDICINE_TERMS = [
+    'registration fee', 'consultation fee', 'admission fee', 'room rent',
+    'nursing charge', 'procedure charge', 'lab charge', 'surgical gloves',
+    'hand gloves', 'cotton roll', 'bandage', 'gauze', 'syringe', 'needle',
+    'iv set', 'cannula', 'apron', 'sanitizer',
+  ];
   // -------------------------------------------------------------
 
   let confirmed = false; // true only for the approved, re-fired click
+
+  // Fetched once at page load, best-effort — if it's not back in time for the
+  // first click, that click just falls back to the built-in list only.
+  let ignoredNamesPromise = fetch(
+    SUPABASE_URL + '/rest/v1/rpc/list_ignored_hospital_medicine_names',
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    },
+  )
+    .then(function (res) { return res.ok ? res.json() : []; })
+    .catch(function () { return []; });
+  let ignoredNamesCache = [];
+  ignoredNamesPromise.then(function (list) { ignoredNamesCache = list || []; });
+
+  function normalizeName(name) {
+    return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function isNonMedicineName(name) {
+    const normalized = normalizeName(name);
+    if (ignoredNamesCache.indexOf(normalized) !== -1) return true;
+    return BUILTIN_NON_MEDICINE_TERMS.some(function (term) {
+      return normalized.indexOf(term) !== -1;
+    });
+  }
 
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('button');
@@ -81,8 +123,9 @@
       if (name) names.push(name);
     });
 
-    console.log('[dosage] medicines detected:', names);
-    return names;
+    const filtered = names.filter(function (n) { return !isNonMedicineName(n); });
+    console.log('[dosage] medicines detected:', filtered, '(non-medicine items hidden:', names.filter(function (n) { return isNonMedicineName(n); }), ')');
+    return filtered;
   }
 
   function findRow(btn) {
