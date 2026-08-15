@@ -17,6 +17,11 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
+    },
+    "production-apk": {
+      "autoIncrement": true,
+      "distribution": "internal",
+      "channel": "production"
     }
   },
   "submit": {
