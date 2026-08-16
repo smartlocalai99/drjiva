@@ -9,7 +9,12 @@ import {
 } from '../../dashboardTheme';
 import { useLanguage, type TranslationKey } from '../../lib/i18n';
 
-export type NavTabKey = 'today' | 'documents' | 'healthFeed' | 'shop';
+export type NavTabKey =
+  | 'today'
+  | 'documents'
+  | 'healthFeed'
+  | 'camps'
+  | 'shop';
 
 const TAB_DEFS: {
   activeIcon: keyof typeof Ionicons.glyphMap;
@@ -29,6 +34,12 @@ const TAB_DEFS: {
     icon: 'medkit-outline',
     key: 'healthFeed',
     labelKey: 'healthFeed',
+  },
+  {
+    activeIcon: 'calendar',
+    icon: 'calendar-outline',
+    key: 'camps',
+    labelKey: 'camps',
   },
   { activeIcon: 'cart', icon: 'cart-outline', key: 'shop', labelKey: 'shop' },
 ];
