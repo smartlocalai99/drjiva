@@ -75,9 +75,13 @@ export async function registerForHospitalEvent(input: {
   patientId?: string;
   mobile: string;
   name?: string;
+  attendeeCount?: number;
+  attendeeNames?: string[];
 }): Promise<void> {
   const ownerUserId = await ensureSecureReportSession();
   const { error } = await supabase.from('hospital_event_registrations').insert({
+    attendee_count: input.attendeeCount ?? 1,
+    attendee_names: input.attendeeNames ?? [],
     event_id: input.eventId,
     mobile: input.mobile,
     name: input.name ?? null,

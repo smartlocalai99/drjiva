@@ -14,7 +14,8 @@ import {
 } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
-import { WeekCalendar } from '../src/components/camps/WeekCalendar';
+import { RegisterSheet } from '../src/components/camps/RegisterSheet';
+import { WeekDayStrip, WeekRangeSelector } from '../src/components/camps/WeekCalendar';
 import { HospitalLogo } from '../src/components/HospitalLogo';
 import { PressableScale } from '../src/components/PressableScale';
 import {
@@ -89,6 +90,7 @@ export default function CampsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [patient, setPatient] = useState<{ patientId: string; name: string } | null>(null);
+  const [registerTarget, setRegisterTarget] = useState<HospitalEvent | null>(null);
 
   const load = useCallback(() => {
     setIsLoading(true);
@@ -161,17 +163,26 @@ export default function CampsScreen() {
     router.replace({ params: { phone }, pathname: route });
   };
 
-  const handleRegister = async (event: HospitalEvent) => {
+  const handleOpenRegister = (event: HospitalEvent) => {
     if (registeredIds.has(event.id) || registeringId) return;
+    setRegisterTarget(event);
+  };
+
+  const handleConfirmRegister = async (attendeeCount: number, otherNames: string[]) => {
+    const event = registerTarget;
+    if (!event) return;
     setRegisteringId(event.id);
     try {
       await registerForHospitalEvent({
+        attendeeCount,
+        attendeeNames: otherNames,
         eventId: event.id,
         mobile: phone,
         name: patient?.name,
         patientId: patient?.patientId,
       });
       setRegisteredIds((current) => new Set(current).add(event.id));
+      setRegisterTarget(null);
     } catch {
       setErrorMessage('campRegisterFailed');
     } finally {
@@ -199,15 +210,28 @@ export default function CampsScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('campsTitle')}</Text>
-        <Text style={styles.headerSubtitle}>{t('campsSubtitle')}</Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerTitleRow}>
+            <View style={styles.headerIcon}>
+              <Ionicons color={dashboardColors.primary} name="medkit" size={18} />
+            </View>
+            <View style={styles.headerTitleText}>
+              <Text style={styles.headerTitle}>{t('campsTitle')}</Text>
+              <Text style={styles.headerSubtitle}>{t('campsSubtitle')}</Text>
+            </View>
+          </View>
+          <WeekRangeSelector
+            onSelectDate={setSelectedDate}
+            onSelectWeekStart={setWeekStart}
+            weekStart={weekStart}
+          />
+        </View>
       </View>
 
       <View style={styles.timelineWrap}>
-        <WeekCalendar
+        <WeekDayStrip
           eventDateKeys={eventDateKeys}
           onSelectDate={setSelectedDate}
-          onSelectWeekStart={setWeekStart}
           selectedDate={selectedDate}
           weekStart={weekStart}
         />
@@ -300,7 +324,7 @@ export default function CampsScreen() {
                   ) : (
                     <PressableScale
                       disabled={isBusy}
-                      onPress={() => void handleRegister(event)}
+                      onPress={() => handleOpenRegister(event)}
                       style={styles.registerButton}
                     >
                       {isBusy ? (
@@ -321,6 +345,15 @@ export default function CampsScreen() {
       )}
 
       <BottomNav activeTab={activeTab} bottomOffset={navBottomOffset} onSelectTab={handleSelectTab} />
+
+      <RegisterSheet
+        eventTitle={registerTarget?.title ?? ''}
+        onClose={() => setRegisterTarget(null)}
+        onConfirm={(count, names) => void handleConfirmRegister(count, names)}
+        patientName={patient?.name ?? ''}
+        submitting={registeringId === registerTarget?.id}
+        visible={registerTarget !== null}
+      />
     </SafeAreaView>
   );
 }
@@ -399,6 +432,30 @@ const styles = StyleSheet.create({
     paddingBottom: dashboardSpacing.md,
     paddingHorizontal: dashboardSpacing.pagePadding,
     paddingTop: dashboardSpacing.sm,
+    zIndex: 10,
+  },
+  headerTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  headerIcon: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 10,
+    height: 34,
+    justifyContent: 'center',
+    marginRight: dashboardSpacing.sm,
+    width: 34,
+  },
+  headerTitleRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    marginRight: dashboardSpacing.sm,
+  },
+  headerTitleText: {
+    flex: 1,
   },
   headerSubtitle: {
     ...dashboardTypography.caption,
@@ -408,6 +465,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...dashboardTypography.title,
     color: dashboardColors.text,
+    fontSize: 18,
   },
   hospitalName: {
     ...dashboardTypography.cardTitle,

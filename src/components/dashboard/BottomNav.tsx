@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, useColorScheme, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 import {
   dashboardColors,
@@ -45,6 +47,8 @@ const TAB_DEFS: {
   { activeIcon: 'cart', icon: 'cart-outline', key: 'shop', labelKey: 'shop' },
 ];
 
+const ITEM_MARGIN = 3;
+
 type BottomNavProps = {
   activeTab: NavTabKey | null;
   bottomOffset: number;
@@ -55,10 +59,45 @@ type BottomNavProps = {
 export function BottomNav({ activeTab, bottomOffset, onSelectTab, overMedia = false }: BottomNavProps) {
   const { t } = useLanguage();
   const colorScheme = useColorScheme();
+  const [containerWidth, setContainerWidth] = useState(0);
   const liquidGlass = process.env.EXPO_OS === 'ios'
     && isGlassEffectAPIAvailable()
     && isLiquidGlassAvailable();
   const dark = colorScheme === 'dark';
+  const activeIndex = Math.max(0, TAB_DEFS.findIndex((tab) => tab.key === activeTab));
+  const slotWidth = containerWidth / TAB_DEFS.length;
+
+  const indicatorStyle = useAnimatedStyle(() => {
+    if (!slotWidth) return { opacity: 0 };
+    return {
+      left: withSpring(activeIndex * slotWidth + ITEM_MARGIN, { damping: 18, mass: 0.5, stiffness: 220 }),
+      opacity: withSpring(activeTab ? 1 : 0),
+      width: slotWidth - ITEM_MARGIN * 2,
+    };
+  }, [activeIndex, slotWidth, activeTab]);
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    setContainerWidth(event.nativeEvent.layout.width);
+  };
+
+  const handlePress = (tab: NavTabKey) => {
+    if (tab !== activeTab) {
+      void Haptics.selectionAsync().catch(() => undefined);
+    }
+    onSelectTab(tab);
+  };
+
+  const indicator = (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.indicator,
+        overMedia ? styles.indicatorOverMedia : styles.indicatorDefault,
+        indicatorStyle,
+      ]}
+    />
+  );
+
   const content = TAB_DEFS.map((tab) => (
     <NavItem
       activeIcon={tab.activeIcon}
@@ -72,20 +111,15 @@ export function BottomNav({ activeTab, bottomOffset, onSelectTab, overMedia = fa
     />
   ));
 
-  const handlePress = (tab: NavTabKey) => {
-    if (tab !== activeTab) {
-      void Haptics.selectionAsync().catch(() => undefined);
-    }
-    onSelectTab(tab);
-  };
-
   if (liquidGlass) {
     return (
       <GlassView
         colorScheme="auto"
         glassEffectStyle="regular"
+        onLayout={handleLayout}
         style={[styles.wrapper, styles.glassWrapper, overMedia && styles.glassWrapperOverMedia, { bottom: bottomOffset }]}
       >
+        {indicator}
         {content}
       </GlassView>
     );
@@ -93,6 +127,7 @@ export function BottomNav({ activeTab, bottomOffset, onSelectTab, overMedia = fa
 
   return (
     <View
+      onLayout={handleLayout}
       style={[
         styles.wrapper,
         styles.fallbackWrapper,
@@ -102,6 +137,7 @@ export function BottomNav({ activeTab, bottomOffset, onSelectTab, overMedia = fa
         { bottom: bottomOffset },
       ]}
     >
+      {indicator}
       {content}
     </View>
   );
@@ -125,7 +161,7 @@ function NavItem({ activeColor, activeIcon, icon, inactiveColor, isActive, label
       accessibilityState={{ selected: isActive }}
       hitSlop={6}
       onPress={onPress}
-      style={[styles.item, isActive && styles.itemActive, isActive && activeColor === '#FFFFFF' && styles.itemActiveOverMedia]}
+      style={styles.item}
     >
       <Ionicons
         color={isActive ? activeColor : inactiveColor}
@@ -156,15 +192,21 @@ const styles = StyleSheet.create({
   fallbackWrapperDark: { backgroundColor: 'rgba(24,28,34,0.94)', borderColor: 'rgba(255,255,255,0.16)' },
   fallbackWrapperLight: { backgroundColor: 'rgba(255,255,255,0.94)', borderColor: 'rgba(255,255,255,0.78)' },
   fallbackWrapperOverMedia: { backgroundColor: 'rgba(12,16,21,0.58)', borderColor: 'rgba(255,255,255,0.38)', boxShadow: '0 8px 30px rgba(0,0,0,0.24)' },
-  item: {
-    alignItems: 'center',
+  indicator: {
     borderCurve: 'continuous',
     borderRadius: 21,
+    height: 42,
+    position: 'absolute',
+    top: (dashboardLayout.bottomNavHeight - 42) / 2,
+  },
+  indicatorDefault: { backgroundColor: 'rgba(42,107,165,0.13)' },
+  indicatorOverMedia: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  item: {
+    alignItems: 'center',
     flex: 1,
     height: 42,
     justifyContent: 'center',
-    marginHorizontal: 3,
+    marginHorizontal: ITEM_MARGIN,
+    zIndex: 1,
   },
-  itemActive: { backgroundColor: 'rgba(42,107,165,0.13)' },
-  itemActiveOverMedia: { backgroundColor: 'rgba(255,255,255,0.18)' },
 });

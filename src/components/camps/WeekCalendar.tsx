@@ -17,36 +17,97 @@ const WEEK_OFFSET_OPTIONS = [
   { label: 'Week after', offset: 2 },
 ] as const;
 
-type WeekCalendarProps = {
-  eventDateKeys: Set<string>;
-  onSelectDate: (date: Date | null) => void;
-  onSelectWeekStart: (date: Date) => void;
-  selectedDate: Date | null;
-  weekStart: Date;
-};
+function weekOffsetFor(weekStart: Date): number {
+  return Math.round(
+    (weekStart.getTime() - startOfWeek(new Date()).getTime()) / (7 * 86_400_000),
+  );
+}
 
-export function WeekCalendar({
-  eventDateKeys,
+// The week-range label + dropdown trigger, meant to sit in the page header
+// (top-right). The menu it opens floats below itself regardless of where
+// it's placed.
+export function WeekRangeSelector({
   onSelectDate,
   onSelectWeekStart,
-  selectedDate,
   weekStart,
-}: WeekCalendarProps) {
+}: {
+  onSelectDate: (date: Date | null) => void;
+  onSelectWeekStart: (date: Date) => void;
+  weekStart: Date;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const today = new Date();
-  const thisWeekStart = startOfWeek(today);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const weekEnd = days[6]!;
-  const activeOffset = Math.round(
-    (weekStart.getTime() - thisWeekStart.getTime()) / (7 * 86_400_000),
-  );
+  const weekEnd = addDays(weekStart, 6);
+  const activeOffset = weekOffsetFor(weekStart);
 
   const handlePickWeek = (offset: number) => {
     void Haptics.selectionAsync().catch(() => undefined);
-    onSelectWeekStart(addDays(thisWeekStart, offset * 7));
+    onSelectWeekStart(addDays(startOfWeek(new Date()), offset * 7));
     onSelectDate(null);
     setMenuOpen(false);
   };
+
+  return (
+    <View style={styles.selectorWrap}>
+      <Pressable
+        accessibilityLabel="Choose a different week"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={() => setMenuOpen((open) => !open)}
+        style={styles.weekLabelButton}
+      >
+        <Text style={styles.weekLabel} numberOfLines={1}>
+          {formatMonthDay(weekStart)} – {formatMonthDay(weekEnd)}
+        </Text>
+        <Ionicons
+          color={dashboardColors.textMuted}
+          name={menuOpen ? 'chevron-up' : 'chevron-down'}
+          size={16}
+        />
+      </Pressable>
+
+      {menuOpen ? (
+        <>
+          <Pressable onPress={() => setMenuOpen(false)} style={styles.menuScrim} />
+          <View style={styles.menu}>
+            {WEEK_OFFSET_OPTIONS.map((option) => {
+              const active = option.offset === activeOffset;
+              return (
+                <Pressable
+                  key={option.offset}
+                  onPress={() => handlePickWeek(option.offset)}
+                  style={[styles.menuItem, active && styles.menuItemActive]}
+                >
+                  <Text style={[styles.menuItemText, active && styles.menuItemTextActive]}>
+                    {option.label}
+                  </Text>
+                  {active ? (
+                    <Ionicons color={dashboardColors.primary} name="checkmark" size={16} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+// The 7-day row for the given week. Tapping a day narrows the list to it;
+// tapping the same day again clears back to the whole week.
+export function WeekDayStrip({
+  eventDateKeys,
+  onSelectDate,
+  selectedDate,
+  weekStart,
+}: {
+  eventDateKeys: Set<string>;
+  onSelectDate: (date: Date | null) => void;
+  selectedDate: Date | null;
+  weekStart: Date;
+}) {
+  const today = new Date();
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const handlePressDay = (day: Date) => {
     void Haptics.selectionAsync().catch(() => undefined);
@@ -54,86 +115,43 @@ export function WeekCalendar({
   };
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.headerRow}>
-        <Pressable
-          accessibilityLabel="Choose a different week"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => setMenuOpen((open) => !open)}
-          style={styles.weekLabelButton}
-        >
-          <Text style={styles.weekLabel}>
-            {formatMonthDay(weekStart)} – {formatMonthDay(weekEnd)}
-          </Text>
-          <Ionicons
-            color={dashboardColors.textMuted}
-            name={menuOpen ? 'chevron-up' : 'chevron-down'}
-            size={16}
-          />
-        </Pressable>
-      </View>
-
-      {menuOpen ? (
-        <View style={styles.menu}>
-          {WEEK_OFFSET_OPTIONS.map((option) => {
-            const active = option.offset === activeOffset;
-            return (
-              <Pressable
-                key={option.offset}
-                onPress={() => handlePickWeek(option.offset)}
-                style={[styles.menuItem, active && styles.menuItemActive]}
+    <View style={styles.daysRow}>
+      {days.map((day, index) => {
+        const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+        const isToday = isSameDay(day, today);
+        const hasEvents = eventDateKeys.has(dateKey(day));
+        return (
+          <Pressable
+            accessibilityLabel={formatMonthDay(day)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
+            hitSlop={4}
+            key={dateKey(day)}
+            onPress={() => handlePressDay(day)}
+            style={styles.dayCell}
+          >
+            <Text style={styles.dayLetter}>{WEEKDAY_LETTERS[index]}</Text>
+            <View
+              style={[
+                styles.dayCircle,
+                isSelected && styles.dayCircleSelected,
+                !isSelected && isToday && styles.dayCircleToday,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dayNumber,
+                  isSelected && styles.dayNumberSelected,
+                  !isSelected && isToday && styles.dayNumberToday,
+                ]}
               >
-                <Text style={[styles.menuItemText, active && styles.menuItemTextActive]}>
-                  {option.label}
-                </Text>
-                {active ? (
-                  <Ionicons color={dashboardColors.primary} name="checkmark" size={16} />
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : (
-        <View style={styles.daysRow}>
-          {days.map((day, index) => {
-            const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-            const isToday = isSameDay(day, today);
-            const hasEvents = eventDateKeys.has(dateKey(day));
-            return (
-              <Pressable
-                accessibilityLabel={formatMonthDay(day)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isSelected }}
-                hitSlop={4}
-                key={dateKey(day)}
-                onPress={() => handlePressDay(day)}
-                style={styles.dayCell}
-              >
-                <Text style={styles.dayLetter}>{WEEKDAY_LETTERS[index]}</Text>
-                <View
-                  style={[
-                    styles.dayCircle,
-                    isSelected && styles.dayCircleSelected,
-                    !isSelected && isToday && styles.dayCircleToday,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      isSelected && styles.dayNumberSelected,
-                      !isSelected && isToday && styles.dayNumberToday,
-                    ]}
-                  >
-                    {day.getDate()}
-                  </Text>
-                </View>
-                <View style={[styles.eventDot, hasEvents && styles.eventDotVisible]} />
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
+                {day.getDate()}
+              </Text>
+            </View>
+            <View style={[styles.eventDot, hasEvents && styles.eventDotVisible]} />
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -188,14 +206,16 @@ const styles = StyleSheet.create({
   eventDotVisible: {
     backgroundColor: dashboardColors.primary,
   },
-  headerRow: {
-    flexDirection: 'row',
-    marginBottom: dashboardSpacing.sm,
-  },
   menu: {
     backgroundColor: dashboardColors.card,
     borderRadius: dashboardRadii.card,
+    boxShadow: '0 8px 24px rgba(15,23,42,0.16)',
     overflow: 'hidden',
+    position: 'absolute',
+    right: 0,
+    top: 30,
+    width: 160,
+    zIndex: 30,
   },
   menuItem: {
     alignItems: 'center',
@@ -216,17 +236,25 @@ const styles = StyleSheet.create({
     color: dashboardColors.primary,
     fontFamily: 'Inter_600SemiBold',
   },
+  menuScrim: {
+    height: 1000,
+    left: -1000,
+    position: 'absolute',
+    top: -1000,
+    width: 2000,
+    zIndex: 20,
+  },
+  selectorWrap: {
+    position: 'relative',
+  },
   weekLabel: {
     color: dashboardColors.text,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+    fontSize: 14,
   },
   weekLabelButton: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 4,
-  },
-  wrap: {
-    width: '100%',
   },
 });
