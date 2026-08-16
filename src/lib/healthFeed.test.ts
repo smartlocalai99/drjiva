@@ -30,6 +30,7 @@ import {
   fetchHealthFeedViewerState,
   recordHealthPostView,
   setHealthPostLike,
+  shuffleHealthFeedPosts,
   subscribeToPublishedHealthPosts,
 } from './healthFeed';
 
@@ -226,5 +227,25 @@ describe('Health Feed interactions', () => {
     expect(idEqMock).toHaveBeenCalledWith('id', 'comment-1');
     expect(postEqMock).toHaveBeenCalledWith('post_id', 'post-1');
     expect(ownerEqMock).toHaveBeenCalledWith('owner_user_id', 'patient-user-id');
+  });
+});
+
+describe('shuffleHealthFeedPosts', () => {
+  it('returns every item exactly once, without mutating the input', () => {
+    const posts = ['a', 'b', 'c', 'd', 'e'];
+    const shuffled = shuffleHealthFeedPosts(posts);
+
+    expect(shuffled).toHaveLength(posts.length);
+    expect([...shuffled].sort()).toEqual([...posts].sort());
+    expect(posts).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('produces a different order across many shuffles of a larger list', () => {
+    const posts = Array.from({ length: 30 }, (_, i) => `post-${i}`);
+    const results = new Set(
+      Array.from({ length: 20 }, () => shuffleHealthFeedPosts(posts).join(',')),
+    );
+
+    expect(results.size).toBeGreaterThan(1);
   });
 });

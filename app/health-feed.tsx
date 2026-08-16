@@ -52,6 +52,7 @@ import {
   deleteHealthPostComment,
   fetchHealthFeed,
   fetchHealthFeedViewerState,
+  shuffleHealthFeedPosts,
   fetchHealthPostComments,
   recordHealthPostView,
   setHealthDoctorFollowed,
@@ -116,7 +117,10 @@ export default function HealthFeedScreen() {
         fetchHealthFeed(),
         fetchHealthFeedViewerState(),
       ]);
-      setPosts(nextPosts);
+      // Silent background syncs (realtime structure changes) must not
+      // reorder the feed out from under someone mid-scroll — only an
+      // explicit open or pull-to-refresh reshuffles.
+      setPosts(silent ? nextPosts : shuffleHealthFeedPosts(nextPosts));
       setLikedIds(new Set(viewerState.likedPostIds));
       setSavedIds(new Set(viewerState.savedPostIds));
       setFollowedDoctors(new Set(viewerState.followedDoctorPhones));

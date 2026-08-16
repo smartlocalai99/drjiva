@@ -97,6 +97,20 @@ export async function fetchHealthFeed(): Promise<HealthFeedPost[]> {
   return (data || []) as unknown as HealthFeedPost[];
 }
 
+// Feed order was purely chronological, so pull-to-refresh re-fetched the
+// same 50 posts in the same order — nothing visibly changed. Shuffling on
+// every load (initial and refresh) gives the feed the "reshuffled" feel of
+// TikTok/Instagram, and naturally mixes doctors/media types instead of
+// clustering same-doctor posts published close together.
+export function shuffleHealthFeedPosts<T>(posts: readonly T[]): T[] {
+  const shuffled = [...posts];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled;
+}
+
 export async function fetchHealthFeedViewerState(): Promise<HealthFeedViewerState> {
   const ownerUserId = await ensureSecureReportSession();
   const [likesResult, savesResult, followsResult] = await Promise.all([

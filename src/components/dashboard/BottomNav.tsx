@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 import {
   dashboardColors,
   dashboardLayout,
+  dashboardSpacing,
 } from '../../dashboardTheme';
 import { useLanguage, type TranslationKey } from '../../lib/i18n';
 
@@ -143,10 +144,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: dashboardLayout.bottomNavHeight,
     justifyContent: 'space-around',
-    left: 44,
+    left: dashboardSpacing.pagePadding,
     overflow: 'hidden',
     position: 'absolute',
-    right: 44,
+    right: dashboardSpacing.pagePadding,
     zIndex: 20,
   },
   glassWrapper: { borderColor: 'rgba(255,255,255,0.32)', borderWidth: StyleSheet.hairlineWidth },
