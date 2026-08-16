@@ -14,7 +14,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
-import { DateTimeline } from '../src/components/dashboard/DateTimeline';
+import { WeekCalendar } from '../src/components/camps/WeekCalendar';
 import { HospitalLogo } from '../src/components/HospitalLogo';
 import { PressableScale } from '../src/components/PressableScale';
 import {
@@ -28,11 +28,12 @@ import {
   fetchRegisteredEventIds,
   fetchUpcomingHospitalEvents,
   registerForHospitalEvent,
+  unregisterFromHospitalEvent,
   type HospitalEvent,
   type HospitalEventType,
 } from '../src/data/hospitalEvents';
 import { getTabRoute } from '../src/lib/dashboardNav';
-import { isSameDay } from '../src/lib/dates';
+import { dateKey, formatShortWeekdayDate, isSameDay, startOfWeek } from '../src/lib/dates';
 import { useLanguage, type TranslationKey } from '../src/lib/i18n';
 import { getPatientByPhone } from '../src/lib/patients';
 
@@ -80,7 +81,8 @@ export default function CampsScreen() {
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
 
   const [activeTab, setActiveTab] = useState<NavTabKey>('camps');
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [events, setEvents] = useState<HospitalEvent[]>([]);
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
   const [registeringId, setRegisteringId] = useState<string | null>(null);
@@ -111,13 +113,41 @@ export default function CampsScreen() {
       .catch(() => undefined);
   }, [phone]);
 
-  const eventsForSelectedDate = useMemo(
+  const eventsWithDate = useMemo(
     () =>
-      events.filter((event) => {
-        const [y, m, d] = event.eventDate.split('-').map(Number);
-        return isSameDay(new Date(y!, m! - 1, d!), selectedDate);
+      events.map((event) => {
+        const [y, m, d] = event.eventDate.split('-').map(Number) as [number, number, number];
+        return { date: new Date(y, m - 1, d), event };
       }),
-    [events, selectedDate],
+    [events],
+  );
+
+  const weekEnd = useMemo(() => {
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [weekStart]);
+
+  const eventDateKeys = useMemo(
+    () =>
+      new Set(
+        eventsWithDate
+          .filter(({ date }) => date >= weekStart && date <= weekEnd)
+          .map(({ date }) => dateKey(date)),
+      ),
+    [eventsWithDate, weekStart, weekEnd],
+  );
+
+  const visibleEvents = useMemo(
+    () =>
+      eventsWithDate
+        .filter(({ date }) => {
+          if (selectedDate) return isSameDay(date, selectedDate);
+          return date >= weekStart && date <= weekEnd;
+        })
+        .map(({ event }) => event),
+    [eventsWithDate, selectedDate, weekStart, weekEnd],
   );
 
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
@@ -149,6 +179,23 @@ export default function CampsScreen() {
     }
   };
 
+  const handleUnregister = async (event: HospitalEvent) => {
+    if (registeringId) return;
+    setRegisteringId(event.id);
+    try {
+      await unregisterFromHospitalEvent(event.id);
+      setRegisteredIds((current) => {
+        const next = new Set(current);
+        next.delete(event.id);
+        return next;
+      });
+    } catch {
+      setErrorMessage('campRegisterFailed');
+    } finally {
+      setRegisteringId(null);
+    }
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
@@ -157,7 +204,13 @@ export default function CampsScreen() {
       </View>
 
       <View style={styles.timelineWrap}>
-        <DateTimeline onSelectDate={setSelectedDate} selectedDate={selectedDate} />
+        <WeekCalendar
+          eventDateKeys={eventDateKeys}
+          onSelectDate={setSelectedDate}
+          onSelectWeekStart={setWeekStart}
+          selectedDate={selectedDate}
+          weekStart={weekStart}
+        />
       </View>
 
       {isLoading ? (
@@ -171,16 +224,19 @@ export default function CampsScreen() {
         >
           {errorMessage ? <Text style={styles.errorText}>{t(errorMessage as TranslationKey)}</Text> : null}
 
-          {eventsForSelectedDate.length === 0 ? (
+          {visibleEvents.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons color={dashboardColors.textFaint} name="calendar-outline" size={30} />
               <Text style={styles.emptyText}>{t('campsEmpty')}</Text>
             </View>
           ) : (
-            eventsForSelectedDate.map((event) => {
+            visibleEvents.map((event) => {
               const theme = EVENT_TYPE_THEME[event.eventType];
               const timeRange = formatTimeRange(event.startTime, event.endTime);
               const isRegistered = registeredIds.has(event.id);
+              const isBusy = registeringId === event.id;
+              const [y, m, d] = event.eventDate.split('-').map(Number) as [number, number, number];
+              const eventDateLabel = formatShortWeekdayDate(new Date(y, m - 1, d));
               return (
                 <View key={event.id} style={styles.card}>
                   <View style={styles.cardTopRow}>
@@ -205,6 +261,10 @@ export default function CampsScreen() {
                   {event.description ? <Text style={styles.cardDescription}>{event.description}</Text> : null}
 
                   <View style={styles.cardMetaRow}>
+                    <View style={styles.metaItem}>
+                      <Ionicons color={dashboardColors.textMuted} name="calendar-outline" size={14} />
+                      <Text style={styles.metaText}>{eventDateLabel}</Text>
+                    </View>
                     {timeRange ? (
                       <View style={styles.metaItem}>
                         <Ionicons color={dashboardColors.textMuted} name="time-outline" size={14} />
@@ -219,26 +279,40 @@ export default function CampsScreen() {
                     ) : null}
                   </View>
 
-                  <PressableScale
-                    disabled={isRegistered || registeringId === event.id}
-                    onPress={() => void handleRegister(event)}
-                    style={[styles.registerButton, isRegistered && styles.registerButtonDone]}
-                  >
-                    {registeringId === event.id ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <>
-                        <Ionicons
-                          color="#FFFFFF"
-                          name={isRegistered ? 'checkmark-circle' : 'calendar-outline'}
-                          size={16}
-                        />
-                        <Text style={styles.registerButtonText}>
-                          {isRegistered ? t('campRegistered') : t('campRegister')}
-                        </Text>
-                      </>
-                    )}
-                  </PressableScale>
+                  {isRegistered ? (
+                    <View style={styles.bookedPill}>
+                      <View style={styles.bookedSegment}>
+                        <Ionicons color={dashboardColors.text} name="checkmark-circle" size={16} />
+                        <Text style={styles.bookedSegmentText}>{t('campRegistered')}</Text>
+                      </View>
+                      <PressableScale
+                        disabled={isBusy}
+                        onPress={() => void handleUnregister(event)}
+                        style={styles.shiftSegment}
+                      >
+                        {isBusy ? (
+                          <ActivityIndicator color={dashboardColors.textMuted} size="small" />
+                        ) : (
+                          <Text style={styles.shiftSegmentText}>{t('campShift')}</Text>
+                        )}
+                      </PressableScale>
+                    </View>
+                  ) : (
+                    <PressableScale
+                      disabled={isBusy}
+                      onPress={() => void handleRegister(event)}
+                      style={styles.registerButton}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <>
+                          <Ionicons color="#FFFFFF" name="calendar-outline" size={16} />
+                          <Text style={styles.registerButtonText}>{t('campRegister')}</Text>
+                        </>
+                      )}
+                    </PressableScale>
+                  )}
                 </View>
               );
             })
@@ -358,11 +432,40 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
   },
-  registerButtonDone: {
-    backgroundColor: dashboardColors.success,
-  },
   registerButtonText: {
     color: '#FFFFFF',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  bookedPill: {
+    backgroundColor: dashboardColors.bg,
+    borderRadius: dashboardRadii.button,
+    flexDirection: 'row',
+    height: 44,
+    padding: 4,
+  },
+  bookedSegment: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.card,
+    borderRadius: dashboardRadii.button - 4,
+    boxShadow: '0 1px 3px rgba(15,23,42,0.10)',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+  },
+  bookedSegmentText: {
+    color: dashboardColors.text,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  shiftSegment: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  shiftSegmentText: {
+    color: dashboardColors.textMuted,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
   },

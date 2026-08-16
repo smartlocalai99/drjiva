@@ -86,3 +86,15 @@ export async function registerForHospitalEvent(input: {
   });
   if (error && error.code !== '23505') throw error; // 23505 = already registered, treat as success
 }
+
+// Lets a patient un-book (the "shift"/change action next to Booked) — they
+// can then register again for the same or a different camp.
+export async function unregisterFromHospitalEvent(eventId: string): Promise<void> {
+  const ownerUserId = await ensureSecureReportSession();
+  const { error } = await supabase
+    .from('hospital_event_registrations')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('owner_user_id', ownerUserId);
+  if (error) throw error;
+}

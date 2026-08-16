@@ -47,6 +47,13 @@ export function formatShortWeekdayDate(date: Date): string {
   return `${WEEKDAY_SHORT[date.getDay()]}, ${formatMonthDay(date)}`;
 }
 
+export function startOfWeek(date: Date): Date {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+}
+
 export function getGreeting(date: Date): string {
   const hour = date.getHours();
 
