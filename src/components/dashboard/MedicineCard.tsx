@@ -149,7 +149,11 @@ export function MedicineCard({
               {medicine.hospitalName}
             </Text>
           </View>
-          <DoctorAvatar roundedSquare size={72} />
+          <DoctorAvatar
+            doctorName={medicine.doctorName}
+            roundedSquare
+            size={72}
+          />
         </View>
       </View>
     </Animated.View>

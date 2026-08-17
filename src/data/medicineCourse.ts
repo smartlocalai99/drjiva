@@ -43,6 +43,7 @@ export type DoseRow = {
   completed: boolean;
   courseId: string;
   description?: string | null;
+  doctorName?: string | null;
   durationDays?: number | null;
   eventId: string;
   hospitalName: string;
@@ -208,7 +209,7 @@ export function mapDoseRows(rows: readonly DoseRow[]): Medicine[] {
       completed: row.completed,
       courseId: row.courseId,
       description: row.description?.trim() || 'Medicine reminder',
-      doctorName: 'Care team',
+      doctorName: row.doctorName?.trim() || 'Care team',
       durationDays: row.durationDays ?? null,
       hospitalName: row.hospitalName,
       id: row.eventId,

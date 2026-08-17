@@ -375,7 +375,7 @@ function ReminderCard({
             {medicine.hospitalName}
           </Text>
         </View>
-        <DoctorAvatar size={48} />
+        <DoctorAvatar doctorName={medicine.doctorName} size={48} />
       </View>
     </Animated.View>
   );

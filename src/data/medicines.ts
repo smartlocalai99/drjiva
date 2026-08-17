@@ -29,6 +29,7 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 }
 
 type RawDoseCourse = {
+  doctor_name: string | null;
   duration_days: number | null;
   hospitals: { name: string } | Array<{ name: string }> | null;
   id: string;
@@ -85,7 +86,7 @@ export async function fetchMedicinesForDate(
   const { data, error } = await supabase
     .from('patient_medicine_dose_events')
     .select(
-      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name,description), patient_custom_medicines(name,image_path))',
+      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, doctor_name, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name,description), patient_custom_medicines(name,image_path))',
     )
     .eq('patient_id', patientId)
     .gte('scheduled_for', start.toISOString())
@@ -164,6 +165,7 @@ export async function fetchMedicinesForDate(
       completed: event.status === 'completed',
       courseId: course.id,
       description: customMedicine ? null : medicine?.description ?? null,
+      doctorName: course.doctor_name,
       durationDays: course.duration_days,
       eventId: event.id,
       hospitalName: hospital,
