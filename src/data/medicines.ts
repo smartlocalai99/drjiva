@@ -86,7 +86,7 @@ export async function fetchMedicinesForDate(
   const { data, error } = await supabase
     .from('patient_medicine_dose_events')
     .select(
-      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, doctor_name, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name,description), patient_custom_medicines(name,image_path))',
+      'id, scheduled_for, slot, status, patient_medicine_courses!inner(id, tablets_per_dose, start_date, duration_days, schedule_mode, hospitals(name), patient_custom_hospitals(name), medicines(name,image_url,hospital_name,description), patient_custom_medicines(name,image_path))',
     )
     .eq('patient_id', patientId)
     .gte('scheduled_for', start.toISOString())
