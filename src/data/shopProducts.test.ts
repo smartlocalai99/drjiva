@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ASIAN_HOSPITAL_NAME,
   DHRUVA_HOSPITAL_NAME,
+  SHANKAR_HOSPITAL_NAME,
   mapMedicineRowsToShopProducts,
   type ShopProduct,
 } from './shopProductModel';
@@ -109,6 +110,23 @@ describe('shop product catalogue', () => {
       expect.objectContaining({
         hospitalName: DHRUVA_HOSPITAL_NAME,
         id: 'dhruva-product',
+      }),
+    ]);
+  });
+
+  it('includes Shankar products with a real image', () => {
+    expect(
+      mapMedicineRowsToShopProducts([
+        {
+          ...BASE_ROW,
+          hospital_name: SHANKAR_HOSPITAL_NAME,
+          id: 'shankar-product',
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        hospitalName: SHANKAR_HOSPITAL_NAME,
+        id: 'shankar-product',
       }),
     ]);
   });

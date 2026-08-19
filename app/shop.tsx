@@ -65,6 +65,7 @@ import {
 } from '../src/data/shopProducts';
 import {
   getShopHospitalCode,
+  SHOP_HOSPITALS,
   type ShopHospitalFilter,
 } from '../src/data/shopProductModel';
 import {
@@ -914,6 +915,7 @@ function HospitalFilter({
     { key: 'all', label: 'All' },
     { key: 'asian', label: 'Asian' },
     { key: 'dhruva', label: 'Dhruva' },
+    { key: 'shankar', label: 'Shankar' },
   ];
   return (
     <View accessibilityRole="tablist" style={styles.hospitalFilters}>
@@ -957,11 +959,11 @@ function EmptySearch({
   query: string;
 }) {
   const supplier =
-    hospitalFilter === 'dhruva'
-      ? 'Dhruva Hospitals'
+    hospitalFilter === 'all'
+      ? 'Asian, Dhruva, and Shankar Hospitals'
       : hospitalFilter === 'asian'
         ? 'Asian Hospitals'
-        : 'Asian and Dhruva Hospitals';
+        : SHOP_HOSPITALS[hospitalFilter];
   return (
     <View style={styles.emptySearch}>
       <View style={styles.stateIcon}>

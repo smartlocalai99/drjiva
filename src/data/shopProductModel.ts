@@ -4,6 +4,7 @@ import { getShopProductFallbackCopy } from './shop-product-copy';
 export const SHOP_HOSPITALS = {
   asian: 'ASIAN MULTI SPECIALITY HOSPITALS',
   dhruva: 'Dhruva Hospitals',
+  shankar: 'SHANKAR GASTRO HOSPITAL',
 } as const;
 
 export type ShopHospitalCode = keyof typeof SHOP_HOSPITALS;
@@ -11,6 +12,7 @@ export type ShopHospitalFilter = 'all' | ShopHospitalCode;
 
 export const ASIAN_HOSPITAL_NAME = SHOP_HOSPITALS.asian;
 export const DHRUVA_HOSPITAL_NAME = SHOP_HOSPITALS.dhruva;
+export const SHANKAR_HOSPITAL_NAME = SHOP_HOSPITALS.shankar;
 
 export const SHOP_SECTION_CODES = [
   'headache',

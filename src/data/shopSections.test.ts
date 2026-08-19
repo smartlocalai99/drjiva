@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ShopProduct } from './shopProductModel';
-import { DHRUVA_HOSPITAL_NAME } from './shopProductModel';
+import {
+  DHRUVA_HOSPITAL_NAME,
+  SHANKAR_HOSPITAL_NAME,
+} from './shopProductModel';
 import {
   buildReminderMedicineReorders,
   buildShopSections,
@@ -127,13 +130,16 @@ describe('shop sections', () => {
       product('dhruva', 'Paracetamol Dhruva', {}, {
         hospitalName: DHRUVA_HOSPITAL_NAME,
       }),
+      product('shankar', 'Paracetamol Shankar', {}, {
+        hospitalName: SHANKAR_HOSPITAL_NAME,
+      }),
     ];
 
     expect(
       buildShopSections(products, 'paracetamol')[0]?.data.map(
         (item) => item.id,
       ),
-    ).toEqual(['asian', 'dhruva']);
+    ).toEqual(['asian', 'dhruva', 'shankar']);
     expect(
       buildShopSections(products, 'paracetamol', 'asian')[0]?.data.map(
         (item) => item.id,
@@ -144,6 +150,11 @@ describe('shop sections', () => {
         (item) => item.id,
       ),
     ).toEqual(['dhruva']);
+    expect(
+      buildShopSections(products, 'paracetamol', 'shankar')[0]?.data.map(
+        (item) => item.id,
+      ),
+    ).toEqual(['shankar']);
   });
 
   it('returns the closest medicine for a misspelled search', () => {
