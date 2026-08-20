@@ -251,7 +251,9 @@ export default function MedicineDetailScreen() {
                   <PressableScale
                     accessibilityLabel={`View cart with ${cart.totalItems} items`}
                     onPress={() =>
-                      router.push({ params: { phone }, pathname: "/checkout" })
+                      phone
+                        ? router.push({ params: { phone }, pathname: "/checkout" })
+                        : router.push("/")
                     }
                     pressedScale={0.97}
                     style={styles.viewCartButton}

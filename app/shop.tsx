@@ -406,6 +406,12 @@ export default function ShopScreen() {
     if (tab === activeTab) {
       return;
     }
+    // Every other tab is account-based (reminders, health records, orders) —
+    // guests browsing without signing in get sent to log in first.
+    if (!phone && tab !== 'shop') {
+      router.push('/');
+      return;
+    }
     const route = getTabRoute(tab);
     if (!route) {
       return;
@@ -415,6 +421,10 @@ export default function ShopScreen() {
   };
 
   const openAddressSheet = () => {
+    if (!phone) {
+      router.push('/');
+      return;
+    }
     router.push({ params: { phone }, pathname: '/shop-address' });
   };
 
@@ -636,7 +646,9 @@ export default function ShopScreen() {
           bottomOffset={navBottomOffset}
           itemCount={cart.totalItems}
           onPress={() =>
-            router.push({ params: { phone }, pathname: '/checkout' })
+            phone
+              ? router.push({ params: { phone }, pathname: '/checkout' })
+              : router.push('/')
           }
           total={cartTotal}
         />

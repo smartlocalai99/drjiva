@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SESSION_PHONE_KEY = 'drjiva.session.phone';
+const TERMS_ACCEPTED_KEY = 'drjiva.terms-accepted.v1';
 const PATIENT_NAME_KEY_PREFIX = 'drjiva.patient-name.v1';
 const PATIENT_AVATAR_KEY_PREFIX = 'drjiva.patient-avatar.v1';
 const avatarListeners = new Map<
@@ -66,6 +67,14 @@ export async function clearSessionPhone(): Promise<void> {
   }
 
   await Promise.all(removals);
+}
+
+export async function hasAcceptedTerms(): Promise<boolean> {
+  return (await AsyncStorage.getItem(TERMS_ACCEPTED_KEY)) === 'true';
+}
+
+export async function saveTermsAccepted(): Promise<void> {
+  await AsyncStorage.setItem(TERMS_ACCEPTED_KEY, 'true');
 }
 
 export async function getCachedPatientName(

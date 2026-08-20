@@ -116,10 +116,18 @@ export default function CartScreen() {
   };
 
   const openDeliveryAddresses = () => {
+    if (!phone) {
+      router.push('/');
+      return;
+    }
     router.push({ params: { phone }, pathname: '/saved-addresses' });
   };
 
   const handleCheckout = () => {
+    if (!phone) {
+      router.push('/');
+      return;
+    }
     router.push({ params: { phone }, pathname: '/checkout' });
   };
 

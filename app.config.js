@@ -9,6 +9,9 @@ const ORDER_SUCCESS_CHANNEL = 'order-success-v1';
 // iOS plays the bundled sound file by its exact filename; Android plays it by
 // the res/raw resource name the expo-notifications plugin derives from the
 // filename minus its extension.
+// Keep iOS on the CAF filename already embedded in shipped app binaries.
+// reminder.caf contains the same PCM recording as rec.wav; changing only the
+// filename lets OTA updates restore the custom sound without a new binary.
 const IOS_SOUND_PATH = './assets/sounds/reminder.caf';
 const IOS_SOUND_FILE = 'reminder.caf';
 const ANDROID_SOUND_PATH = './assets/sounds/rec.wav';
@@ -28,9 +31,11 @@ module.exports = ({ config }) => {
     ? MEDICINE_REMINDER_SOUND_CHANNEL
     : MEDICINE_REMINDER_CHANNEL;
   const soundPaths = [
-    ...(hasIOSSound ? [IOS_SOUND_PATH] : []),
-    ...(hasAndroidSound ? [ANDROID_SOUND_PATH] : []),
-    ...(hasOrderSuccessSound ? [ORDER_SUCCESS_SOUND_PATH] : []),
+    ...new Set([
+      ...(hasIOSSound ? [IOS_SOUND_PATH] : []),
+      ...(hasAndroidSound ? [ANDROID_SOUND_PATH] : []),
+      ...(hasOrderSuccessSound ? [ORDER_SUCCESS_SOUND_PATH] : []),
+    ]),
   ];
   const plugins = (config.plugins ?? []).map((plugin) => {
     const pluginName = Array.isArray(plugin) ? plugin[0] : plugin;
@@ -66,7 +71,11 @@ module.exports = ({ config }) => {
         (Array.isArray(plugin) ? plugin[0] : plugin) === 'expo-audio',
     )
   ) {
-    plugins.push('expo-audio');
+    // enableBackgroundPlayback defaults to true, which makes the plugin add
+    // UIBackgroundModes: ["audio"] to Info.plist — App Store rejected this
+    // (guideline 2.5.4) since the app only plays short one-shot foreground
+    // chimes (add-medicine, checkout), never continuous background audio.
+    plugins.push(['expo-audio', { enableBackgroundPlayback: false }]);
   }
   if (
     !plugins.some(

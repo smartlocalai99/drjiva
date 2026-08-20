@@ -16,8 +16,10 @@ import {
   clearSessionPhone,
   getCachedAvatarUrl,
   getCachedPatientName,
+  hasAcceptedTerms,
   saveCachedAvatarUrl,
   saveCachedPatientName,
+  saveTermsAccepted,
   subscribeCachedAvatarUrl,
 } from './session';
 
@@ -142,5 +144,33 @@ describe('patient avatar cache', () => {
       'https://example.test/ignored.jpg',
     );
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('terms acceptance', () => {
+  beforeEach(() => {
+    asyncStorage.getItem.mockReset();
+    asyncStorage.setItem.mockReset();
+  });
+
+  it('defaults to not accepted when nothing has been stored yet', async () => {
+    asyncStorage.getItem.mockResolvedValueOnce(null);
+
+    await expect(hasAcceptedTerms()).resolves.toBe(false);
+  });
+
+  it('reports accepted once saved', async () => {
+    asyncStorage.getItem.mockResolvedValueOnce('true');
+
+    await expect(hasAcceptedTerms()).resolves.toBe(true);
+  });
+
+  it('persists acceptance under a stable key', async () => {
+    await saveTermsAccepted();
+
+    expect(asyncStorage.setItem).toHaveBeenCalledWith(
+      'drjiva.terms-accepted.v1',
+      'true',
+    );
   });
 });

@@ -7,7 +7,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -59,6 +59,16 @@ export default function CheckoutScreen() {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder>();
   const requestIdRef = useRef<string | undefined>(undefined);
+
+  // Checking out is account-based (needs a phone number for delivery) —
+  // guests who reach this screen without one (e.g. a stale deep link) get
+  // sent to log in first, per Apple guideline 5.1.1: browsing stays open,
+  // registration is only required for account-based actions like this one.
+  useEffect(() => {
+    if (!phone) {
+      router.replace('/');
+    }
+  }, [phone, router]);
 
   const lines = useMemo(
     () =>

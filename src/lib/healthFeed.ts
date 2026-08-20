@@ -37,12 +37,19 @@ export type HealthFeedComment = {
   created_at: string;
   id: string;
   is_owner: boolean;
+  owner_user_id: string;
   post_id: string;
 };
 
-type HealthFeedCommentRow = Omit<HealthFeedComment, 'is_owner'> & {
-  owner_user_id: string;
-};
+type HealthFeedCommentRow = Omit<HealthFeedComment, 'is_owner'>;
+
+export type ContentReportReason =
+  | 'objectionable'
+  | 'harassment'
+  | 'spam'
+  | 'misleading_medical'
+  | 'violence'
+  | 'other';
 
 export type HealthFeedViewerState = {
   followedDoctorPhones: string[];
@@ -210,7 +217,10 @@ export async function recordHealthPostView(postId: string): Promise<HealthFeedCo
 }
 
 export async function fetchHealthPostComments(postId: string): Promise<HealthFeedComment[]> {
-  const ownerUserId = await ensureSecureReportSession();
+  const [ownerUserId, blockedIds] = await Promise.all([
+    ensureSecureReportSession(),
+    fetchBlockedOwnerIds(),
+  ]);
   const { data, error } = await supabase
     .from('health_post_comments')
     .select('id,post_id,owner_user_id,author_name,body,created_at')
@@ -218,10 +228,13 @@ export async function fetchHealthPostComments(postId: string): Promise<HealthFee
     .order('created_at', { ascending: true })
     .limit(100);
   if (error) throw new Error('Unable to load comments. Please try again.');
-  return ((data || []) as HealthFeedCommentRow[]).map(({ owner_user_id, ...comment }) => ({
-    ...comment,
-    is_owner: owner_user_id === ownerUserId,
-  }));
+  const blockedSet = new Set(blockedIds);
+  return ((data || []) as HealthFeedCommentRow[])
+    .filter((comment) => !blockedSet.has(comment.owner_user_id))
+    .map((comment) => ({
+      ...comment,
+      is_owner: comment.owner_user_id === ownerUserId,
+    }));
 }
 
 export async function createHealthPostComment(
@@ -247,7 +260,7 @@ export async function createHealthPostComment(
   if (error) throw new Error('Unable to post your comment. Please try again.');
 
   const result = await readPostCount(postId, 'comments_count');
-  const { owner_user_id: _ownerUserId, ...comment } = data as HealthFeedCommentRow;
+  const comment = data as HealthFeedCommentRow;
   return { comment: { ...comment, is_owner: true }, count: result.count };
 }
 
@@ -268,6 +281,77 @@ export async function deleteHealthPostComment(
   if (error) throw new Error('Unable to delete your comment. Please try again.');
   if (!data) throw new Error('This comment is no longer available or does not belong to you.');
   return readPostCount(postId, 'comments_count');
+}
+
+export async function reportHealthPost(
+  postId: string,
+  reason: ContentReportReason,
+  description?: string,
+): Promise<void> {
+  const ownerUserId = await ensureSecureReportSession();
+  const { error } = await supabase.from('content_reports').insert({
+    description: description?.trim().slice(0, 500) || null,
+    post_id: postId,
+    reason,
+    reporter_owner_user_id: ownerUserId,
+    target_type: 'post',
+  });
+  if (error) throw new Error('Unable to submit your report. Please try again.');
+}
+
+export async function reportHealthPostComment(
+  postId: string,
+  commentId: string,
+  reason: ContentReportReason,
+  description?: string,
+): Promise<void> {
+  const ownerUserId = await ensureSecureReportSession();
+  const { error } = await supabase.from('content_reports').insert({
+    comment_id: commentId,
+    description: description?.trim().slice(0, 500) || null,
+    post_id: postId,
+    reason,
+    reporter_owner_user_id: ownerUserId,
+    target_type: 'comment',
+  });
+  if (error) throw new Error('Unable to submit your report. Please try again.');
+}
+
+export async function fetchBlockedOwnerIds(): Promise<string[]> {
+  const ownerUserId = await ensureSecureReportSession();
+  const { data, error } = await supabase
+    .from('blocked_users')
+    .select('blocked_owner_user_id')
+    .eq('blocker_owner_user_id', ownerUserId);
+  if (error) return [];
+  return (data || []).map((row) => row.blocked_owner_user_id as string);
+}
+
+// Blocking also files a report on the author's most recent comment on this
+// post so the moderation team sees why — Apple's guideline 1.2 requires
+// blocking to notify the developer of the inappropriate content, not just
+// silently hide it client-side.
+export async function blockCommentAuthor(
+  blockedOwnerUserId: string,
+  contextPostId: string,
+  contextCommentId: string,
+): Promise<void> {
+  const ownerUserId = await ensureSecureReportSession();
+  const { error } = await supabase.from('blocked_users').upsert(
+    {
+      blocked_owner_user_id: blockedOwnerUserId,
+      blocker_owner_user_id: ownerUserId,
+    },
+    { ignoreDuplicates: true, onConflict: 'blocker_owner_user_id,blocked_owner_user_id' },
+  );
+  if (error) throw new Error('Unable to block this user. Please try again.');
+
+  await reportHealthPostComment(
+    contextPostId,
+    contextCommentId,
+    'harassment',
+    'Reported automatically because the author was blocked.',
+  ).catch(() => undefined);
 }
 
 async function readPostCount(

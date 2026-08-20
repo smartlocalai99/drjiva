@@ -24,11 +24,15 @@ vi.mock('./supabase', () => ({
 }));
 
 import {
+  blockCommentAuthor,
   createHealthPostComment,
   deleteHealthPostComment,
+  fetchBlockedOwnerIds,
   fetchHealthPostComments,
   fetchHealthFeedViewerState,
   recordHealthPostView,
+  reportHealthPost,
+  reportHealthPostComment,
   setHealthPostLike,
   shuffleHealthFeedPosts,
   subscribeToPublishedHealthPosts,
@@ -154,6 +158,7 @@ describe('Health Feed interactions', () => {
         created_at: '2026-08-11T12:00:00.000Z',
         id: 'comment-1',
         is_owner: true,
+        owner_user_id: 'patient-user-id',
         post_id: 'post-1',
       },
       count: 3,
@@ -227,6 +232,122 @@ describe('Health Feed interactions', () => {
     expect(idEqMock).toHaveBeenCalledWith('id', 'comment-1');
     expect(postEqMock).toHaveBeenCalledWith('post_id', 'post-1');
     expect(ownerEqMock).toHaveBeenCalledWith('owner_user_id', 'patient-user-id');
+  });
+
+  it('excludes comments from blocked authors', async () => {
+    const blockedEqMock = vi.fn(async () => ({
+      data: [{ blocked_owner_user_id: 'blocked-user-id' }],
+      error: null,
+    }));
+    const limitMock = vi.fn(async () => ({
+      data: [
+        {
+          author_name: 'Anita',
+          body: 'Kept',
+          created_at: '2026-08-11T12:00:00.000Z',
+          id: 'comment-kept',
+          owner_user_id: 'patient-user-id',
+          post_id: 'post-1',
+        },
+        {
+          author_name: 'Rahul',
+          body: 'Hidden',
+          created_at: '2026-08-11T12:01:00.000Z',
+          id: 'comment-hidden',
+          owner_user_id: 'blocked-user-id',
+          post_id: 'post-1',
+        },
+      ],
+      error: null,
+    }));
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'blocked_users') return { select: () => ({ eq: blockedEqMock }) };
+      if (table === 'health_post_comments') {
+        return { select: () => ({ eq: () => ({ order: () => ({ limit: limitMock }) }) }) };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const comments = await fetchHealthPostComments('post-1');
+
+    expect(comments).toHaveLength(1);
+    expect(comments[0]?.id).toBe('comment-kept');
+  });
+
+  it('files a report tied to the reporting patient', async () => {
+    const insertMock = vi.fn(async () => ({ error: null }));
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'content_reports') return { insert: insertMock };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await reportHealthPost('post-1', 'spam', 'Looks like an ad');
+
+    expect(insertMock).toHaveBeenCalledWith({
+      description: 'Looks like an ad',
+      post_id: 'post-1',
+      reason: 'spam',
+      reporter_owner_user_id: 'patient-user-id',
+      target_type: 'post',
+    });
+  });
+
+  it('reports a specific comment', async () => {
+    const insertMock = vi.fn(async () => ({ error: null }));
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'content_reports') return { insert: insertMock };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await reportHealthPostComment('post-1', 'comment-1', 'harassment');
+
+    expect(insertMock).toHaveBeenCalledWith({
+      comment_id: 'comment-1',
+      description: null,
+      post_id: 'post-1',
+      reason: 'harassment',
+      reporter_owner_user_id: 'patient-user-id',
+      target_type: 'comment',
+    });
+  });
+
+  it('reads blocked owner ids for the current patient', async () => {
+    const eqMock = vi.fn(async () => ({
+      data: [{ blocked_owner_user_id: 'blocked-1' }, { blocked_owner_user_id: 'blocked-2' }],
+      error: null,
+    }));
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'blocked_users') return { select: () => ({ eq: eqMock }) };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(fetchBlockedOwnerIds()).resolves.toEqual(['blocked-1', 'blocked-2']);
+    expect(eqMock).toHaveBeenCalledWith('blocker_owner_user_id', 'patient-user-id');
+  });
+
+  it('blocking a comment author also files a report for the offending comment', async () => {
+    const blockUpsertMock = vi.fn(async () => ({ error: null }));
+    const reportInsertMock = vi.fn(async () => ({ error: null }));
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'blocked_users') return { upsert: blockUpsertMock };
+      if (table === 'content_reports') return { insert: reportInsertMock };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await blockCommentAuthor('blocked-user-id', 'post-1', 'comment-1');
+
+    expect(blockUpsertMock).toHaveBeenCalledWith(
+      { blocked_owner_user_id: 'blocked-user-id', blocker_owner_user_id: 'patient-user-id' },
+      { ignoreDuplicates: true, onConflict: 'blocker_owner_user_id,blocked_owner_user_id' },
+    );
+    expect(reportInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        comment_id: 'comment-1',
+        post_id: 'post-1',
+        reason: 'harassment',
+        target_type: 'comment',
+      }),
+    );
   });
 });
 

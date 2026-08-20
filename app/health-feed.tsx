@@ -48,6 +48,7 @@ import { VerifiedBadge } from '../src/components/VerifiedBadge';
 import { dashboardFonts, dashboardLayout } from '../src/dashboardTheme';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import {
+  blockCommentAuthor,
   createHealthPostComment,
   deleteHealthPostComment,
   fetchHealthFeed,
@@ -55,10 +56,13 @@ import {
   shuffleHealthFeedPosts,
   fetchHealthPostComments,
   recordHealthPostView,
+  reportHealthPost,
+  reportHealthPostComment,
   setHealthDoctorFollowed,
   setHealthPostLike,
   setHealthPostSaved,
   subscribeToPublishedHealthPosts,
+  type ContentReportReason,
   type HealthFeedComment,
   type HealthFeedDoctor,
   type HealthFeedPost,
@@ -97,6 +101,11 @@ export default function HealthFeedScreen() {
   const [followedDoctors, setFollowedDoctors] = useState<Set<string>>(() => new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
   const [commentPost, setCommentPost] = useState<HealthFeedPost | null>(null);
+  const [reportTarget, setReportTarget] = useState<
+    | { postId: string; type: 'post' }
+    | { commentId: string; postId: string; type: 'comment' }
+    | null
+  >(null);
   const [patientName, setPatientName] = useState('Patient');
   const [patientAvatarUrl, setPatientAvatarUrl] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -250,6 +259,22 @@ export default function HealthFeedScreen() {
     }
   };
 
+  const submitReport = async (reason: ContentReportReason, description: string) => {
+    if (!reportTarget) return;
+    try {
+      if (reportTarget.type === 'post') {
+        await reportHealthPost(reportTarget.postId, reason, description);
+      } else {
+        await reportHealthPostComment(reportTarget.postId, reportTarget.commentId, reason, description);
+      }
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      setReportTarget(null);
+      setActionError('Thanks — our team will review this within 24 hours.');
+    } catch (reportError) {
+      setActionError(reportError instanceof Error ? reportError.message : 'Unable to submit your report.');
+    }
+  };
+
   const likePost = async (postId: string, desiredState?: boolean) => {
     if (pendingLikesRef.current.has(postId)) return;
     const wasLiked = likedIds.has(postId);
@@ -339,6 +364,7 @@ export default function HealthFeedScreen() {
               onFollow={() => void followDoctor(item.doctor_phone)}
               onLike={() => void likePost(item.id)}
               onSave={() => void savePost(item.id)}
+              onReport={() => setReportTarget({ postId: item.id, type: 'post' })}
               onShare={() => void sharePost(item)}
               post={item}
               saved={savedIds.has(item.id)}
@@ -368,6 +394,7 @@ export default function HealthFeedScreen() {
               onFollow={() => void followDoctor(item.doctor_phone)}
               onLike={() => void likePost(item.id)}
               onSave={() => void savePost(item.id)}
+              onReport={() => setReportTarget({ postId: item.id, type: 'post' })}
               onShare={() => void sharePost(item)}
               post={item}
               saved={savedIds.has(item.id)}
@@ -404,7 +431,13 @@ export default function HealthFeedScreen() {
         authorName={patientName}
         onClose={() => setCommentPost(null)}
         onCommentCountChanged={(postId, count) => updatePostCount(setPosts, postId, 'comments_count', count)}
+        onReportComment={(postId, commentId) => setReportTarget({ commentId, postId, type: 'comment' })}
         post={commentPost}
+      />
+      <ReportSheet
+        onClose={() => setReportTarget(null)}
+        onSubmit={submitReport}
+        visible={Boolean(reportTarget)}
       />
       <BottomNav activeTab="healthFeed" bottomOffset={insets.bottom + dashboardLayout.navBottomGap} onSelectTab={handleSelectTab} overMedia />
     </SafeAreaView>
@@ -443,7 +476,7 @@ function ReelViewerHeader({ insetTop, onBack, title }: { insetTop: number; onBac
   );
 }
 
-function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, onFollow, onLike, onSave, onShare, post, saved }: {
+function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, onFollow, onLike, onReport, onSave, onShare, post, saved }: {
   active: boolean;
   followed: boolean;
   height: number;
@@ -452,6 +485,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   onDoubleLike: () => void;
   onFollow: () => void;
   onLike: () => void;
+  onReport: () => void;
   onSave: () => void;
   onShare: () => void;
   post: HealthFeedPost;
@@ -633,6 +667,7 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
         <FeedAction count={post.comments_count} icon="chatbubble-outline" label="Comments" onPress={onComments} />
         <FeedAction active={saved} count={post.saves_count} icon={saved ? 'bookmark' : 'bookmark-outline'} label="Save" onPress={onSave} />
         <FeedAction icon="paper-plane-outline" label="Share" onPress={onShare} />
+        <FeedAction icon="flag-outline" label="Report" onPress={onReport} />
       </View>
     </View>
   );
@@ -810,11 +845,12 @@ function FeedAction({ active = false, animatedStyle, count, icon, label, onPress
   );
 }
 
-function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChanged, post }: {
+function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChanged, onReportComment, post }: {
   authorAvatarUrl: string | null;
   authorName: string;
   onClose: () => void;
   onCommentCountChanged: (postId: string, count: number) => void;
+  onReportComment: (postId: string, commentId: string) => void;
   post: HealthFeedPost | null;
 }) {
   const insets = useSafeAreaInsets();
@@ -992,6 +1028,47 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     }
   };
 
+  const blockAuthor = async (comment: HealthFeedComment) => {
+    if (!post) return;
+    try {
+      await blockCommentAuthor(comment.owner_user_id, post.id, comment.id);
+      // Hide instantly — Apple's UGC guideline requires blocking to remove
+      // the author's content from the reporting user's feed right away.
+      setComments((current) =>
+        current.filter((item) => item.owner_user_id !== comment.owner_user_id),
+      );
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    } catch (blockError) {
+      setError(blockError instanceof Error ? blockError.message : 'Unable to block this user.');
+    }
+  };
+
+  const openCommentOptions = (comment: HealthFeedComment) => {
+    if (!post) return;
+    Alert.alert(
+      comment.author_name,
+      undefined,
+      [
+        { style: 'cancel', text: 'Cancel' },
+        { onPress: () => onReportComment(post.id, comment.id), text: 'Report comment' },
+        {
+          onPress: () => {
+            Alert.alert(
+              `Block ${comment.author_name}?`,
+              "You won't see their comments again, and this comment is reported to our team.",
+              [
+                { style: 'cancel', text: 'Cancel' },
+                { onPress: () => void blockAuthor(comment), style: 'destructive', text: 'Block' },
+              ],
+            );
+          },
+          style: 'destructive',
+          text: 'Block user',
+        },
+      ],
+    );
+  };
+
   const confirmCommentDeletion = (comment: HealthFeedComment) => {
     if (process.env.EXPO_OS === 'web') {
       void removeComment(comment);
@@ -1071,6 +1148,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                       comment={item}
                       deleting={deletingIds.has(item.id)}
                       onDelete={item.is_owner ? () => confirmCommentDeletion(item) : undefined}
+                      onOptions={item.is_owner ? undefined : () => openCommentOptions(item)}
                     />
                   )}
                   showsVerticalScrollIndicator={false}
@@ -1154,11 +1232,85 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   );
 }
 
-function CommentRow({ avatarUrl, comment, deleting, onDelete }: {
+const REPORT_REASONS: Array<{ label: string; value: ContentReportReason }> = [
+  { label: 'Objectionable content', value: 'objectionable' },
+  { label: 'Harassment or bullying', value: 'harassment' },
+  { label: 'Spam', value: 'spam' },
+  { label: 'Misleading medical information', value: 'misleading_medical' },
+  { label: 'Violence', value: 'violence' },
+  { label: 'Something else', value: 'other' },
+];
+
+function ReportSheet({ onClose, onSubmit, visible }: {
+  onClose: () => void;
+  onSubmit: (reason: ContentReportReason, description: string) => void;
+  visible: boolean;
+}) {
+  const insets = useSafeAreaInsets();
+  const [reason, setReason] = useState<ContentReportReason>('objectionable');
+  const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      setReason('objectionable');
+      setDescription('');
+    }
+  }, [visible]);
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} presentationStyle="overFullScreen" transparent visible={visible}>
+      <View style={styles.reportModal}>
+        <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.reportBackdrop} />
+        <View style={[styles.reportSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.commentHandle} />
+          <Text style={styles.reportHeading}>Report content</Text>
+          <Text style={styles.reportSubheading}>
+            Tell us what's wrong — our team reviews reports within 24 hours.
+          </Text>
+          {REPORT_REASONS.map((item) => (
+            <Pressable
+              accessibilityLabel={item.label}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: reason === item.value }}
+              key={item.value}
+              onPress={() => setReason(item.value)}
+              style={styles.reportReasonRow}
+            >
+              <View style={[styles.reportRadio, reason === item.value && styles.reportRadioSelected]}>
+                {reason === item.value ? <View style={styles.reportRadioDot} /> : null}
+              </View>
+              <Text style={styles.reportReasonLabel}>{item.label}</Text>
+            </Pressable>
+          ))}
+          <TextInput
+            maxLength={500}
+            multiline
+            onChangeText={setDescription}
+            placeholder="Add details (optional)"
+            placeholderTextColor="#87919D"
+            style={styles.reportDescriptionInput}
+            value={description}
+          />
+          <Pressable
+            accessibilityLabel="Submit report"
+            accessibilityRole="button"
+            onPress={() => onSubmit(reason, description)}
+            style={styles.reportSubmitButton}
+          >
+            <Text style={styles.reportSubmitButtonText}>Submit report</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function CommentRow({ avatarUrl, comment, deleting, onDelete, onOptions }: {
   avatarUrl: string | null;
   comment: HealthFeedComment;
   deleting: boolean;
   onDelete?: () => void;
+  onOptions?: () => void;
 }) {
   return (
     <View style={styles.commentRow}>
@@ -1179,6 +1331,17 @@ function CommentRow({ avatarUrl, comment, deleting, onDelete }: {
               {deleting
                 ? <ActivityIndicator color="#D92D3F" size="small" />
                 : <Ionicons color="#D92D3F" name="close" size={18} />}
+            </Pressable>
+          ) : null}
+          {onOptions ? (
+            <Pressable
+              accessibilityLabel={`Report or block ${comment.author_name}`}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onOptions}
+              style={styles.commentDelete}
+            >
+              <Ionicons color="#87919D" name="ellipsis-horizontal" size={18} />
             </Pressable>
           ) : null}
         </View>
@@ -1392,6 +1555,19 @@ const styles = StyleSheet.create({
   commentStateText: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   commentStateTitle: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 15 },
   commentTime: { color: '#87919D', fontFamily: dashboardFonts.medium, fontSize: 10, fontVariant: ['tabular-nums'] },
+  reportBackdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  reportDescriptionInput: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, color: '#18202A', fontFamily: dashboardFonts.medium, fontSize: 13, marginTop: 10, minHeight: 64, padding: 12, textAlignVertical: 'top' },
+  reportHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18, marginTop: 6 },
+  reportModal: { flex: 1, justifyContent: 'flex-end' },
+  reportReasonLabel: { color: '#18202A', flex: 1, fontFamily: dashboardFonts.medium, fontSize: 14 },
+  reportReasonRow: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 9 },
+  reportRadio: { alignItems: 'center', borderColor: '#CBD1D6', borderRadius: 10, borderWidth: 1.5, height: 20, justifyContent: 'center', width: 20 },
+  reportRadioDot: { backgroundColor: '#2E7EBC', borderRadius: 5, height: 10, width: 10 },
+  reportRadioSelected: { borderColor: '#2E7EBC' },
+  reportSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, gap: 4, paddingHorizontal: 20, paddingTop: 10 },
+  reportSubheading: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 17, marginBottom: 4 },
+  reportSubmitButton: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 16, height: 50, justifyContent: 'center', marginTop: 14 },
+  reportSubmitButtonText: { color: '#FFFFFF', fontFamily: dashboardFonts.bold, fontSize: 15 },
   doctorName: { color: '#FFFFFF', flexShrink: 1, fontFamily: dashboardFonts.bold, fontSize: 15 },
   doctorNameRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
   doctorRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
