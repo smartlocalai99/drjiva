@@ -268,7 +268,7 @@ export default function HealthFeedScreen() {
       await reportHealthPostComment(reportTarget.postId, reportTarget.commentId, reason, description);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       setReportTarget(null);
-      setActionError('Thanks — our team will review this within 24 hours.');
+      Alert.alert('Reported', "Thanks — we'll review this within 24 hours.");
     } catch (reportError) {
       Alert.alert(
         'Unable to submit your report',
