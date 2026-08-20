@@ -106,9 +106,6 @@ export default function HealthFeedScreen() {
   const [followedDoctors, setFollowedDoctors] = useState<Set<string>>(() => new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
   const [commentPost, setCommentPost] = useState<HealthFeedPost | null>(null);
-  const [reportTarget, setReportTarget] = useState<
-    { commentId: string; postId: string } | null
-  >(null);
   const [patientName, setPatientName] = useState('Patient');
   const [patientAvatarUrl, setPatientAvatarUrl] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -259,21 +256,6 @@ export default function HealthFeedScreen() {
       });
     } catch (shareError) {
       setActionError(shareError instanceof Error ? shareError.message : 'Unable to open sharing.');
-    }
-  };
-
-  const submitReport = async (reason: ContentReportReason, description: string) => {
-    if (!reportTarget) return;
-    try {
-      await reportHealthPostComment(reportTarget.postId, reportTarget.commentId, reason, description);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      setReportTarget(null);
-      Alert.alert('Reported', "Thanks — we'll review this within 24 hours.");
-    } catch (reportError) {
-      Alert.alert(
-        'Unable to submit your report',
-        reportError instanceof Error ? reportError.message : 'Please try again.',
-      );
     }
   };
 
@@ -431,13 +413,7 @@ export default function HealthFeedScreen() {
         authorName={patientName}
         onClose={() => setCommentPost(null)}
         onCommentCountChanged={(postId, count) => updatePostCount(setPosts, postId, 'comments_count', count)}
-        onReportComment={(postId, commentId) => setReportTarget({ commentId, postId })}
         post={commentPost}
-      />
-      <ReportSheet
-        onClose={() => setReportTarget(null)}
-        onSubmit={submitReport}
-        visible={Boolean(reportTarget)}
       />
       <BottomNav activeTab="healthFeed" bottomOffset={insets.bottom + dashboardLayout.navBottomGap} onSelectTab={handleSelectTab} overMedia />
     </SafeAreaView>
@@ -843,12 +819,11 @@ function FeedAction({ active = false, animatedStyle, count, icon, label, onPress
   );
 }
 
-function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChanged, onReportComment, post }: {
+function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChanged, post }: {
   authorAvatarUrl: string | null;
   authorName: string;
   onClose: () => void;
   onCommentCountChanged: (postId: string, count: number) => void;
-  onReportComment: (postId: string, commentId: string) => void;
   post: HealthFeedPost | null;
 }) {
   const insets = useSafeAreaInsets();
@@ -860,6 +835,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ commentId: string } | null>(null);
   const [emojiBursts, setEmojiBursts] = useState<Array<{ emoji: string; id: number }>>([]);
   const burstIdRef = useRef(0);
   const sheetTranslateY = useSharedValue(0);
@@ -1084,6 +1060,21 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     }
   };
 
+  const submitReport = async (reason: ContentReportReason, description: string) => {
+    if (!post || !reportTarget) return;
+    try {
+      await reportHealthPostComment(post.id, reportTarget.commentId, reason, description);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      setReportTarget(null);
+      Alert.alert('Reported', "Thanks — we'll review this within 24 hours.");
+    } catch (reportError) {
+      Alert.alert(
+        'Unable to submit your report',
+        reportError instanceof Error ? reportError.message : 'Please try again.',
+      );
+    }
+  };
+
   const openCommentOptions = (comment: HealthFeedComment) => {
     if (!post) return;
     Alert.alert(
@@ -1091,7 +1082,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       undefined,
       [
         { style: 'cancel', text: 'Cancel' },
-        { onPress: () => onReportComment(post.id, comment.id), text: 'Report comment' },
+        { onPress: () => setReportTarget({ commentId: comment.id }), text: 'Report comment' },
         {
           onPress: () => {
             Alert.alert(
@@ -1269,6 +1260,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
           </Animated.View>
         </KeyboardAvoidingView>
         <EmojiBurstOverlay bursts={emojiBursts} onDone={removeEmojiBurst} travelDistance={height * 0.72} />
+        <ReportSheet
+          onClose={() => setReportTarget(null)}
+          onSubmit={submitReport}
+          visible={Boolean(reportTarget)}
+        />
       </View>
     </Modal>
   );
@@ -1299,51 +1295,55 @@ function ReportSheet({ onClose, onSubmit, visible }: {
     }
   }, [visible]);
 
+  if (!visible) return null;
+
+  // Rendered inline inside CommentSheet's own Modal rather than as a
+  // second <Modal> — two native Modals stacked at once is unreliable
+  // (the second one can silently fail to present on top of the first),
+  // which is why tapping "Report comment" used to appear to do nothing.
   return (
-    <Modal animationType="slide" onRequestClose={onClose} presentationStyle="overFullScreen" transparent visible={visible}>
-      <View style={styles.reportModal}>
-        <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.reportBackdrop} />
-        <View style={[styles.reportSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.commentHandle} />
-          <Text style={styles.reportHeading}>Report content</Text>
-          <Text style={styles.reportSubheading}>
-            Tell us what's wrong — our team reviews reports within 24 hours.
-          </Text>
-          {REPORT_REASONS.map((item) => (
-            <Pressable
-              accessibilityLabel={item.label}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: reason === item.value }}
-              key={item.value}
-              onPress={() => setReason(item.value)}
-              style={styles.reportReasonRow}
-            >
-              <View style={[styles.reportRadio, reason === item.value && styles.reportRadioSelected]}>
-                {reason === item.value ? <View style={styles.reportRadioDot} /> : null}
-              </View>
-              <Text style={styles.reportReasonLabel}>{item.label}</Text>
-            </Pressable>
-          ))}
-          <TextInput
-            maxLength={500}
-            multiline
-            onChangeText={setDescription}
-            placeholder="Add details (optional)"
-            placeholderTextColor="#87919D"
-            style={styles.reportDescriptionInput}
-            value={description}
-          />
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={styles.reportModal}>
+      <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.reportBackdrop} />
+      <View style={[styles.reportSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={styles.commentHandle} />
+        <Text style={styles.reportHeading}>Report content</Text>
+        <Text style={styles.reportSubheading}>
+          Tell us what's wrong — our team reviews reports within 24 hours.
+        </Text>
+        {REPORT_REASONS.map((item) => (
           <Pressable
-            accessibilityLabel="Submit report"
-            accessibilityRole="button"
-            onPress={() => onSubmit(reason, description)}
-            style={styles.reportSubmitButton}
+            accessibilityLabel={item.label}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: reason === item.value }}
+            key={item.value}
+            onPress={() => setReason(item.value)}
+            style={styles.reportReasonRow}
           >
-            <Text style={styles.reportSubmitButtonText}>Submit report</Text>
+            <View style={[styles.reportRadio, reason === item.value && styles.reportRadioSelected]}>
+              {reason === item.value ? <View style={styles.reportRadioDot} /> : null}
+            </View>
+            <Text style={styles.reportReasonLabel}>{item.label}</Text>
           </Pressable>
-        </View>
+        ))}
+        <TextInput
+          maxLength={500}
+          multiline
+          onChangeText={setDescription}
+          placeholder="Add details (optional)"
+          placeholderTextColor="#87919D"
+          style={styles.reportDescriptionInput}
+          value={description}
+        />
+        <Pressable
+          accessibilityLabel="Submit report"
+          accessibilityRole="button"
+          onPress={() => onSubmit(reason, description)}
+          style={styles.reportSubmitButton}
+        >
+          <Text style={styles.reportSubmitButtonText}>Submit report</Text>
+        </Pressable>
       </View>
-    </Modal>
+    </Animated.View>
   );
 }
 
@@ -1666,7 +1666,7 @@ const styles = StyleSheet.create({
   reportBackdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   reportDescriptionInput: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, color: '#18202A', fontFamily: dashboardFonts.medium, fontSize: 13, marginTop: 10, minHeight: 64, padding: 12, textAlignVertical: 'top' },
   reportHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18, marginTop: 6 },
-  reportModal: { flex: 1, justifyContent: 'flex-end' },
+  reportModal: { bottom: 0, justifyContent: 'flex-end', left: 0, position: 'absolute', right: 0, top: 0, zIndex: 20 },
   reportReasonLabel: { color: '#18202A', flex: 1, fontFamily: dashboardFonts.medium, fontSize: 14 },
   reportReasonRow: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 9 },
   reportRadio: { alignItems: 'center', borderColor: '#CBD1D6', borderRadius: 10, borderWidth: 1.5, height: 20, justifyContent: 'center', width: 20 },
