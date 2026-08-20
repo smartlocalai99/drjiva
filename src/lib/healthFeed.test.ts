@@ -31,7 +31,6 @@ import {
   fetchHealthPostComments,
   fetchHealthFeedViewerState,
   recordHealthPostView,
-  reportHealthPost,
   reportHealthPostComment,
   setHealthPostLike,
   shuffleHealthFeedPosts,
@@ -272,24 +271,6 @@ describe('Health Feed interactions', () => {
 
     expect(comments).toHaveLength(1);
     expect(comments[0]?.id).toBe('comment-kept');
-  });
-
-  it('files a report tied to the reporting patient', async () => {
-    const insertMock = vi.fn(async () => ({ error: null }));
-    fromMock.mockImplementation((table: string) => {
-      if (table === 'content_reports') return { insert: insertMock };
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await reportHealthPost('post-1', 'spam', 'Looks like an ad');
-
-    expect(insertMock).toHaveBeenCalledWith({
-      description: 'Looks like an ad',
-      post_id: 'post-1',
-      reason: 'spam',
-      reporter_owner_user_id: 'patient-user-id',
-      target_type: 'post',
-    });
   });
 
   it('reports a specific comment', async () => {

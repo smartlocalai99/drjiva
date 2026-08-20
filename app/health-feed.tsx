@@ -56,7 +56,6 @@ import {
   shuffleHealthFeedPosts,
   fetchHealthPostComments,
   recordHealthPostView,
-  reportHealthPost,
   reportHealthPostComment,
   setHealthDoctorFollowed,
   setHealthPostLike,
@@ -102,9 +101,7 @@ export default function HealthFeedScreen() {
   const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
   const [commentPost, setCommentPost] = useState<HealthFeedPost | null>(null);
   const [reportTarget, setReportTarget] = useState<
-    | { postId: string; type: 'post' }
-    | { commentId: string; postId: string; type: 'comment' }
-    | null
+    { commentId: string; postId: string } | null
   >(null);
   const [patientName, setPatientName] = useState('Patient');
   const [patientAvatarUrl, setPatientAvatarUrl] = useState<string | null>(null);
@@ -262,11 +259,7 @@ export default function HealthFeedScreen() {
   const submitReport = async (reason: ContentReportReason, description: string) => {
     if (!reportTarget) return;
     try {
-      if (reportTarget.type === 'post') {
-        await reportHealthPost(reportTarget.postId, reason, description);
-      } else {
-        await reportHealthPostComment(reportTarget.postId, reportTarget.commentId, reason, description);
-      }
+      await reportHealthPostComment(reportTarget.postId, reportTarget.commentId, reason, description);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       setReportTarget(null);
       setActionError('Thanks — our team will review this within 24 hours.');
@@ -364,7 +357,6 @@ export default function HealthFeedScreen() {
               onFollow={() => void followDoctor(item.doctor_phone)}
               onLike={() => void likePost(item.id)}
               onSave={() => void savePost(item.id)}
-              onReport={() => setReportTarget({ postId: item.id, type: 'post' })}
               onShare={() => void sharePost(item)}
               post={item}
               saved={savedIds.has(item.id)}
@@ -394,7 +386,6 @@ export default function HealthFeedScreen() {
               onFollow={() => void followDoctor(item.doctor_phone)}
               onLike={() => void likePost(item.id)}
               onSave={() => void savePost(item.id)}
-              onReport={() => setReportTarget({ postId: item.id, type: 'post' })}
               onShare={() => void sharePost(item)}
               post={item}
               saved={savedIds.has(item.id)}
@@ -431,7 +422,7 @@ export default function HealthFeedScreen() {
         authorName={patientName}
         onClose={() => setCommentPost(null)}
         onCommentCountChanged={(postId, count) => updatePostCount(setPosts, postId, 'comments_count', count)}
-        onReportComment={(postId, commentId) => setReportTarget({ commentId, postId, type: 'comment' })}
+        onReportComment={(postId, commentId) => setReportTarget({ commentId, postId })}
         post={commentPost}
       />
       <ReportSheet
@@ -476,7 +467,7 @@ function ReelViewerHeader({ insetTop, onBack, title }: { insetTop: number; onBac
   );
 }
 
-function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, onFollow, onLike, onReport, onSave, onShare, post, saved }: {
+function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, onFollow, onLike, onSave, onShare, post, saved }: {
   active: boolean;
   followed: boolean;
   height: number;
@@ -485,7 +476,6 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   onDoubleLike: () => void;
   onFollow: () => void;
   onLike: () => void;
-  onReport: () => void;
   onSave: () => void;
   onShare: () => void;
   post: HealthFeedPost;
@@ -667,7 +657,6 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
         <FeedAction count={post.comments_count} icon="chatbubble-outline" label="Comments" onPress={onComments} />
         <FeedAction active={saved} count={post.saves_count} icon={saved ? 'bookmark' : 'bookmark-outline'} label="Save" onPress={onSave} />
         <FeedAction icon="paper-plane-outline" label="Share" onPress={onShare} />
-        <FeedAction icon="flag-outline" label="Report" onPress={onReport} />
       </View>
     </View>
   );

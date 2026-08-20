@@ -283,22 +283,6 @@ export async function deleteHealthPostComment(
   return readPostCount(postId, 'comments_count');
 }
 
-export async function reportHealthPost(
-  postId: string,
-  reason: ContentReportReason,
-  description?: string,
-): Promise<void> {
-  const ownerUserId = await ensureSecureReportSession();
-  const { error } = await supabase.from('content_reports').insert({
-    description: description?.trim().slice(0, 500) || null,
-    post_id: postId,
-    reason,
-    reporter_owner_user_id: ownerUserId,
-    target_type: 'post',
-  });
-  if (error) throw new Error('Unable to submit your report. Please try again.');
-}
-
 export async function reportHealthPostComment(
   postId: string,
   commentId: string,
