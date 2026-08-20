@@ -81,6 +81,12 @@ type FeedTab = 'forYou' | 'following' | 'saved';
 
 const DOUBLE_TAP_HEART_SIZE = 96;
 const COMMENT_EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'] as const;
+const EMOJI_PATTERN = /\p{Extended_Pictographic}/gu;
+const EMOJI_BURST_COUNT = 8;
+
+function extractEmojis(text: string): string[] {
+  return text.match(EMOJI_PATTERN) || [];
+}
 
 type DoctorProfile = { doctor: HealthFeedDoctor; posts: HealthFeedPost[] };
 type ReelViewer = { initialIndex: number; key: string; posts: HealthFeedPost[]; title: string };
@@ -851,6 +857,8 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [emojiBursts, setEmojiBursts] = useState<Array<{ emoji: string; id: number }>>([]);
+  const burstIdRef = useRef(0);
   const sheetTranslateY = useSharedValue(0);
   const emptyStateDragDismissedRef = useRef(false);
   const previewHeight = keyboardVisible
@@ -875,6 +883,12 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       setKeyboardVisible(false);
       return;
     }
+
+    // Modal uses animationType="none" so this owns the whole entrance —
+    // it used to rely on the native slide, which fought with the manual
+    // drag-to-dismiss transform and made the gesture feel janky.
+    sheetTranslateY.value = height;
+    sheetTranslateY.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
 
     let cancelled = false;
     setLoading(true);
@@ -927,11 +941,15 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
         sheetTranslateY.value = Math.max(0, gesture.dy);
       },
       onPanResponderRelease: (_, gesture) => {
-        const shouldDismiss = gesture.dy > 1 || gesture.vy > 0.05;
+        const shouldDismiss = gesture.dy > 100 || gesture.vy > 0.6;
         if (shouldDismiss) {
-          sheetTranslateY.value = withTiming(height, { duration: 190 }, (finished) => {
-            if (finished) runOnJS(closeComments)();
-          });
+          sheetTranslateY.value = withTiming(
+            height,
+            { duration: 220, easing: Easing.out(Easing.cubic) },
+            (finished) => {
+              if (finished) runOnJS(closeComments)();
+            },
+          );
           return;
         }
         sheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 260 });
@@ -954,9 +972,13 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     onPanResponderMove: (_, gesture) => {
       if (gesture.dy <= 0 || emptyStateDragDismissedRef.current) return;
       emptyStateDragDismissedRef.current = true;
-      sheetTranslateY.value = withTiming(height, { duration: 190 }, (finished) => {
-        if (finished) runOnJS(closeComments)();
-      });
+      sheetTranslateY.value = withTiming(
+        height,
+        { duration: 220, easing: Easing.out(Easing.cubic) },
+        (finished) => {
+          if (finished) runOnJS(closeComments)();
+        },
+      );
     },
     onPanResponderRelease: () => {
       if (!emptyStateDragDismissedRef.current) {
@@ -980,6 +1002,23 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     void Haptics.selectionAsync().catch(() => undefined);
   };
 
+  // A comment with an emoji in it launches a burst of that emoji floating
+  // up over the reel preview, like a live-stream reaction — pure delight,
+  // no functional purpose.
+  const launchEmojiBurst = (commentText: string) => {
+    const emojis = extractEmojis(commentText);
+    if (emojis.length === 0) return;
+    const burst = Array.from({ length: EMOJI_BURST_COUNT }, (_, index) => ({
+      emoji: emojis[index % emojis.length]!,
+      id: burstIdRef.current++,
+    }));
+    setEmojiBursts((current) => [...current, ...burst]);
+  };
+
+  const removeEmojiBurst = (id: number) => {
+    setEmojiBursts((current) => current.filter((item) => item.id !== id));
+  };
+
   const submit = async () => {
     if (!post || !draft.trim() || submitting) return;
     setSubmitting(true);
@@ -987,6 +1026,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     try {
       const result = await createHealthPostComment(post.id, authorName, draft);
       setComments((current) => [...current, result.comment]);
+      launchEmojiBurst(draft);
       setDraft('');
       onCommentCountChanged(post.id, result.count);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -1074,7 +1114,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   };
 
   return (
-    <Modal animationType="slide" onRequestClose={closeComments} presentationStyle="overFullScreen" visible={Boolean(post)}>
+    <Modal animationType="none" onRequestClose={closeComments} presentationStyle="overFullScreen" visible={Boolean(post)}>
       <View style={styles.commentModal}>
         <KeyboardAvoidingView behavior="height" keyboardVerticalOffset={0} style={styles.commentKeyboard}>
           {post ? (
@@ -1093,6 +1133,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                   )
                   : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={160} />}
               </View>
+              <EmojiBurstOverlay bursts={emojiBursts} onDone={removeEmojiBurst} />
             </Animated.View>
           ) : null}
           <Animated.View {...sheetDragResponder.panHandlers} style={[styles.commentSheet, sheetDragStyle]}>
@@ -1340,6 +1381,58 @@ function CommentRow({ avatarUrl, comment, deleting, onDelete, onOptions }: {
   );
 }
 
+function EmojiBurstOverlay({ bursts, onDone }: {
+  bursts: Array<{ emoji: string; id: number }>;
+  onDone: (id: number) => void;
+}) {
+  return (
+    <View pointerEvents="none" style={styles.emojiBurstOverlay}>
+      {bursts.map((item) => (
+        <FloatingEmoji emoji={item.emoji} key={item.id} onDone={() => onDone(item.id)} />
+      ))}
+    </View>
+  );
+}
+
+function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
+  const progress = useSharedValue(0);
+  const driftDirection = useRef(Math.random() * 2 - 1).current;
+  const startLeftPercent = useRef(12 + Math.random() * 76).current;
+  const startDelay = useRef(Math.random() * 260).current;
+  const travelDuration = useRef(1300 + Math.random() * 600).current;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      progress.value = withTiming(
+        1,
+        { duration: travelDuration, easing: Easing.out(Easing.quad) },
+        (finished) => {
+          if (finished) runOnJS(onDone)();
+        },
+      );
+    }, startDelay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- animation params are randomized once per particle, intentionally not reactive
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const travelY = interpolate(progress.value, [0, 1], [0, -230]);
+    const driftX = interpolate(progress.value, [0, 0.5, 1], [0, driftDirection * 26, driftDirection * 54]);
+    const opacity = interpolate(progress.value, [0, 0.12, 0.75, 1], [0, 1, 1, 0]);
+    const scale = interpolate(progress.value, [0, 0.18, 1], [0.4, 1.2, 0.85]);
+    return {
+      opacity,
+      transform: [{ translateY: travelY }, { translateX: driftX }, { scale }],
+    };
+  });
+
+  return (
+    <Animated.Text style={[styles.floatingEmoji, { left: `${startLeftPercent}%` }, animatedStyle]}>
+      {emoji}
+    </Animated.Text>
+  );
+}
+
 function CommentAvatar({ name, uri }: { name: string; uri: string | null }) {
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -1477,7 +1570,9 @@ function formatRelativeTime(value: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  return `${days}d`;
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w`;
 }
 
 function LoadingState() {
@@ -1536,6 +1631,8 @@ const styles = StyleSheet.create({
   commentPreview: { alignItems: 'center', backgroundColor: '#050607', justifyContent: 'center', paddingBottom: 10 },
   commentPreviewMedia: { backgroundColor: '#111416', borderCurve: 'continuous', borderRadius: 18, overflow: 'hidden' },
   commentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
+  emojiBurstOverlay: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  floatingEmoji: { bottom: 12, fontSize: 30, position: 'absolute' },
   commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   commentSendDisabled: { backgroundColor: '#AFBAC3' },
   commentSendSlot: { bottom: 4, position: 'absolute', right: 4, zIndex: 2 },
