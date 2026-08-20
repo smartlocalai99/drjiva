@@ -10,7 +10,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuthScaffold } from '../src/components/AuthScaffold';
 import { BrandHeader } from '../src/components/BrandHeader';
-import { LoginLegalLinks } from '../src/components/login-legal-links';
 import {
   isValidIndianPhone,
   PhoneInput,
@@ -240,8 +239,6 @@ export default function LoginScreen() {
           </Text>
         </Pressable>
       </View>
-
-      <LoginLegalLinks />
     </AuthScaffold>
   );
 }

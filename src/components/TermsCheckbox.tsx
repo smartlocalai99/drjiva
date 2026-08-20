@@ -54,8 +54,6 @@ export function TermsCheckbox({
         >
           Privacy Policy
         </Text>
-        , including no tolerance for objectionable content or abusive
-        behaviour on the Health Feed.
       </Text>
     </Pressable>
   );
