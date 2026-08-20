@@ -32,7 +32,6 @@ import Animated, {
   FadeIn,
   FadeOut,
   interpolate,
-  LinearTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -1122,10 +1121,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
         <KeyboardAvoidingView behavior="height" keyboardVerticalOffset={0} style={styles.commentKeyboard}>
           {post ? (
             <Animated.View
-              entering={FadeIn.duration(180)}
-              exiting={FadeOut.duration(120)}
-              layout={LinearTransition.duration(180)}
-              style={[styles.commentPreview, { height: previewHeight, paddingTop: insets.top + 8 }]}
+              style={[styles.commentPreview, { height: previewHeight, paddingTop: insets.top + 8 }, sheetDragStyle]}
             >
               <View style={[styles.commentPreviewMedia, { height: previewMediaHeight, width: previewMediaWidth }]}>
                 {post.media_type === 'video'
@@ -1663,7 +1659,7 @@ const styles = StyleSheet.create({
   commentStateText: { color: '#6E7985', fontFamily: dashboardFonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   commentStateTitle: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 15 },
   commentTime: { color: '#87919D', fontFamily: dashboardFonts.medium, fontSize: 10, fontVariant: ['tabular-nums'] },
-  reportBackdrop: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  reportBackdrop: { backgroundColor: 'rgba(5,6,7,0.55)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   reportDescriptionInput: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 14, color: '#18202A', fontFamily: dashboardFonts.medium, fontSize: 13, marginTop: 10, minHeight: 64, padding: 12, textAlignVertical: 'top' },
   reportHeading: { color: '#18202A', fontFamily: dashboardFonts.bold, fontSize: 18, marginTop: 6 },
   reportModal: { bottom: 0, justifyContent: 'flex-end', left: 0, position: 'absolute', right: 0, top: 0, zIndex: 20 },
