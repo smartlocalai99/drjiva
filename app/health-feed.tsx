@@ -853,7 +853,11 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
   useEffect(() => {
     if (!post) {
-      sheetTranslateY.value = 0;
+      // Deliberately not resetting sheetTranslateY here — it's already
+      // sitting off-screen (at `height`) from whatever closed it, and the
+      // Modal's native hide can lag a frame behind this state update.
+      // Snapping it back to 0 immediately caused a visible flash of the
+      // white sheet popping back into view right as it was closing.
       setComments([]);
       setDraft('');
       setDeletingIds(new Set());
@@ -900,6 +904,22 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
     Keyboard.dismiss();
     onClose();
   }, [onClose]);
+
+  // Tapping the handle (rather than dragging) used to close instantly with
+  // no exit motion at all — jarring next to the animated drag-dismiss.
+  // This makes every way of closing (tap, drag, back button) animate the
+  // same way.
+  const dismissSheet = useCallback(() => {
+    Keyboard.dismiss();
+    cancelAnimation(sheetTranslateY);
+    sheetTranslateY.value = withTiming(
+      height,
+      { duration: 220, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(closeComments)();
+      },
+    );
+  }, [closeComments, height, sheetTranslateY]);
 
   const sheetDragStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
@@ -1116,7 +1136,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   };
 
   return (
-    <Modal animationType="none" onRequestClose={closeComments} presentationStyle="overFullScreen" visible={Boolean(post)}>
+    <Modal animationType="none" onRequestClose={dismissSheet} presentationStyle="overFullScreen" visible={Boolean(post)}>
       <View style={styles.commentModal}>
         <KeyboardAvoidingView behavior="height" keyboardVerticalOffset={0} style={styles.commentKeyboard}>
           {post ? (
@@ -1138,7 +1158,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
             <View
               accessibilityLabel="Comments sheet. Swipe down to close."
               accessible
-              onAccessibilityEscape={closeComments}
+              onAccessibilityEscape={dismissSheet}
               style={styles.commentDragArea}
             >
               <Pressable
@@ -1146,8 +1166,8 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                 accessibilityRole="button"
                 delayLongPress={120}
                 hitSlop={12}
-                onLongPress={closeComments}
-                onPress={closeComments}
+                onLongPress={dismissSheet}
+                onPress={dismissSheet}
                 style={styles.commentHandleButton}
               >
                 <View style={styles.commentHandle} />
