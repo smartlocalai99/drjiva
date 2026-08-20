@@ -270,7 +270,10 @@ export default function HealthFeedScreen() {
       setReportTarget(null);
       setActionError('Thanks — our team will review this within 24 hours.');
     } catch (reportError) {
-      setActionError(reportError instanceof Error ? reportError.message : 'Unable to submit your report.');
+      Alert.alert(
+        'Unable to submit your report',
+        reportError instanceof Error ? reportError.message : 'Please try again.',
+      );
     }
   };
 
@@ -1059,16 +1062,25 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
 
   const blockAuthor = async (comment: HealthFeedComment) => {
     if (!post) return;
+    // Hide instantly and optimistically — Apple's UGC guideline requires
+    // blocking to remove the author's content from the reporting user's
+    // feed right away, so the UI shouldn't wait on the network for that.
+    const hiddenComments = comments.filter(
+      (item) => item.owner_user_id === comment.owner_user_id,
+    );
+    setComments((current) =>
+      current.filter((item) => item.owner_user_id !== comment.owner_user_id),
+    );
     try {
       await blockCommentAuthor(comment.owner_user_id, post.id, comment.id);
-      // Hide instantly — Apple's UGC guideline requires blocking to remove
-      // the author's content from the reporting user's feed right away.
-      setComments((current) =>
-        current.filter((item) => item.owner_user_id !== comment.owner_user_id),
-      );
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     } catch (blockError) {
-      setError(blockError instanceof Error ? blockError.message : 'Unable to block this user.');
+      // Block didn't actually save — put their comments back and say why.
+      setComments((current) => [...current, ...hiddenComments]);
+      Alert.alert(
+        'Unable to block this user',
+        blockError instanceof Error ? blockError.message : 'Please try again.',
+      );
     }
   };
 
@@ -1133,7 +1145,6 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
                   )
                   : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={160} />}
               </View>
-              <EmojiBurstOverlay bursts={emojiBursts} onDone={removeEmojiBurst} />
             </Animated.View>
           ) : null}
           <Animated.View {...sheetDragResponder.panHandlers} style={[styles.commentSheet, sheetDragStyle]}>
@@ -1257,6 +1268,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
             </View>
           </Animated.View>
         </KeyboardAvoidingView>
+        <EmojiBurstOverlay bursts={emojiBursts} onDone={removeEmojiBurst} travelDistance={height * 0.72} />
       </View>
     </Modal>
   );
@@ -1381,25 +1393,35 @@ function CommentRow({ avatarUrl, comment, deleting, onDelete, onOptions }: {
   );
 }
 
-function EmojiBurstOverlay({ bursts, onDone }: {
+function EmojiBurstOverlay({ bursts, onDone, travelDistance }: {
   bursts: Array<{ emoji: string; id: number }>;
   onDone: (id: number) => void;
+  travelDistance: number;
 }) {
   return (
     <View pointerEvents="none" style={styles.emojiBurstOverlay}>
       {bursts.map((item) => (
-        <FloatingEmoji emoji={item.emoji} key={item.id} onDone={() => onDone(item.id)} />
+        <FloatingEmoji
+          emoji={item.emoji}
+          key={item.id}
+          onDone={() => onDone(item.id)}
+          travelDistance={travelDistance}
+        />
       ))}
     </View>
   );
 }
 
-function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
+function FloatingEmoji({ emoji, onDone, travelDistance }: {
+  emoji: string;
+  onDone: () => void;
+  travelDistance: number;
+}) {
   const progress = useSharedValue(0);
   const driftDirection = useRef(Math.random() * 2 - 1).current;
-  const startLeftPercent = useRef(12 + Math.random() * 76).current;
-  const startDelay = useRef(Math.random() * 260).current;
-  const travelDuration = useRef(1300 + Math.random() * 600).current;
+  const startLeftPercent = useRef(10 + Math.random() * 80).current;
+  const startDelay = useRef(Math.random() * 320).current;
+  const travelDuration = useRef(1700 + Math.random() * 700).current;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1416,10 +1438,10 @@ function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void })
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
-    const travelY = interpolate(progress.value, [0, 1], [0, -230]);
-    const driftX = interpolate(progress.value, [0, 0.5, 1], [0, driftDirection * 26, driftDirection * 54]);
-    const opacity = interpolate(progress.value, [0, 0.12, 0.75, 1], [0, 1, 1, 0]);
-    const scale = interpolate(progress.value, [0, 0.18, 1], [0.4, 1.2, 0.85]);
+    const travelY = interpolate(progress.value, [0, 1], [0, -travelDistance]);
+    const driftX = interpolate(progress.value, [0, 0.5, 1], [0, driftDirection * 34, driftDirection * 70]);
+    const opacity = interpolate(progress.value, [0, 0.1, 0.8, 1], [0, 1, 1, 0]);
+    const scale = interpolate(progress.value, [0, 0.16, 1], [0.4, 1.25, 0.9]);
     return {
       opacity,
       transform: [{ translateY: travelY }, { translateX: driftX }, { scale }],
@@ -1632,7 +1654,7 @@ const styles = StyleSheet.create({
   commentPreviewMedia: { backgroundColor: '#111416', borderCurve: 'continuous', borderRadius: 18, overflow: 'hidden' },
   commentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 9 },
   emojiBurstOverlay: { bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
-  floatingEmoji: { bottom: 12, fontSize: 30, position: 'absolute' },
+  floatingEmoji: { bottom: 90, fontSize: 34, position: 'absolute' },
   commentSend: { alignItems: 'center', backgroundColor: '#2E7EBC', borderCurve: 'continuous', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   commentSendDisabled: { backgroundColor: '#AFBAC3' },
   commentSendSlot: { bottom: 4, position: 'absolute', right: 4, zIndex: 2 },
