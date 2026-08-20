@@ -866,9 +866,12 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
       return;
     }
 
-    // Modal uses animationType="none" so this owns the whole entrance —
-    // it used to rely on the native slide, which fought with the manual
-    // drag-to-dismiss transform and made the gesture feel janky.
+    // Modal uses animationType="fade" (not "slide") so the native
+    // transition doesn't fight this transform's own slide-up motion —
+    // fade only affects opacity, so the two don't visually conflict the
+    // way two competing slides did. animationType="none" was tried too,
+    // but skipping the native transition entirely caused a white flash on
+    // iOS right as the modal toggled off.
     sheetTranslateY.value = height;
     sheetTranslateY.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
 
@@ -1136,7 +1139,7 @@ function CommentSheet({ authorAvatarUrl, authorName, onClose, onCommentCountChan
   };
 
   return (
-    <Modal animationType="none" onRequestClose={dismissSheet} presentationStyle="overFullScreen" visible={Boolean(post)}>
+    <Modal animationType="fade" onRequestClose={dismissSheet} presentationStyle="overFullScreen" visible={Boolean(post)}>
       <View style={styles.commentModal}>
         <KeyboardAvoidingView behavior="height" keyboardVerticalOffset={0} style={styles.commentKeyboard}>
           {post ? (
