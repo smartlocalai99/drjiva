@@ -1663,7 +1663,7 @@ const styles = StyleSheet.create({
   commentInputWithSend: { paddingRight: 48 },
   commentInputDock: { backgroundColor: '#FFFFFF', borderTopColor: '#E5E9ED', borderTopWidth: StyleSheet.hairlineWidth, flexShrink: 0, gap: 7, paddingTop: 4 },
   commentInputShell: { backgroundColor: '#F4F6F8', borderCurve: 'continuous', borderRadius: 22, flex: 1, justifyContent: 'center', minHeight: 42, position: 'relative' },
-  commentKeyboard: { backgroundColor: '#FFFFFF', flex: 1 },
+  commentKeyboard: { backgroundColor: '#050607', flex: 1 },
   commentList: { flexGrow: 1, gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   commentListView: { flex: 1, minHeight: 0 },
   commentMeta: { alignItems: 'center', flexDirection: 'row', gap: 7 },
