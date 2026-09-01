@@ -26,6 +26,7 @@ import { DashboardHeader } from '../src/components/dashboard/DashboardHeader';
 import { EmptyMedicines } from '../src/components/dashboard/EmptyMedicines';
 import { FloatingAddButton } from '../src/components/dashboard/FloatingAddButton';
 import { MedicineCard } from '../src/components/dashboard/MedicineCard';
+import { TipOfTheDayCard } from '../src/components/dashboard/TipOfTheDayCard';
 import { PressableScale } from '../src/components/PressableScale';
 import {
   fetchMedicinesForDate,
@@ -486,6 +487,8 @@ export default function HomeScreen() {
           }
           profileAccessibilityLabel={t('manageProfile')}
         />
+
+        <TipOfTheDayCard />
 
         {medicineContent === 'loading' ? (
           <View
