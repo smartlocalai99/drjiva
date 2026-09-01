@@ -98,15 +98,26 @@ export function TipOfTheDayCard({ authorName }: { authorName: string }) {
 
 const styles = StyleSheet.create({
   action: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  actionRow: { flexDirection: 'row', gap: dashboardSpacing.gap, marginTop: dashboardSpacing.sm },
+  actionRow: {
+    flexDirection: 'row',
+    gap: dashboardSpacing.gap,
+    marginTop: dashboardSpacing.sm,
+    paddingBottom: dashboardSpacing.gap,
+    paddingHorizontal: dashboardSpacing.gap,
+  },
   actionText: { ...dashboardTypography.caption, color: dashboardColors.textMuted, fontVariant: ['tabular-nums'] },
-  caption: { ...dashboardTypography.body, color: dashboardColors.textMuted, marginTop: dashboardSpacing.sm },
+  caption: {
+    ...dashboardTypography.body,
+    color: dashboardColors.textMuted,
+    marginTop: dashboardSpacing.sm,
+    paddingHorizontal: dashboardSpacing.gap,
+  },
   card: {
     backgroundColor: dashboardColors.card,
     borderRadius: dashboardRadii.card,
     elevation: 2,
     marginBottom: dashboardSpacing.gap,
-    padding: dashboardSpacing.gap,
+    overflow: 'hidden',
     shadowColor: dashboardColors.shadow,
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.06,
@@ -116,12 +127,13 @@ const styles = StyleSheet.create({
     ...dashboardTypography.caption,
     color: dashboardColors.primary,
     letterSpacing: 0.6,
-    marginBottom: dashboardSpacing.sm,
+    paddingHorizontal: dashboardSpacing.gap,
+    paddingTop: dashboardSpacing.gap,
     textTransform: 'uppercase',
   },
   image: {
-    borderRadius: dashboardRadii.card - 8,
-    height: 220,
+    height: 340,
+    marginTop: dashboardSpacing.sm,
     width: '100%',
   },
 });
