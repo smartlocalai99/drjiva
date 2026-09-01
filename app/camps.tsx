@@ -15,6 +15,7 @@ import {
 
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { RegisterSheet } from '../src/components/camps/RegisterSheet';
+import { TipOfTheDayCard } from '../src/components/camps/TipOfTheDayCard';
 import { WeekDayStrip, WeekRangeSelector } from '../src/components/camps/WeekCalendar';
 import { HospitalLogo } from '../src/components/HospitalLogo';
 import { PressableScale } from '../src/components/PressableScale';
@@ -246,6 +247,8 @@ export default function CampsScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}
           showsVerticalScrollIndicator={false}
         >
+          <TipOfTheDayCard authorName={patient?.name || 'Patient'} />
+
           {errorMessage ? <Text style={styles.errorText}>{t(errorMessage as TranslationKey)}</Text> : null}
 
           {visibleEvents.length === 0 ? (
@@ -264,7 +267,12 @@ export default function CampsScreen() {
               return (
                 <View key={event.id} style={styles.card}>
                   <View style={styles.cardTopRow}>
-                    <HospitalLogo hospitalName={event.hospitalName} roundedSquare size={40} />
+                    <HospitalLogo
+                      hospitalName={event.hospitalName}
+                      logoUrl={event.hospitalLogoUrl}
+                      roundedSquare
+                      size={40}
+                    />
                     <View style={styles.cardTopText}>
                       <Text style={styles.hospitalName} numberOfLines={1}>
                         {event.hospitalName}

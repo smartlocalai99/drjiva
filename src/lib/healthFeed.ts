@@ -66,42 +66,64 @@ export type HealthFeedPostRealtimeUpdate = Partial<Omit<HealthFeedPost, 'doctor'
   status?: string;
 };
 
+// The "DrJiva Health Tips" account posts Tip of the Day content that lives
+// in the Camps screen instead of the Health Feed reels — excluded from
+// fetchHealthFeed below so it doesn't show up in both places.
+export const HEALTH_TIPS_DOCTOR_PHONE = '+910000000001';
+
+const HEALTH_POST_SELECT = `
+  id,
+  doctor_phone,
+  title,
+  caption,
+  hashtags,
+  media_type,
+  media_url,
+  safety_note,
+  source_url,
+  views_count,
+  likes_count,
+  comments_count,
+  saves_count,
+  published_at,
+  created_at,
+  doctor:doctors!health_posts_doctor_phone_fkey(
+    phone_number,
+    display_name,
+    specialty,
+    hospital_name,
+    experience_years,
+    bio,
+    avatar_url,
+    verification_status
+  )
+`;
+
 export async function fetchHealthFeed(): Promise<HealthFeedPost[]> {
   const { data, error } = await supabase
     .from('health_posts')
-    .select(`
-      id,
-      doctor_phone,
-      title,
-      caption,
-      hashtags,
-      media_type,
-      media_url,
-      safety_note,
-      source_url,
-      views_count,
-      likes_count,
-      comments_count,
-      saves_count,
-      published_at,
-      created_at,
-      doctor:doctors!health_posts_doctor_phone_fkey(
-        phone_number,
-        display_name,
-        specialty,
-        hospital_name,
-        experience_years,
-        bio,
-        avatar_url,
-        verification_status
-      )
-    `)
+    .select(HEALTH_POST_SELECT)
     .eq('status', 'published')
+    .neq('doctor_phone', HEALTH_TIPS_DOCTOR_PHONE)
     .order('published_at', { ascending: false })
     .limit(50);
 
   if (error) throw new Error(error.message);
   return (data || []) as unknown as HealthFeedPost[];
+}
+
+export async function fetchLatestHealthTip(): Promise<HealthFeedPost | null> {
+  const { data, error } = await supabase
+    .from('health_posts')
+    .select(HEALTH_POST_SELECT)
+    .eq('status', 'published')
+    .eq('doctor_phone', HEALTH_TIPS_DOCTOR_PHONE)
+    .order('published_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as unknown as HealthFeedPost) || null;
 }
 
 // Feed order was purely chronological, so pull-to-refresh re-fetched the

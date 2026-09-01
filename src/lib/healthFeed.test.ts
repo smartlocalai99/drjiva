@@ -28,8 +28,11 @@ import {
   createHealthPostComment,
   deleteHealthPostComment,
   fetchBlockedOwnerIds,
+  fetchHealthFeed,
   fetchHealthPostComments,
   fetchHealthFeedViewerState,
+  fetchLatestHealthTip,
+  HEALTH_TIPS_DOCTOR_PHONE,
   recordHealthPostView,
   reportHealthPostComment,
   setHealthPostLike,
@@ -329,6 +332,43 @@ describe('Health Feed interactions', () => {
         target_type: 'comment',
       }),
     );
+  });
+
+  it('excludes the Tip of the Day account from the main reels feed', async () => {
+    const neqMock = vi.fn(() => ({
+      order: () => ({ limit: async () => ({ data: [], error: null }) }),
+    }));
+    const eqMock = vi.fn(() => ({ neq: neqMock }));
+    fromMock.mockReturnValue({ select: () => ({ eq: eqMock }) });
+
+    await fetchHealthFeed();
+
+    expect(neqMock).toHaveBeenCalledWith('doctor_phone', HEALTH_TIPS_DOCTOR_PHONE);
+  });
+
+  it('fetches the latest tip from the Tip of the Day account only', async () => {
+    const maybeSingleMock = vi.fn(async () => ({ data: { id: 'tip-1' }, error: null }));
+    const limitMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
+    const orderMock = vi.fn(() => ({ limit: limitMock }));
+    const eqDoctorMock = vi.fn(() => ({ order: orderMock }));
+    const eqStatusMock = vi.fn(() => ({ eq: eqDoctorMock }));
+    fromMock.mockReturnValue({ select: () => ({ eq: eqStatusMock }) });
+
+    await expect(fetchLatestHealthTip()).resolves.toEqual({ id: 'tip-1' });
+
+    expect(eqStatusMock).toHaveBeenCalledWith('status', 'published');
+    expect(eqDoctorMock).toHaveBeenCalledWith('doctor_phone', HEALTH_TIPS_DOCTOR_PHONE);
+  });
+
+  it('returns null when there is no tip published yet', async () => {
+    const maybeSingleMock = vi.fn(async () => ({ data: null, error: null }));
+    fromMock.mockReturnValue({
+      select: () => ({
+        eq: () => ({ eq: () => ({ order: () => ({ limit: () => ({ maybeSingle: maybeSingleMock }) }) }) }),
+      }),
+    });
+
+    await expect(fetchLatestHealthTip()).resolves.toBeNull();
   });
 });
 
