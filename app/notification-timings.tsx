@@ -29,7 +29,7 @@ import {
 import {
   requestMedicineNotificationPermission,
 } from '../src/lib/medicineNotifications';
-import { syncDoseNotifications } from '../src/lib/medicineNotificationSync';
+import { syncPatientDoseNotifications } from '../src/lib/medicineNotificationSync';
 import { replaceEventSlotTime, type DoseSlot } from '../src/lib/medicineSchedule';
 import {
   areSelectedSlotTimesOrdered,
@@ -169,12 +169,7 @@ export default function NotificationTimingsScreen() {
             phoneAlertsUnavailable = true;
           } else {
             try {
-              const result = await syncDoseNotifications(
-                reminders.map((reminder, index) => ({
-                  ...reminder,
-                  scheduledFor: updates[index]!.scheduledFor,
-                })),
-              );
+              const result = await syncPatientDoseNotifications(patientId);
               cleanupPending = result.cleanupPending;
             } catch {
               phoneAlertsUnavailable = true;

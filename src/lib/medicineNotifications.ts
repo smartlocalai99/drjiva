@@ -11,6 +11,13 @@ type NotificationEvent = {
   scheduledFor: string;
 };
 
+type ScheduledNotificationRequest = {
+  content: {
+    data?: Record<string, unknown> | null;
+  };
+  identifier: string;
+};
+
 type NotificationContent = {
   medicineName: string;
   slot: string;
@@ -128,6 +135,31 @@ export function groupDoseNotificationRequests(
   return [...groups.entries()]
     .sort(([left], [right]) => left - right)
     .map(([, group]) => group);
+}
+
+export function findScheduledDoseNotificationIds(
+  requests: readonly ScheduledNotificationRequest[],
+  eventIds: readonly string[],
+): string[] {
+  const targetEventIds = new Set(eventIds);
+  const identifiers = new Set<string>();
+
+  for (const request of requests) {
+    const data = request.content.data;
+    const requestEventIds = [
+      ...(typeof data?.eventId === 'string' ? [data.eventId] : []),
+      ...(Array.isArray(data?.eventIds)
+        ? data.eventIds.filter(
+            (eventId): eventId is string => typeof eventId === 'string',
+          )
+        : []),
+    ];
+    if (requestEventIds.some((eventId) => targetEventIds.has(eventId))) {
+      identifiers.add(request.identifier);
+    }
+  }
+
+  return [...identifiers];
 }
 
 export async function scheduleGroupedDoseNotificationsWithAdapter(
@@ -295,6 +327,18 @@ export async function cancelDoseNotifications(
     [...new Set(identifiers)].map(
       Notifications.cancelScheduledNotificationAsync,
     ),
+  );
+}
+
+export async function cancelScheduledDoseNotificationsForEvents(
+  eventIds: readonly string[],
+): Promise<void> {
+  if (eventIds.length === 0) return;
+  const Notifications = await requireExpoNotifications();
+  const requests = await Notifications.getAllScheduledNotificationsAsync();
+  const identifiers = findScheduledDoseNotificationIds(requests, eventIds);
+  await Promise.all(
+    identifiers.map(Notifications.cancelScheduledNotificationAsync),
   );
 }
 

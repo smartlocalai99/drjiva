@@ -25,12 +25,37 @@ vi.mock('./expoNotifications', () => ({
 }));
 
 import {
+  findScheduledDoseNotificationIds,
   groupDoseNotificationRequests,
   scheduleDoseNotifications,
   scheduleDoseNotificationsWithAdapter,
   scheduleGroupedDoseNotifications,
   scheduleGroupedDoseNotificationsWithAdapter,
 } from './medicineNotifications';
+
+describe('findScheduledDoseNotificationIds', () => {
+  it('finds every old phone alert linked to a dose event and deduplicates ids', () => {
+    expect(
+      findScheduledDoseNotificationIds(
+        [
+          {
+            content: { data: { eventId: 'event-1' } },
+            identifier: 'old-single',
+          },
+          {
+            content: { data: { eventIds: ['event-1', 'event-2'] } },
+            identifier: 'old-group',
+          },
+          {
+            content: { data: { eventId: 'unrelated' } },
+            identifier: 'keep-me',
+          },
+        ],
+        ['event-1', 'event-2'],
+      ),
+    ).toEqual(['old-single', 'old-group']);
+  });
+});
 
 describe('scheduleDoseNotificationsWithAdapter', () => {
   beforeEach(() => {

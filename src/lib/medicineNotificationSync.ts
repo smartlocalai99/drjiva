@@ -5,23 +5,30 @@ import {
 } from './medicineCourses';
 import {
   cancelDoseNotifications,
+  cancelScheduledDoseNotificationsForEvents,
   queueNotificationCancellations,
   scheduleGroupedDoseNotifications,
 } from './medicineNotifications';
 
-export async function syncDoseNotifications(
+let notificationSyncQueue: Promise<void> = Promise.resolve();
+
+async function performDoseNotificationSync(
   reminders: readonly FutureDoseReminder[],
 ): Promise<{ cleanupPending: boolean }> {
   const oldIds = reminders.flatMap((reminder) =>
     reminder.notificationId ? [reminder.notificationId] : [],
   );
-  let cleanupPending = false;
 
   try {
+    // Discover phone-side alarms before cancelling stored IDs so a failed
+    // inventory read leaves the current reminders intact.
+    await cancelScheduledDoseNotificationsForEvents(
+      reminders.map((reminder) => reminder.eventId),
+    );
     await cancelDoseNotifications(oldIds);
-  } catch {
+  } catch (error) {
     await queueNotificationCancellations(oldIds);
-    cleanupPending = true;
+    throw error;
   }
 
   const identifiers = await scheduleGroupedDoseNotifications(
@@ -34,14 +41,37 @@ export async function syncDoseNotifications(
       tablets: reminder.tablets,
     })),
   );
+  // Keep the working alerts if saving IDs fails. A later sync discovers
+  // them by event metadata, so retrying does not add duplicate reminders.
   await saveNotificationIds(identifiers);
-  return { cleanupPending };
+  return { cleanupPending: false };
 }
 
-export async function syncPatientDoseNotifications(
+function enqueueDoseNotificationSync(
+  loadReminders: () => Promise<readonly FutureDoseReminder[]>,
+): Promise<{ cleanupPending: boolean }> {
+  const sync = notificationSyncQueue.then(async () =>
+    performDoseNotificationSync(await loadReminders()),
+  );
+  notificationSyncQueue = sync.then(
+    () => undefined,
+    () => undefined,
+  );
+  return sync;
+}
+
+export function syncDoseNotifications(
+  reminders: readonly FutureDoseReminder[],
+): Promise<{ cleanupPending: boolean }> {
+  return enqueueDoseNotificationSync(async () => reminders);
+}
+
+export function syncPatientDoseNotifications(
   patientId: string,
 ): Promise<{ cleanupPending: boolean }> {
-  return syncDoseNotifications(
-    await fetchScheduledDoseRemindersFromToday(patientId),
+  // Fetch inside the queue so an overlapping app resume or medicine save
+  // cannot replace newer alarms with a snapshot loaded before the last sync.
+  return enqueueDoseNotificationSync(
+    () => fetchScheduledDoseRemindersFromToday(patientId),
   );
 }

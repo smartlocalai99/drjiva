@@ -7,10 +7,10 @@ import { ensureSecureReportSession } from './reportAuth';
 import type { DoseSlot } from './medicineSchedule';
 import { supabase } from './supabase';
 
-// Re-sync existing scheduled alerts once so Android moves them to the louder
-// v3 notification channel and both platforms use the newly mastered sound.
+// Rebuild existing alerts once to remove orphaned per-medicine notifications.
+// This also preserves the earlier iOS sound migration to reminder.caf.
 const GROUPED_NOTIFICATION_MIGRATION_KEY =
-  'drjiva.groupedMedicineNotifications.v2';
+  'drjiva.groupedMedicineNotifications.v4-grouped-reminder-cleanup';
 
 type OngoingCourseRow = {
   id: string;
