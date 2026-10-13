@@ -33,7 +33,7 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | This week | ఈ వారం |
 | As big as {fruit} | {fruit} అంత ఉంటుంది |
 | Weight | బరువు |
-| Head to bottom | తల నుంచి పిరుదుల వరకు |
+| Head to bottom | పొడవు |
 | Head to heel | తల నుంచి మడమ వరకు |
 | Under 1 g | 1 గ్రాము కంటే తక్కువ |
 | {n} mm | {n} మి.మీ. |

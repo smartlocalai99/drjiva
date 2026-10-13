@@ -82,7 +82,7 @@ const te: Record<CareCopyKey, string> = {
   thisWeek: 'ఈ వారం',
   asBigAs: '{fruit} అంత ఉంటుంది',
   weight: 'బరువు',
-  lengthHeadToBottom: 'తల నుంచి పిరుదుల వరకు',
+  lengthHeadToBottom: 'పొడవు',
   lengthHeadToHeel: 'తల నుంచి మడమ వరకు',
   underOneGram: '1 గ్రాము కంటే తక్కువ',
   amountMm: '{n} మి.మీ.',
