@@ -15,9 +15,14 @@ import { AppState } from 'react-native';
 
 import { SplashTransitionProvider } from '../src/components/SplashTransition';
 import { CartProvider } from '../src/lib/cart';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { fetchMyCare } from '../src/lib/care';
+import { syncCareReminders } from '../src/lib/careReminders';
 import { loadExpoNotifications } from '../src/lib/expoNotifications';
 import { LanguageProvider } from '../src/lib/i18n';
 import { replenishOngoingMedicineCourses } from '../src/lib/ongoingMedicineCoordinator';
+import { getSessionPhone } from '../src/lib/session';
 import { colors } from '../src/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -71,6 +76,29 @@ export default function RootLayout() {
     replenish();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') replenish();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Follow-up visit reminders: refresh on every app open so a date the
+  // nurse saved later still gets reminded (see src/lib/careReminders.ts).
+  // Separate from medicine reminders; best-effort and throttled.
+  useEffect(() => {
+    let lastRun = 0;
+    const sync = () => {
+      if (Date.now() - lastRun < 10 * 60_000) return;
+      lastRun = Date.now();
+      void (async () => {
+        const phone = (await getSessionPhone())?.replace(/\D/g, '').slice(-10);
+        if (!phone || phone.length !== 10) return;
+        const stored = await AsyncStorage.getItem('drjiva.language').catch(() => null);
+        const care = await fetchMyCare(phone);
+        await syncCareReminders(phone, care, stored === 'te' ? 'te' : 'en');
+      })().catch(() => undefined);
+    };
+    sync();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sync();
     });
     return () => subscription.remove();
   }, []);

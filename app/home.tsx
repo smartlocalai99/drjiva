@@ -368,7 +368,7 @@ export default function HomeScreen() {
     }
     router.prefetch({
       params: { patientId, phone },
-      pathname: '/documents',
+      pathname: '/my-care',
     });
   }, [patientId, phone, router]);
 
@@ -448,7 +448,7 @@ export default function HomeScreen() {
     router.replace({
       params: {
         phone,
-        ...(tab === 'documents' && patientId ? { patientId } : {}),
+        ...(tab === 'myCare' && patientId ? { patientId } : {}),
       },
       pathname: route,
     });

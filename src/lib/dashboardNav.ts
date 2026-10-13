@@ -2,12 +2,12 @@ import type { NavTabKey } from '../components/dashboard/BottomNav';
 
 export function getTabRoute(
   tab: NavTabKey,
-): '/home' | '/documents' | '/health-feed' | '/camps' | '/shop' | null {
+): '/home' | '/my-care' | '/health-feed' | '/camps' | '/shop' | null {
   switch (tab) {
     case 'today':
       return '/home';
-    case 'documents':
-      return '/documents';
+    case 'myCare':
+      return '/my-care';
     case 'healthFeed':
       return '/health-feed';
     case 'camps':

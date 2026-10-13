@@ -14,7 +14,7 @@ import { useLanguage, type TranslationKey } from '../../lib/i18n';
 
 export type NavTabKey =
   | 'today'
-  | 'documents'
+  | 'myCare'
   | 'healthFeed'
   | 'camps'
   | 'shop';
@@ -27,10 +27,10 @@ const TAB_DEFS: {
 }[] = [
   { activeIcon: 'home', icon: 'home-outline', key: 'today', labelKey: 'todayTab' },
   {
-    activeIcon: 'document-text',
-    icon: 'document-text-outline',
-    key: 'documents',
-    labelKey: 'documents',
+    activeIcon: 'heart',
+    icon: 'heart-outline',
+    key: 'myCare',
+    labelKey: 'myCare',
   },
   {
     activeIcon: 'medkit',
