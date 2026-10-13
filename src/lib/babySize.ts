@@ -6,6 +6,13 @@
 
 export type BabyStage = 'cells' | 'embryo' | 'early' | 'fetus' | 'grown';
 
+// One real photo per fruit or vegetable (assets/care/fruits/<name>.webp).
+export type FruitPhoto =
+  | 'poppy' | 'sesame' | 'rice' | 'peanut' | 'grape' | 'jamun' | 'amla' | 'fig' | 'lemon' | 'sapota'
+  | 'guava' | 'apple' | 'pomegranate' | 'sweetpotato' | 'capsicum' | 'mango' | 'banana' | 'carrot'
+  | 'ridgegourd' | 'papaya' | 'corn' | 'radish' | 'cauliflower' | 'cucumber' | 'brinjal' | 'cabbage'
+  | 'bottlegourd' | 'coconut' | 'pineapple' | 'muskmelon' | 'jackfruit' | 'ashgourd' | 'pumpkin' | 'watermelon';
+
 export type BabyWeek = {
   week: number;
   stage: BabyStage;
@@ -14,6 +21,7 @@ export type BabyWeek = {
   weightG: number | null;
   likeEn: string;
   likeTe: string;
+  photo: FruitPhoto;
 };
 
 export const FIRST_BABY_WEEK = 4;
@@ -21,45 +29,45 @@ export const LAST_BABY_WEEK = 40;
 // The week length switches from head-to-bottom to head-to-heel.
 export const HEAD_TO_HEEL_FROM_WEEK = 20;
 
-// [week, length cm, weight g, as big as (English), as big as (Telugu)]
-const ROWS: readonly (readonly [number, number, number | null, string, string])[] = [
-  [4, 0.1, null, 'a poppy seed', 'గసగసాల గింజ'],
-  [5, 0.2, null, 'a sesame seed', 'నువ్వు గింజ'],
-  [6, 0.6, null, 'a grain of rice', 'బియ్యం గింజ'],
-  [7, 1.3, null, 'a peanut', 'వేరుశనగ గింజ'],
-  [8, 1.6, 1, 'a grape', 'ద్రాక్ష పండు'],
-  [9, 2.3, 2, 'a jamun', 'నేరేడు పండు'],
-  [10, 3.1, 4, 'an amla', 'ఉసిరికాయ'],
-  [11, 4.1, 7, 'a fig', 'అంజీర పండు'],
-  [12, 5.4, 14, 'a lemon', 'నిమ్మకాయ'],
-  [13, 7.4, 23, 'a sapota', 'సపోటా పండు'],
-  [14, 8.7, 43, 'a guava', 'జామకాయ'],
-  [15, 10.1, 70, 'an apple', 'ఆపిల్ పండు'],
-  [16, 11.6, 100, 'a pomegranate', 'దానిమ్మ పండు'],
-  [17, 13, 140, 'a sweet potato', 'చిలగడదుంప'],
-  [18, 14.2, 190, 'a capsicum', 'క్యాప్సికం'],
-  [19, 15.3, 240, 'a mango', 'మామిడి పండు'],
-  [20, 25.6, 300, 'a banana', 'అరటి పండు'],
-  [21, 26.7, 360, 'a carrot', 'క్యారెట్'],
-  [22, 27.8, 430, 'a ridge gourd', 'బీరకాయ'],
-  [23, 28.9, 501, 'a papaya', 'బొప్పాయి పండు'],
-  [24, 30, 600, 'a corn cob', 'మొక్కజొన్న కంకి'],
-  [25, 34.6, 660, 'a radish', 'ముల్లంగి'],
-  [26, 35.6, 760, 'a cauliflower', 'కాలీఫ్లవర్'],
-  [27, 36.6, 875, 'a yellow cucumber', 'దోసకాయ'],
-  [28, 37.6, 1005, 'a large brinjal', 'పెద్ద వంకాయ'],
-  [29, 38.6, 1153, 'a cabbage', 'క్యాబేజీ'],
-  [30, 39.9, 1319, 'a bottle gourd', 'సొరకాయ'],
-  [31, 41.1, 1502, 'a coconut', 'కొబ్బరికాయ'],
-  [32, 42.4, 1702, 'a pineapple', 'అనాస పండు'],
-  [33, 43.7, 1918, 'a muskmelon', 'కర్బూజ పండు'],
-  [34, 45, 2146, 'a large papaya', 'పెద్ద బొప్పాయి పండు'],
-  [35, 46.2, 2383, 'a small jackfruit', 'చిన్న పనస పండు'],
-  [36, 47.4, 2622, 'an ash gourd', 'బూడిద గుమ్మడికాయ'],
-  [37, 48.6, 2859, 'a pumpkin', 'గుమ్మడికాయ'],
-  [38, 49.8, 3083, 'a large pumpkin', 'పెద్ద గుమ్మడికాయ'],
-  [39, 50.7, 3288, 'a small watermelon', 'చిన్న పుచ్చకాయ'],
-  [40, 51.2, 3462, 'a watermelon', 'పుచ్చకాయ'],
+// [week, length cm, weight g, as big as (English), as big as (Telugu), photo]
+const ROWS: readonly (readonly [number, number, number | null, string, string, FruitPhoto])[] = [
+  [4, 0.1, null, 'a poppy seed', 'గసగసాల గింజ', 'poppy'],
+  [5, 0.2, null, 'a sesame seed', 'నువ్వు గింజ', 'sesame'],
+  [6, 0.6, null, 'a grain of rice', 'బియ్యం గింజ', 'rice'],
+  [7, 1.3, null, 'a peanut', 'వేరుశనగ గింజ', 'peanut'],
+  [8, 1.6, 1, 'a grape', 'ద్రాక్ష పండు', 'grape'],
+  [9, 2.3, 2, 'a jamun', 'నేరేడు పండు', 'jamun'],
+  [10, 3.1, 4, 'an amla', 'ఉసిరికాయ', 'amla'],
+  [11, 4.1, 7, 'a fig', 'అంజీర పండు', 'fig'],
+  [12, 5.4, 14, 'a lemon', 'నిమ్మకాయ', 'lemon'],
+  [13, 7.4, 23, 'a sapota', 'సపోటా పండు', 'sapota'],
+  [14, 8.7, 43, 'a guava', 'జామకాయ', 'guava'],
+  [15, 10.1, 70, 'an apple', 'ఆపిల్ పండు', 'apple'],
+  [16, 11.6, 100, 'a pomegranate', 'దానిమ్మ పండు', 'pomegranate'],
+  [17, 13, 140, 'a sweet potato', 'చిలగడదుంప', 'sweetpotato'],
+  [18, 14.2, 190, 'a capsicum', 'క్యాప్సికం', 'capsicum'],
+  [19, 15.3, 240, 'a mango', 'మామిడి పండు', 'mango'],
+  [20, 25.6, 300, 'a banana', 'అరటి పండు', 'banana'],
+  [21, 26.7, 360, 'a carrot', 'క్యారెట్', 'carrot'],
+  [22, 27.8, 430, 'a ridge gourd', 'బీరకాయ', 'ridgegourd'],
+  [23, 28.9, 501, 'a papaya', 'బొప్పాయి పండు', 'papaya'],
+  [24, 30, 600, 'a corn cob', 'మొక్కజొన్న కంకి', 'corn'],
+  [25, 34.6, 660, 'a radish', 'ముల్లంగి', 'radish'],
+  [26, 35.6, 760, 'a cauliflower', 'కాలీఫ్లవర్', 'cauliflower'],
+  [27, 36.6, 875, 'a yellow cucumber', 'దోసకాయ', 'cucumber'],
+  [28, 37.6, 1005, 'a large brinjal', 'పెద్ద వంకాయ', 'brinjal'],
+  [29, 38.6, 1153, 'a cabbage', 'క్యాబేజీ', 'cabbage'],
+  [30, 39.9, 1319, 'a bottle gourd', 'సొరకాయ', 'bottlegourd'],
+  [31, 41.1, 1502, 'a coconut', 'కొబ్బరికాయ', 'coconut'],
+  [32, 42.4, 1702, 'a pineapple', 'అనాస పండు', 'pineapple'],
+  [33, 43.7, 1918, 'a muskmelon', 'కర్బూజ పండు', 'muskmelon'],
+  [34, 45, 2146, 'a large papaya', 'పెద్ద బొప్పాయి పండు', 'papaya'],
+  [35, 46.2, 2383, 'a small jackfruit', 'చిన్న పనస పండు', 'jackfruit'],
+  [36, 47.4, 2622, 'an ash gourd', 'బూడిద గుమ్మడికాయ', 'ashgourd'],
+  [37, 48.6, 2859, 'a pumpkin', 'గుమ్మడికాయ', 'pumpkin'],
+  [38, 49.8, 3083, 'a large pumpkin', 'పెద్ద గుమ్మడికాయ', 'pumpkin'],
+  [39, 50.7, 3288, 'a small watermelon', 'చిన్న పుచ్చకాయ', 'watermelon'],
+  [40, 51.2, 3462, 'a watermelon', 'పుచ్చకాయ', 'watermelon'],
 ];
 
 export function babyStage(week: number): BabyStage {
@@ -70,10 +78,11 @@ export function babyStage(week: number): BabyStage {
   return 'grown';
 }
 
-export const BABY_WEEKS: readonly BabyWeek[] = ROWS.map(([week, lengthCm, weightG, likeEn, likeTe]) => ({
+export const BABY_WEEKS: readonly BabyWeek[] = ROWS.map(([week, lengthCm, weightG, likeEn, likeTe, photo]) => ({
   likeEn,
   likeTe,
   lengthCm,
+  photo,
   stage: babyStage(week),
   week,
   weightG,

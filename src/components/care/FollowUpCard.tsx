@@ -5,6 +5,7 @@ import { dashboardColors } from '../../dashboardTheme';
 import type { CareFollowup } from '../../lib/care';
 import { useCareCopy } from '../../lib/careCopy';
 import { daysUntil, dialableIndianPhone, type CareVisit } from '../../lib/careSchedule';
+import { DoctorAvatar } from '../DoctorAvatar';
 import { HospitalLogo } from '../HospitalLogo';
 import { CallButton } from './CallButton';
 import { careFonts, careShared } from './careStyles';
@@ -44,10 +45,19 @@ export function FollowUpCard({ followup, today, visit }: { followup: CareFollowu
       <Text style={styles.date}>{date(followup.nextDate, 'weekdayDayMonth')}</Text>
 
       <View style={styles.placeRow}>
-        <HospitalLogo hospitalName={followup.hospital.name} logoUrl={followup.hospital.logoUrl} roundedSquare size={40} />
+        {followup.doctorName ? (
+          <DoctorAvatar doctorName={followup.doctorName} hospitalName={followup.hospital.name} size={56} />
+        ) : (
+          <HospitalLogo hospitalName={followup.hospital.name} logoUrl={followup.hospital.logoUrl} roundedSquare size={40} />
+        )}
         <View style={styles.flex}>
           {followup.doctorName ? <Text style={styles.doctor}>{followup.doctorName}</Text> : null}
-          <Text style={careShared.muted}>{followup.hospital.name}</Text>
+          <View style={styles.hospitalRow}>
+            {followup.doctorName ? (
+              <HospitalLogo hospitalName={followup.hospital.name} logoUrl={followup.hospital.logoUrl} roundedSquare size={24} />
+            ) : null}
+            <Text style={[careShared.muted, styles.flex]}>{followup.hospital.name}</Text>
+          </View>
         </View>
       </View>
 
@@ -134,6 +144,12 @@ const styles = StyleSheet.create({
     width: 52,
   },
   flex: { flex: 1 },
+  hospitalRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
+  },
   note: {
     backgroundColor: dashboardColors.warningTint,
     borderCurve: 'continuous',
