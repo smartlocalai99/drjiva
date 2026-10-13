@@ -27,8 +27,8 @@ const TAB_DEFS: {
 }[] = [
   { activeIcon: 'home', icon: 'home-outline', key: 'today', labelKey: 'todayTab' },
   {
-    activeIcon: 'heart',
-    icon: 'heart-outline',
+    activeIcon: 'document-text',
+    icon: 'document-text-outline',
     key: 'myCare',
     labelKey: 'myCare',
   },

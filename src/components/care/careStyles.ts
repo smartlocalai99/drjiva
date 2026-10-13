@@ -10,15 +10,6 @@ export const careFonts = {
   bold: 'Inter_700Bold',
 } as const;
 
-export const careStateColors = {
-  done: { dot: dashboardColors.success, text: '#15803D', tint: dashboardColors.successTint },
-  due_now: { dot: dashboardColors.primary, text: dashboardColors.primary, tint: dashboardColors.primaryTint },
-  pending: { dot: dashboardColors.warning, text: '#B45309', tint: dashboardColors.warningTint },
-  upcoming: { dot: '#94A3B8', text: dashboardColors.textMuted, tint: '#F1F5F9' },
-  not_needed: { dot: '#94A3B8', text: dashboardColors.textMuted, tint: '#F1F5F9' },
-  optional: { dot: '#CBD5E1', text: dashboardColors.textMuted, tint: '#F8FAFC' },
-} as const;
-
 export const careShared = StyleSheet.create({
   card: {
     backgroundColor: dashboardColors.card,

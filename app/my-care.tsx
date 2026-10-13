@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { careFonts, careShared } from '../src/components/care/careStyles';
@@ -22,7 +22,7 @@ type LoadState = 'loading' | 'ready' | 'offline' | 'error';
 
 export default function MyCareScreen() {
   const router = useRouter();
-  const { c, language, pick } = useCareCopy();
+  const { c, language } = useCareCopy();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
   const phone = normalizeRoutePhone(params.phone);
@@ -110,20 +110,14 @@ export default function MyCareScreen() {
   const followupPlan = plans.find((plan) => plan.id === followup?.planId) ?? selectedPlan;
   const followupVisit = followup && followupPlan ? visitForDate(followupPlan, followup.nextDate) : null;
   const today = care?.today ?? '';
-  const isPediatric = care?.currentDoctor?.department === 'pediatrics';
-  const hasChildPlan = plans.some((plan) => plan.type === 'child');
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const scrollBottomPadding = navBottomOffset + dashboardLayout.bottomNavHeight + dashboardSpacing.xl;
-  const everyVisitLine = (type: 'pregnancy' | 'child') => {
-    const line = care?.everyVisit?.[type];
-    return line ? pick(line.en ?? '', line.te ?? '') || null : null;
-  };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.headerIcon}>
-          <Ionicons color={dashboardColors.primary} name="heart" size={20} />
+          <Ionicons color={dashboardColors.primary} name="document-text" size={20} />
         </View>
         <View style={styles.flex}>
           <Text style={styles.headerTitle}>{c('title')}</Text>
@@ -172,33 +166,19 @@ export default function MyCareScreen() {
                 />
               ) : null}
 
+              {selectedPlan?.type === 'pregnancy' ? (
+                <PregnancySection key={selectedPlan.id} plan={selectedPlan} today={today} />
+              ) : null}
+
+              {selectedPlan?.type === 'child' ? <ChildSection plan={selectedPlan} today={today} /> : null}
+
               <FollowUpCard followup={followup} today={today} visit={followupVisit} />
 
-              {selectedPlan?.type === 'pregnancy' ? (
-                <PregnancySection
-                  everyVisitLine={everyVisitLine('pregnancy')}
-                  onNotForMe={() => confirmHide(selectedPlan.id)}
-                  plan={selectedPlan}
-                  today={today}
-                />
+              {selectedPlan ? (
+                <Pressable accessibilityRole="button" hitSlop={8} onPress={() => confirmHide(selectedPlan.id)} style={styles.notForMe}>
+                  <Text style={styles.notForMeText}>{c('notForMe')}</Text>
+                </Pressable>
               ) : null}
-
-              {selectedPlan?.type === 'child' ? (
-                <ChildSection
-                  everyVisit={{ line: everyVisitLine('child'), untilMonths: care.everyVisit?.child?.untilMonths ?? null }}
-                  onNotForMe={() => confirmHide(selectedPlan.id)}
-                  plan={selectedPlan}
-                  today={today}
-                />
-              ) : null}
-
-              {isPediatric && !hasChildPlan ? (
-                <View style={[careShared.card, styles.childHint]}>
-                  <Ionicons color={dashboardColors.primary} name="happy-outline" size={26} />
-                  <Text style={[careShared.body, styles.flex]}>{c('askNurseChild')}</Text>
-                </View>
-              ) : null}
-
             </>
           ) : null}
         </ScrollView>
@@ -238,11 +218,6 @@ const styles = StyleSheet.create({
   centerText: {
     textAlign: 'center',
   },
-  childHint: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 14,
-  },
   content: {
     gap: dashboardSpacing.gap,
     paddingHorizontal: dashboardSpacing.pagePadding,
@@ -277,6 +252,17 @@ const styles = StyleSheet.create({
     fontFamily: careFonts.semiBold,
     fontSize: 22,
     lineHeight: 28,
+  },
+  notForMe: {
+    alignSelf: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  notForMeText: {
+    color: dashboardColors.textMuted,
+    fontFamily: careFonts.semiBold,
+    fontSize: 15,
+    textDecorationLine: 'underline',
   },
   safeArea: {
     backgroundColor: dashboardColors.bg,

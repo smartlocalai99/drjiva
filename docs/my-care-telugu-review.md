@@ -3,6 +3,7 @@
 Every new piece of Telugu text, next to its English. Where to change it:
 
 - App screen text: `src/lib/careCopy.ts` (the `te` block) – needs an app update.
+- Baby size comparisons (week 4–40): `src/lib/babySize.ts` – needs an app update.
 - Visit names and checklist items: Supabase tables `care_schedule_visits` / `care_schedule_items` (`title_te`, `label_te`) – changes show at once, no app update.
 - Reminder push text: function `care_send_followup_reminders` in the database.
 
@@ -23,32 +24,28 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Call hospital | హాస్పిటల్‌కు కాల్ చేయండి |
 | Your nurse will add your next visit date after your consultation. | డాక్టర్‌ను కలిసిన తర్వాత మీ నర్సు తదుపరి సందర్శన తేదీని ఇక్కడ చేర్చుతారు. |
 | Pregnancy | గర్భధారణ |
-| Week {week} of 40 | 40 వారాల్లో {week}వ వారం |
 | Due date {date} | డెలివరీ తేదీ {date} |
 | 1st trimester | మొదటి త్రైమాసికం |
 | 2nd trimester | రెండవ త్రైమాసికం |
 | 3rd trimester | మూడవ త్రైమాసికం |
 | Week {week} | {week}వ వారం |
-| Week {from}–{to} | {from}–{to} వారాలు |
-| Done | పూర్తయింది |
-| Due now | ఇప్పుడు చేయాలి |
-| Not done yet – ask your doctor | ఇంకా చేయలేదు – డాక్టర్‌ను అడగండి |
-| Upcoming | రాబోయేది |
-| Not needed | అవసరం లేదు |
-| Only if your doctor advises | డాక్టర్ సూచిస్తే మాత్రమే |
-| Done on {date} | {date}న పూర్తయింది |
-| by {nurse} | నర్సు {nurse} |
-| Show {n} finished visits | పూర్తయిన {n} సందర్శనలు చూపించు |
-| Hide finished visits | పూర్తయిన సందర్శనలు దాచు |
-| Show full schedule | పూర్తి షెడ్యూల్ చూపించు |
-| Show less | తక్కువ చూపించు |
-| Tap a visit to see what is checked. | ఏమి చేశారో చూడటానికి సందర్శనను నొక్కండి. |
+| Week | వారం |
+| This week | ఈ వారం |
+| As big as {fruit} | {fruit} అంత ఉంటుంది |
+| Weight | బరువు |
+| Head to bottom | తల నుంచి పిరుదుల వరకు |
+| Head to heel | తల నుంచి మడమ వరకు |
+| Under 1 g | 1 గ్రాము కంటే తక్కువ |
+| {n} mm | {n} మి.మీ. |
+| {n} cm | {n} సెం.మీ. |
+| {n} g | {n} గ్రాములు |
+| {n} kg | {n} కిలోలు |
+| Average size. Every baby grows differently. | ఇవి సగటు కొలతలు. ప్రతి బిడ్డ ఎదుగుదల వేరుగా ఉంటుంది. |
 | This doesn't apply to me anymore | ఇది ఇప్పుడు నాకు వర్తించదు |
 | Hide this schedule? | ఈ షెడ్యూల్ దాచాలా? |
 | It will not show in your app anymore. Your nurse can still see it. | ఇది మీ యాప్‌లో ఇక కనిపించదు. మీ నర్సు చూడగలరు. |
 | Hide | దాచు |
 | Cancel | రద్దు |
-| Close | మూసివేయి |
 | 1 week old | 1 వారం వయస్సు |
 | {n} weeks old | {n} వారాల వయస్సు |
 | 1 month old | 1 నెల వయస్సు |
@@ -56,8 +53,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | 1 year old | 1 సంవత్సరం వయస్సు |
 | {n} years old | {n} సంవత్సరాల వయస్సు |
 | Newborn | అప్పుడే పుట్టిన బిడ్డ |
-| Vaccines | టీకాలు |
-| Ask the nurse to add your child's vaccine schedule. | మీ బిడ్డ టీకాల షెడ్యూల్‌ను జోడించమని నర్సును అడగండి. |
 | Loading your care… | మీ సంరక్షణ వివరాలు వస్తున్నాయి… |
 | Showing your last saved details. Pull down to refresh. | చివరిగా సేవ్ చేసిన వివరాలు చూపిస్తున్నాం. రిఫ్రెష్ చేయడానికి కిందికి లాగండి. |
 | Could not load My Care. Pull down to try again. | నా సంరక్షణ లోడ్ కాలేదు. మళ్ళీ ప్రయత్నించడానికి కిందికి లాగండి. |
@@ -66,6 +61,48 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Your follow-up visit at {hospital} is tomorrow. | {hospital} లో మీ ఫాలో-అప్ సందర్శన రేపు ఉంది. |
 | Hospital visit today | ఈరోజు హాస్పిటల్ సందర్శన |
 | Your follow-up visit at {hospital} is today. | {hospital} లో మీ ఫాలో-అప్ సందర్శన ఈరోజు ఉంది. |
+
+## Baby size ("As big as …")
+
+| Week | English | Telugu |
+|---|---|---|
+| 4 | a poppy seed | గసగసాల గింజ |
+| 5 | a sesame seed | నువ్వు గింజ |
+| 6 | a grain of rice | బియ్యం గింజ |
+| 7 | a peanut | వేరుశనగ గింజ |
+| 8 | a grape | ద్రాక్ష పండు |
+| 9 | a jamun | నేరేడు పండు |
+| 10 | an amla | ఉసిరికాయ |
+| 11 | a fig | అంజీర పండు |
+| 12 | a lemon | నిమ్మకాయ |
+| 13 | a sapota | సపోటా పండు |
+| 14 | a guava | జామకాయ |
+| 15 | an apple | ఆపిల్ పండు |
+| 16 | a pomegranate | దానిమ్మ పండు |
+| 17 | a sweet potato | చిలగడదుంప |
+| 18 | a capsicum | క్యాప్సికం |
+| 19 | a mango | మామిడి పండు |
+| 20 | a banana | అరటి పండు |
+| 21 | a carrot | క్యారెట్ |
+| 22 | a ridge gourd | బీరకాయ |
+| 23 | a papaya | బొప్పాయి పండు |
+| 24 | a corn cob | మొక్కజొన్న కంకి |
+| 25 | a radish | ముల్లంగి |
+| 26 | a cauliflower | కాలీఫ్లవర్ |
+| 27 | a yellow cucumber | దోసకాయ |
+| 28 | a large brinjal | పెద్ద వంకాయ |
+| 29 | a cabbage | క్యాబేజీ |
+| 30 | a bottle gourd | సొరకాయ |
+| 31 | a coconut | కొబ్బరికాయ |
+| 32 | a pineapple | అనాస పండు |
+| 33 | a muskmelon | కర్బూజ పండు |
+| 34 | a large papaya | పెద్ద బొప్పాయి పండు |
+| 35 | a small jackfruit | చిన్న పనస పండు |
+| 36 | an ash gourd | బూడిద గుమ్మడికాయ |
+| 37 | a pumpkin | గుమ్మడికాయ |
+| 38 | a large pumpkin | పెద్ద గుమ్మడికాయ |
+| 39 | a small watermelon | చిన్న పుచ్చకాయ |
+| 40 | a watermelon | పుచ్చకాయ |
 
 ## Schedule headings and every-visit lines
 

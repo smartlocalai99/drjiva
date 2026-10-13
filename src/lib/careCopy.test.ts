@@ -4,8 +4,10 @@ import { careDate, careText } from './careCopy';
 
 describe('My Care copy', () => {
   it('fills in values in both languages', () => {
-    expect(careText('en', 'weekOf40', { week: 18 })).toBe('Week 18 of 40');
-    expect(careText('te', 'weekOf40', { week: 18 })).toBe('40 వారాల్లో 18వ వారం');
+    expect(careText('en', 'week', { week: 18 })).toBe('Week 18');
+    expect(careText('te', 'week', { week: 18 })).toBe('18వ వారం');
+    expect(careText('en', 'asBigAs', { fruit: 'a capsicum' })).toBe('As big as a capsicum');
+    expect(careText('te', 'asBigAs', { fruit: 'క్యాప్సికం' })).toBe('క్యాప్సికం అంత ఉంటుంది');
     expect(careText('en', 'updatedBy', { date: '13 Oct', nurse: 'Lakshmi' })).toBe('Updated by nurse Lakshmi on 13 Oct');
   });
 
