@@ -21,14 +21,6 @@ export type CareFollowup = {
   hospital: { id: string; name: string; phone: string | null; logoUrl: string | null };
 };
 
-export type CareChatMessage = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  urgent: boolean;
-  createdAt: string;
-};
-
 export type MyCare = {
   linked: boolean;
   today: string;
@@ -37,7 +29,6 @@ export type MyCare = {
   followup?: CareFollowup | null;
   plans?: CarePlan[];
   everyVisit?: Partial<Record<CarePlan['type'], { en: string | null; te: string | null; untilMonths: number | null }>>;
-  chat?: { messages: CareChatMessage[]; remainingToday: number; dailyLimit: number };
 };
 
 export type CachedMyCare = { data: MyCare; savedAt: number };

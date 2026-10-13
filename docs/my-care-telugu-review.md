@@ -5,7 +5,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 - App screen text: `src/lib/careCopy.ts` (the `te` block) – needs an app update.
 - Visit names and checklist items: Supabase tables `care_schedule_visits` / `care_schedule_items` (`title_te`, `label_te`) – changes show at once, no app update.
 - Reminder push text: function `care_send_followup_reminders` in the database.
-- Chat safety lines: `supabase/functions/_shared/careChatSafety.ts`.
 
 ## App screen
 
@@ -63,26 +62,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Showing your last saved details. Pull down to refresh. | చివరిగా సేవ్ చేసిన వివరాలు చూపిస్తున్నాం. రిఫ్రెష్ చేయడానికి కిందికి లాగండి. |
 | Could not load My Care. Pull down to try again. | నా సంరక్షణ లోడ్ కాలేదు. మళ్ళీ ప్రయత్నించడానికి కిందికి లాగండి. |
 | Open DrJiva with your mobile number to see your care details. | మీ సంరక్షణ వివరాలు చూడటానికి మీ మొబైల్ నంబర్‌తో DrJiva తెరవండి. |
-| Ask DrJiva | DrJiva ను అడగండి |
-| Questions about food, rest or your tablets | ఆహారం, విశ్రాంతి, మీ మందుల గురించి అడగండి |
-| After-hospital care – ask anything | హాస్పిటల్ తర్వాత సంరక్షణ – ఏదైనా అడగండి |
-| Simple answers about recovery, food, rest and your tablet timings. | కోలుకోవడం, ఆహారం, విశ్రాంతి, మీ మందుల సమయాల గురించి సులభమైన సమాధానాలు. |
-| What can I eat? | నేను ఏమి తినొచ్చు? |
-| When do I take my tablets? | నా మాత్రలు ఎప్పుడు వేసుకోవాలి? |
-| Is this side effect normal? | ఈ సైడ్ ఎఫెక్ట్ సాధారణమేనా? |
-| When is my next visit? | నా తదుపరి సందర్శన ఎప్పుడు? |
-| Type your question | మీ ప్రశ్న టైప్ చేయండి |
-| Send | పంపు |
-| DrJiva is typing… | DrJiva టైప్ చేస్తోంది… |
-| You | మీరు |
-| {n} questions left today | ఈరోజు ఇంకా {n} ప్రశ్నలు అడగవచ్చు |
-| DrJiva AI gives general information, not medical advice. Emergency: call 108. | DrJiva AI సాధారణ సమాచారం మాత్రమే ఇస్తుంది, వైద్య సలహా కాదు. అత్యవసరమైతే 108కి కాల్ చేయండి. |
-| Call 108 | 108కి కాల్ చేయండి |
-| This may need care right now | దీనికి వెంటనే వైద్యం అవసరం కావచ్చు |
-| Call 108 or go to the hospital now. | వెంటనే 108కి కాల్ చేయండి లేదా హాస్పిటల్‌కు వెళ్ళండి. |
-| You have asked 30 questions today. Please try again tomorrow. | ఈరోజు 30 ప్రశ్నలు అడిగారు. దయచేసి రేపు మళ్ళీ ప్రయత్నించండి. |
-| Could not send. Check your internet and try again. | పంపలేకపోయాం. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి. |
-| Chat is not available right now. Please try later. | చాట్ ఇప్పుడు అందుబాటులో లేదు. కాసేపటి తర్వాత ప్రయత్నించండి. |
 | Hospital visit tomorrow | రేపు హాస్పిటల్ సందర్శన |
 | Your follow-up visit at {hospital} is tomorrow. | {hospital} లో మీ ఫాలో-అప్ సందర్శన రేపు ఉంది. |
 | Hospital visit today | ఈరోజు హాస్పిటల్ సందర్శన |
@@ -226,11 +205,3 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Hospital visit today | ఈరోజు హాస్పిటల్ సందర్శన |
 | Your follow-up visit at {hospital} is tomorrow, {date}. | {hospital} లో మీ ఫాలో-అప్ సందర్శన రేపు ఉంది. |
 | Your follow-up visit at {hospital} is today. | {hospital} లో మీ ఫాలో-అప్ సందర్శన ఈరోజు ఉంది. |
-
-## Chat safety lines (added by the server)
-
-| English | Telugu |
-|---|---|
-| Please call 108 or go to the hospital now. | దయచేసి వెంటనే 108కి కాల్ చేయండి లేదా హాస్పిటల్‌కు వెళ్ళండి. |
-| Please talk to someone now: call Tele MANAS 14416 (free, any time) or 108. | దయచేసి ఇప్పుడే ఎవరితోనైనా మాట్లాడండి: Tele MANAS 14416 (ఉచితం, ఎప్పుడైనా) లేదా 108కి కాల్ చేయండి. |
-| Sorry, I cannot answer that here. Please ask your doctor at {hospital}. | క్షమించండి, దీనికి ఇక్కడ సమాధానం ఇవ్వలేను. దయచేసి {hospital} లో మీ డాక్టర్‌ను అడగండి. |

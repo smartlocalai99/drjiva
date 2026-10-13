@@ -6,20 +6,19 @@ import { dashboardColors, dashboardRadii } from '../../dashboardTheme';
 import { PressableScale } from '../PressableScale';
 import { careFonts } from './careStyles';
 
-export function CallButton({ label, number, tone = 'outline' }: { label: string; number: string; tone?: 'outline' | 'danger' }) {
+export function CallButton({ label, number }: { label: string; number: string }) {
   const call = () => {
     void Linking.openURL(`tel:${number}`).catch(() => Alert.alert(label, number));
   };
-  const danger = tone === 'danger';
   return (
     <PressableScale
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={call}
-      style={[styles.button, danger ? styles.danger : styles.outline]}
+      style={[styles.button, styles.outline]}
     >
-      <Ionicons color={danger ? '#FFFFFF' : dashboardColors.primary} name="call" size={20} />
-      <Text style={[styles.text, danger && styles.dangerText]}>{label}</Text>
+      <Ionicons color={dashboardColors.primary} name="call" size={20} />
+      <Text style={styles.text}>{label}</Text>
     </PressableScale>
   );
 }
@@ -38,15 +37,9 @@ const styles = StyleSheet.create({
   outline: {
     backgroundColor: dashboardColors.primaryTint,
   },
-  danger: {
-    backgroundColor: '#DC2626',
-  },
   text: {
     color: dashboardColors.primary,
     fontFamily: careFonts.bold,
     fontSize: 17,
-  },
-  dangerText: {
-    color: '#FFFFFF',
   },
 });

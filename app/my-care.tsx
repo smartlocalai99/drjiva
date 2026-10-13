@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AskDrJivaCard, CareChatModal, CareChatPanel, useCareChatState } from '../src/components/care/CareChat';
 import { careFonts, careShared } from '../src/components/care/careStyles';
 import { ChildSection } from '../src/components/care/ChildSection';
 import { FollowUpCard } from '../src/components/care/FollowUpCard';
@@ -15,7 +14,7 @@ import { dashboardColors, dashboardLayout, dashboardSpacing } from '../src/dashb
 import { fetchMyCare, hideCarePlan, readCachedMyCare, type MyCare } from '../src/lib/care';
 import { useCareCopy } from '../src/lib/careCopy';
 import { syncCareReminders } from '../src/lib/careReminders';
-import { dialableIndianPhone, visitForDate } from '../src/lib/careSchedule';
+import { visitForDate } from '../src/lib/careSchedule';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 
@@ -33,9 +32,6 @@ export default function MyCareScreen() {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatQuestion, setChatQuestion] = useState<string | null>(null);
-  const [chat, setChat] = useCareChatState(care?.chat);
   const hasCare = useRef(false);
 
   const load = useCallback(async () => {
@@ -108,11 +104,6 @@ export default function MyCareScreen() {
     ]);
   };
 
-  const openChat = (question?: string) => {
-    setChatQuestion(question ?? null);
-    setChatOpen(true);
-  };
-
   const plans = care?.plans ?? [];
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0] ?? null;
   const followup = care?.followup ?? null;
@@ -121,7 +112,6 @@ export default function MyCareScreen() {
   const today = care?.today ?? '';
   const isPediatric = care?.currentDoctor?.department === 'pediatrics';
   const hasChildPlan = plans.some((plan) => plan.type === 'child');
-  const hospitalPhone = dialableIndianPhone(followup?.hospital.phone);
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const scrollBottomPadding = navBottomOffset + dashboardLayout.bottomNavHeight + dashboardSpacing.xl;
   const everyVisitLine = (type: 'pregnancy' | 'child') => {
@@ -209,30 +199,10 @@ export default function MyCareScreen() {
                 </View>
               ) : null}
 
-              {plans.length > 0 ? (
-                <AskDrJivaCard onOpen={() => openChat()} />
-              ) : (
-                <CareChatPanel messages={chat.messages} onOpen={openChat} />
-              )}
             </>
           ) : null}
         </ScrollView>
       )}
-
-      {phone ? (
-        <CareChatModal
-          chat={chat}
-          hospitalPhone={hospitalPhone}
-          initialQuestion={chatQuestion}
-          onChatChange={setChat}
-          onClose={() => {
-            setChatOpen(false);
-            setChatQuestion(null);
-          }}
-          phone={phone}
-          visible={chatOpen}
-        />
-      ) : null}
 
       <BottomNav activeTab={activeTab} bottomOffset={navBottomOffset} onSelectTab={handleSelectTab} />
     </SafeAreaView>
