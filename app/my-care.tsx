@@ -5,6 +5,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View }
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { careFonts, careShared } from '../src/components/care/careStyles';
+import { ChatBubble } from '../src/components/care/ChatBubble';
 import { ChildSection } from '../src/components/care/ChildSection';
 import { FollowUpCard } from '../src/components/care/FollowUpCard';
 import { PlanSwitcher } from '../src/components/care/PlanSwitcher';
@@ -14,7 +15,7 @@ import { dashboardColors, dashboardLayout, dashboardSpacing } from '../src/dashb
 import { fetchMyCare, readCachedMyCare, type MyCare } from '../src/lib/care';
 import { useCareCopy } from '../src/lib/careCopy';
 import { syncCareReminders } from '../src/lib/careReminders';
-import { visitForDate } from '../src/lib/careSchedule';
+import { dialableIndianPhone, visitForDate } from '../src/lib/careSchedule';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 
@@ -100,7 +101,9 @@ export default function MyCareScreen() {
   // A pregnancy page opens straight on the baby; no page heading.
   const isPregnancy = selectedPlan?.type === 'pregnancy';
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
-  const scrollBottomPadding = navBottomOffset + dashboardLayout.bottomNavHeight + dashboardSpacing.xl;
+  const chatBottom = navBottomOffset + dashboardLayout.bottomNavHeight + 14;
+  // Room so the chat button never covers the last card.
+  const scrollBottomPadding = chatBottom + 72;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -168,6 +171,16 @@ export default function MyCareScreen() {
           ) : null}
         </ScrollView>
       )}
+
+      {care?.linked ? (
+        <ChatBubble
+          bottom={chatBottom}
+          chat={care.chat}
+          hospitalPhone={dialableIndianPhone(followup?.hospital.phone)}
+          isPregnancy={isPregnancy}
+          phone={phone}
+        />
+      ) : null}
 
       <BottomNav activeTab={activeTab} bottomOffset={navBottomOffset} onSelectTab={handleSelectTab} />
     </SafeAreaView>

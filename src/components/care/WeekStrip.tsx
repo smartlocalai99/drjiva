@@ -9,8 +9,8 @@ import { PressableScale } from '../PressableScale';
 import { BABY_IMAGES } from './BabyWeekCard';
 import { careFonts } from './careStyles';
 
-const CHIP_WIDTH = 66;
-const CHIP_GAP = 8;
+const CHIP_WIDTH = 52;
+const CHIP_GAP = 6;
 const SIDE = dashboardSpacing.pagePadding;
 const CONTENT_WIDTH = SIDE * 2 + BABY_WEEKS.length * CHIP_WIDTH + (BABY_WEEKS.length - 1) * CHIP_GAP;
 
@@ -51,7 +51,7 @@ export function WeekStrip({
       {BABY_WEEKS.map(({ stage, week }) => {
         const selected = week === selectedWeek;
         const now = week === currentWeek;
-        const icon = Math.round(18 + 16 * babyScale(week));
+        const icon = Math.round(14 + 12 * babyScale(week));
         return (
           <PressableScale
             accessibilityLabel={now ? `${c('week', { week })}, ${c('thisWeek')}` : c('week', { week })}
@@ -78,11 +78,11 @@ const styles = StyleSheet.create({
     backgroundColor: dashboardColors.card,
     borderColor: dashboardColors.track,
     borderCurve: 'continuous',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1.5,
-    gap: 2,
-    paddingBottom: 10,
-    paddingTop: 8,
+    gap: 0,
+    paddingBottom: 6,
+    paddingTop: 6,
     width: CHIP_WIDTH,
   },
   chipNow: {
@@ -95,23 +95,23 @@ const styles = StyleSheet.create({
   iconWell: {
     alignItems: 'center',
     backgroundColor: '#C4614B',
-    borderRadius: 21,
-    height: 42,
+    borderRadius: 16,
+    height: 32,
     justifyContent: 'center',
-    marginBottom: 4,
-    width: 42,
+    marginBottom: 3,
+    width: 32,
   },
   label: {
     color: dashboardColors.textMuted,
     fontFamily: careFonts.semiBold,
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 14,
   },
   number: {
     color: dashboardColors.text,
     fontFamily: careFonts.bold,
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 20,
   },
   row: {
     gap: CHIP_GAP,

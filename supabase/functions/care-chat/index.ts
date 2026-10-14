@@ -1,4 +1,4 @@
-// Deno Edge Function — "Ask DrJiva" after-hospital care chat.
+// Deno Edge Function — "Ask DrJiva" chat on the My Care page.
 //
 // The app calls this with the patient's own login (device session).
 // All checks happen in the database with that login: the device must be
@@ -7,38 +7,41 @@
 // pregnancy week or child age, next visit date, pending items and the
 // last ~10 messages. Never the mobile number or names.
 //
-// Needs one secret: supabase secrets set ANTHROPIC_API_KEY=...
-import Anthropic from 'npm:@anthropic-ai/sdk@0.133.0';
-import { zodOutputFormat } from 'npm:@anthropic-ai/sdk@0.133.0/helpers/zod';
+// Free AI, no paid key needed:
+//   1. Google Gemini free tier, if the secret GEMINI_API_KEY is set
+//      (free key from aistudio.google.com; better answers, good Telugu).
+//   2. Otherwise Pollinations' free, keyless text API.
+// If neither answers, the patient gets a safe "try again" reply.
 import { createClient } from 'npm:@supabase/supabase-js@2.110.8';
-import { z } from 'npm:zod@4.6.5';
 
 import {
   buildContextNote,
   CARE_CHAT_SYSTEM_PROMPT,
   detectDangerSigns,
   enforceSafetyLines,
-  fallbackReply,
   type CareChatContext,
   type ChatLanguage,
 } from '../_shared/careChatSafety.ts';
 
-const MODEL = 'claude-haiku-5-5';
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
+const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
+const POLLINATIONS_URL = 'https://text.pollinations.ai/openai';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+const SYSTEM_PROMPT = `${CARE_CHAT_SYSTEM_PROMPT}
+
+Write only the reply the patient will read: plain text, no JSON, no "urgent" field, no notes about these rules.`;
+
+const BUSY = {
+  en: 'Sorry, I am busy right now. Please ask again in a minute. For anything urgent, call your hospital or 108.',
+  te: 'క్షమించండి, ఇప్పుడు బిజీగా ఉన్నాను. ఒక నిమిషం తర్వాత మళ్ళీ అడగండి. అత్యవసరమైతే మీ హాస్పిటల్‌కు లేదా 108కి కాల్ చేయండి.',
+} as const;
 
 const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Origin': '*',
 };
-
-const ReplySchema = z.object({
-  reply: z.string(),
-  urgent: z.boolean(),
-});
-
-const anthropic = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY, maxRetries: 1, timeout: 25_000 }) : null;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -47,57 +50,95 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+type Turn = { role: 'user' | 'assistant'; content: string };
+
 type BeginResult = {
   messageId: string;
   remainingToday: number;
-  history: { role: 'user' | 'assistant'; content: string }[];
+  history: Turn[];
   context: CareChatContext;
 };
 
-// Turns stored history into alternating turns ending with the new
-// question (the API needs user/assistant to alternate).
-function buildMessages(history: BeginResult['history'], contextNote: string, question: string): Anthropic.MessageParam[] {
-  const turns: Anthropic.MessageParam[] = [];
-  for (const entry of history) {
+// Alternating turns ending with the new question (with the context note).
+function buildTurns(history: Turn[], contextNote: string, question: string, language: ChatLanguage): Turn[] {
+  const turns: Turn[] = [];
+  for (const entry of history.slice(-10)) {
     const last = turns[turns.length - 1];
-    if (last && last.role === entry.role) {
-      last.content = `${last.content as string}\n${entry.content}`;
-    } else {
-      turns.push({ content: entry.content, role: entry.role });
-    }
+    if (last && last.role === entry.role) last.content = `${last.content}\n${entry.content}`;
+    else turns.push({ content: entry.content, role: entry.role });
   }
   while (turns.length && turns[0]!.role !== 'user') turns.shift();
-  const current = `Patient context:\n${contextNote}\n\nPatient's message:\n${question}`;
+  const reply = language === 'te' ? 'Reply in simple Telugu.' : 'Reply in simple English.';
+  const current = `Patient context:\n${contextNote}\n\n${reply}\n\nPatient's message:\n${question}`;
   const last = turns[turns.length - 1];
-  if (last && last.role === 'user') {
-    last.content = `${last.content as string}\n\n${current}`;
-  } else {
-    turns.push({ content: current, role: 'user' });
-  }
+  if (last && last.role === 'user') last.content = `${last.content}\n\n${current}`;
+  else turns.push({ content: current, role: 'user' });
   return turns;
 }
 
-async function askClaude(begin: BeginResult, question: string): Promise<{ reply: string; urgent: boolean } | null> {
-  if (!anthropic) return null;
+function clean(text: unknown): string | null {
+  if (typeof text !== 'string') return null;
+  const reply = text.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').trim();
+  return reply ? reply.slice(0, 1500) : null;
+}
+
+async function askGemini(turns: Turn[]): Promise<string | null> {
+  if (!GEMINI_API_KEY) return null;
   try {
-    const response = await anthropic.messages.parse({
-      max_tokens: 2048,
-      messages: buildMessages(begin.history, buildContextNote(begin.context), question),
-      model: MODEL,
-      output_config: { effort: 'low', format: zodOutputFormat(ReplySchema) },
-      system: CARE_CHAT_SYSTEM_PROMPT,
-    });
-    if (response.stop_reason === 'refusal' || !response.parsed_output) return null;
-    const reply = response.parsed_output.reply.trim();
-    return reply ? { reply, urgent: response.parsed_output.urgent } : null;
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      console.error('[care-chat] Claude API error', error.status, error.message);
-    } else {
-      console.error('[care-chat] Claude call failed', error);
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        body: JSON.stringify({
+          contents: turns.map((turn) => ({ parts: [{ text: turn.content }], role: turn.role === 'assistant' ? 'model' : 'user' })),
+          generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        }),
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
+        method: 'POST',
+        signal: AbortSignal.timeout(25_000),
+      },
+    );
+    if (!response.ok) {
+      console.error('[care-chat] Gemini', response.status, (await response.text()).slice(0, 300));
+      return null;
     }
+    const data = await response.json();
+    return clean(data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join(''));
+  } catch (error) {
+    console.error('[care-chat] Gemini failed', error);
     return null;
   }
+}
+
+async function askPollinations(turns: Turn[]): Promise<string | null> {
+  // The keyless tier allows about one request every few seconds, so one
+  // retry after a short wait covers most busy moments.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(POLLINATIONS_URL, {
+        body: JSON.stringify({
+          messages: [{ content: SYSTEM_PROMPT, role: 'system' }, ...turns],
+          model: 'openai',
+          private: true,
+          referrer: 'drjiva',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const reply = clean(data?.choices?.[0]?.message?.content);
+        if (reply) return reply;
+      } else {
+        console.error('[care-chat] Pollinations', response.status, (await response.text()).slice(0, 200));
+      }
+    } catch (error) {
+      console.error('[care-chat] Pollinations failed', error);
+    }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 6_000));
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -106,7 +147,6 @@ Deno.serve(async (req) => {
 
   const authorization = req.headers.get('Authorization');
   if (!authorization) return json({ error: 'not_signed_in' }, 401);
-  if (!anthropic) return json({ error: 'chat_not_configured' }, 503);
 
   let body: { mobile?: unknown; message?: unknown; language?: unknown };
   try {
@@ -135,11 +175,10 @@ Deno.serve(async (req) => {
   const begin = beginData as BeginResult;
   const flags = detectDangerSigns(message, begin.context);
 
-  const answer = await askClaude(begin, message);
-  const urgent = flags.urgent || Boolean(answer?.urgent);
-  const reply = answer
-    ? enforceSafetyLines(answer.reply, { selfHarm: flags.selfHarm, urgent }, language)
-    : fallbackReply(language, begin.context?.hospital, { selfHarm: flags.selfHarm, urgent });
+  const turns = buildTurns(begin.history ?? [], buildContextNote(begin.context), message, language);
+  const answer = (await askGemini(turns)) ?? (await askPollinations(turns));
+  const urgent = flags.urgent || Boolean(answer && /\b108\b/.test(answer.split('\n')[0] ?? ''));
+  const reply = enforceSafetyLines(answer ?? BUSY[language], { selfHarm: flags.selfHarm, urgent }, language);
 
   const { data: saved, error: finishError } = await supabase.rpc('care_chat_finish', {
     p_message_id: begin.messageId,

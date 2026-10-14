@@ -110,15 +110,10 @@ export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | n
             </View>
           ) : null}
         </View>
-        <View style={styles.metaRow}>
-          <Text style={careShared.muted}>{careMonth(language, pregnancyMonth(info.week))}</Text>
-          {dueDate ? (
-            <>
-              <View style={styles.metaDot} />
-              <Text style={careShared.muted}>{c('dueDate', { date: date(dueDate) })}</Text>
-            </>
-          ) : null}
-        </View>
+        <Text style={[careShared.muted, styles.meta]}>
+          {careMonth(language, pregnancyMonth(info.week))}
+          {dueDate ? ` · ${c('dueDate', { date: date(dueDate) })}` : ''}
+        </Text>
       </View>
 
       <View style={styles.body}>
@@ -132,15 +127,6 @@ export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | n
         </View>
 
         <View style={styles.facts}>
-          <View accessibilityLabel={[before, fruit, after].filter(Boolean).join(' ')} accessible style={styles.compare}>
-            {before ? <Text style={styles.lead}>{before}</Text> : null}
-            <View style={styles.fruitRow}>
-              <Image contentFit="contain" source={FRUIT_PHOTOS[info.photo]} style={styles.fruitPhoto} transition={150} />
-              <Text style={styles.fruitName}>{fruit}</Text>
-            </View>
-            {after ? <Text style={styles.lead}>{after}</Text> : null}
-          </View>
-
           <View style={styles.stats}>
             <Stat
               caption={c('weight')}
@@ -152,6 +138,15 @@ export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | n
               change={cm === null ? null : `+${say(lengthAmount(cm, info.lengthCm))}`}
               value={say(lengthAmount(info.lengthCm))}
             />
+          </View>
+
+          <View accessibilityLabel={[before, fruit, after].filter(Boolean).join(' ')} accessible style={styles.compare}>
+            <Image contentFit="contain" source={FRUIT_PHOTOS[info.photo]} style={styles.fruitPhoto} transition={150} />
+            <Text numberOfLines={2} style={styles.compareText}>
+              {before ? `${before} ` : ''}
+              <Text style={styles.fruitName}>{fruit}</Text>
+              {after ? ` ${after}` : ''}
+            </Text>
           </View>
         </View>
       </View>
@@ -195,11 +190,25 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   compare: {
-    gap: 4,
+    alignItems: 'center',
+    backgroundColor: dashboardColors.bg,
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  compareText: {
+    color: dashboardColors.textMuted,
+    flex: 1,
+    fontFamily: careFonts.semiBold,
+    fontSize: 15,
+    lineHeight: 20,
   },
   facts: {
     flex: 1,
-    gap: 12,
+    gap: 14,
   },
   fill: {
     height: '100%',
@@ -207,37 +216,13 @@ const styles = StyleSheet.create({
   },
   fruitName: {
     color: dashboardColors.text,
-    flexShrink: 1,
     fontFamily: careFonts.bold,
-    fontSize: 18,
-    lineHeight: 23,
   },
   fruitPhoto: {
-    height: 52,
-    width: 52,
+    height: 40,
+    width: 40,
   },
-  fruitRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  lead: {
-    color: dashboardColors.textMuted,
-    fontFamily: careFonts.semiBold,
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  metaDot: {
-    backgroundColor: dashboardColors.textMuted,
-    borderRadius: 2,
-    height: 4,
-    width: 4,
-  },
-  metaRow: {
-    alignItems: 'center',
-    columnGap: 8,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  meta: {
     marginTop: 2,
   },
   nowPill: {

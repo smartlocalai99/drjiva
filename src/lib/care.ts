@@ -21,6 +21,14 @@ export type CareFollowup = {
   hospital: { id: string; name: string; phone: string | null; logoUrl: string | null };
 };
 
+export type CareChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  urgent: boolean;
+  createdAt: string;
+};
+
 // A test or scan the nurse added from the case sheet, still to do.
 export type CareExtraItem = { id: string; hospitalId: string; label: string; dueDate: string };
 
@@ -33,6 +41,7 @@ export type MyCare = {
   plans?: CarePlan[];
   everyVisit?: Partial<Record<CarePlan['type'], { en: string | null; te: string | null; untilMonths: number | null }>>;
   extraItems?: CareExtraItem[];
+  chat?: { messages: CareChatMessage[]; remainingToday: number; dailyLimit: number };
 };
 
 export type CachedMyCare = { data: MyCare; savedAt: number };
