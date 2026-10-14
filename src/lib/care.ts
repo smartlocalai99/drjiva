@@ -21,6 +21,9 @@ export type CareFollowup = {
   hospital: { id: string; name: string; phone: string | null; logoUrl: string | null };
 };
 
+// A test or scan the nurse added from the case sheet, still to do.
+export type CareExtraItem = { id: string; hospitalId: string; label: string; dueDate: string };
+
 export type MyCare = {
   linked: boolean;
   today: string;
@@ -29,13 +32,19 @@ export type MyCare = {
   followup?: CareFollowup | null;
   plans?: CarePlan[];
   everyVisit?: Partial<Record<CarePlan['type'], { en: string | null; te: string | null; untilMonths: number | null }>>;
+  extraItems?: CareExtraItem[];
 };
 
 export type CachedMyCare = { data: MyCare; savedAt: number };
 
 const cacheKey = (phone: string) => `drjiva.myCare.v1.${phone}`;
 
+// v2 = the same answer plus extra tests from the case sheet, in one call.
+// Falls back to v1 if the database does not have v2 yet.
 async function getMyCare(mobile: string): Promise<MyCare> {
+  const v2 = await supabase.rpc('care_get_my_care_v2', { p_mobile: mobile });
+  if (!v2.error) return v2.data as MyCare;
+  if (v2.error.code !== 'PGRST202') throw v2.error;
   const { data, error } = await supabase.rpc('care_get_my_care', { p_mobile: mobile });
   if (error) throw error;
   return data as MyCare;

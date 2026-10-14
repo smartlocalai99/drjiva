@@ -163,7 +163,7 @@ export default function MyCareScreen() {
 
               {selectedPlan?.type === 'child' ? <ChildSection plan={selectedPlan} today={today} /> : null}
 
-              <FollowUpCard followup={followup} today={today} visit={followupVisit} />
+              <FollowUpCard extraItems={care.extraItems} followup={followup} today={today} visit={followupVisit} />
             </>
           ) : null}
         </ScrollView>

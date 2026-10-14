@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors } from '../../dashboardTheme';
-import type { CareFollowup } from '../../lib/care';
+import type { CareExtraItem, CareFollowup } from '../../lib/care';
 import { useCareCopy } from '../../lib/careCopy';
 import { daysUntil, dialableIndianPhone, type CareVisit } from '../../lib/careSchedule';
 import { DoctorAvatar } from '../DoctorAvatar';
@@ -11,7 +11,17 @@ import { CallButton } from './CallButton';
 import { careFonts, careShared } from './careStyles';
 
 // Always the first card: when to go back, where, and who set it.
-export function FollowUpCard({ followup, today, visit }: { followup: CareFollowup | null | undefined; today: string; visit: CareVisit | null }) {
+export function FollowUpCard({
+  extraItems = [],
+  followup,
+  today,
+  visit,
+}: {
+  extraItems?: CareExtraItem[];
+  followup: CareFollowup | null | undefined;
+  today: string;
+  visit: CareVisit | null;
+}) {
   const { c, date, pick } = useCareCopy();
 
   if (!followup) {
@@ -32,6 +42,8 @@ export function FollowUpCard({ followup, today, visit }: { followup: CareFollowu
   const when = days <= 0 ? c('today') : days === 1 ? c('tomorrow') : c('inDays', { n: days });
   const phone = dialableIndianPhone(followup.hospital.phone);
   const visitItems = visit?.items.filter((item) => !item.conditional).slice(0, 4) ?? [];
+  // Tests the nurse added from the case sheet for this visit.
+  const extras = extraItems.filter((item) => item.dueDate === followup.nextDate && item.hospitalId === followup.hospital.id);
 
   return (
     <View accessibilityLabel={`${c('nextVisit')}: ${date(followup.nextDate, 'weekdayDayMonth')}, ${when}`} style={careShared.card}>
@@ -61,13 +73,23 @@ export function FollowUpCard({ followup, today, visit }: { followup: CareFollowu
         </View>
       </View>
 
-      {visitItems.length > 0 && visit ? (
+      {(visitItems.length > 0 && visit) || extras.length > 0 ? (
         <View style={styles.block}>
-          <Text style={styles.blockTitle}>{c('atThisVisit')} · {pick(visit.titleEn, visit.titleTe)}</Text>
-          {visitItems.map((item) => (
+          <Text style={styles.blockTitle}>
+            {visitItems.length > 0 && visit ? `${c('atThisVisit')} · ${pick(visit.titleEn, visit.titleTe)}` : c('atThisVisit')}
+          </Text>
+          {visit
+            ? visitItems.map((item) => (
+                <View key={item.id} style={styles.bulletRow}>
+                  <View style={styles.bullet} />
+                  <Text style={[careShared.body, styles.flex]}>{pick(item.labelEn, item.labelTe)}</Text>
+                </View>
+              ))
+            : null}
+          {extras.map((item) => (
             <View key={item.id} style={styles.bulletRow}>
               <View style={styles.bullet} />
-              <Text style={[careShared.body, styles.flex]}>{pick(item.labelEn, item.labelTe)}</Text>
+              <Text style={[careShared.body, styles.flex]}>{item.label}</Text>
             </View>
           ))}
         </View>
