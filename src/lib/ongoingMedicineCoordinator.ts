@@ -7,10 +7,12 @@ import { ensureSecureReportSession } from './reportAuth';
 import type { DoseSlot } from './medicineSchedule';
 import { supabase } from './supabase';
 
-// Rebuild existing alerts once to remove orphaned per-medicine notifications.
-// This also preserves the earlier iOS sound migration to reminder.caf.
+// Rebuild existing alerts once after each grouping change. v5: one alert per
+// time for every patient on the phone (two people at 8 AM rang twice). This
+// also removes orphaned per-medicine notifications and keeps the earlier iOS
+// sound migration to reminder.caf.
 const GROUPED_NOTIFICATION_MIGRATION_KEY =
-  'drjiva.groupedMedicineNotifications.v4-grouped-reminder-cleanup';
+  'drjiva.groupedMedicineNotifications.v5-one-alert-per-time';
 
 type OngoingCourseRow = {
   id: string;
@@ -97,9 +99,9 @@ export async function replenishOngoingMedicineCourses(horizonDays = 14): Promise
     }
   }
 
-  for (const patientId of patientsToSync) {
-    await syncPatientDoseNotifications(patientId);
-  }
+  // One rebuild covers every patient on this phone.
+  const [firstPatient] = patientsToSync;
+  if (firstPatient) await syncPatientDoseNotifications(firstPatient);
 
   if (migrationStorageKey) {
     const { default: AsyncStorage } = await import(

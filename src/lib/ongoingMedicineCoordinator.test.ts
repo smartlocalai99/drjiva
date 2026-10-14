@@ -35,7 +35,7 @@ vi.mock('./medicineNotifications', () => ({
 import { replenishOngoingMedicineCourses } from './ongoingMedicineCoordinator';
 
 const migrationKey =
-  'drjiva.groupedMedicineNotifications.v4-grouped-reminder-cleanup.owner-1';
+  'drjiva.groupedMedicineNotifications.v5-one-alert-per-time.owner-1';
 
 describe('grouped reminder cleanup migration', () => {
   const savedNotificationIds = new Map<string, string>();
@@ -90,9 +90,9 @@ describe('grouped reminder cleanup migration', () => {
           return query;
         },
         update: ({ notification_id }: { notification_id: string }) => ({
-          eq: async (column: string, eventId: string) => {
+          in: async (column: string, eventIds: string[]) => {
             if (column !== 'id') throw new Error(`Unexpected filter: ${column}`);
-            savedNotificationIds.set(eventId, notification_id);
+            for (const eventId of eventIds) savedNotificationIds.set(eventId, notification_id);
             return { error: null };
           },
         }),
@@ -100,7 +100,7 @@ describe('grouped reminder cleanup migration', () => {
     });
   });
 
-  it.each(['v2', 'v3-ios-sound'])(
+  it.each(['v2', 'v3-ios-sound', 'v4-grouped-reminder-cleanup'])(
     'rebuilds existing reminders even when migration %s was already completed',
     async (previousVersion) => {
       migrationStorage.set(
