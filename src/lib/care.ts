@@ -66,9 +66,3 @@ export async function readCachedMyCare(phone: string): Promise<CachedMyCare | nu
     return null;
   }
 }
-
-export async function hideCarePlan(phone: string, planId: string): Promise<void> {
-  await ensureSecureReportSession();
-  const { error } = await supabase.rpc('care_hide_plan', { p_mobile: toIndianE164(phone), p_plan_id: planId });
-  if (error) throw error;
-}

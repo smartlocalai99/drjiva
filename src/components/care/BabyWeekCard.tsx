@@ -28,7 +28,8 @@ export const BABY_IMAGES: Record<BabyStage, number> = {
 };
 const WOMB_IMAGE = require('../../../assets/care/womb.webp');
 
-// Real photos (public domain, see assets/care/fruits/SOURCES.md).
+// Real photos cut out of their background (public domain, see
+// assets/care/fruits/SOURCES.md).
 const FRUIT_PHOTOS: Record<FruitPhoto, number> = {
   amla: require('../../../assets/care/fruits/amla.webp'),
   apple: require('../../../assets/care/fruits/apple.webp'),
@@ -67,7 +68,7 @@ const FRUIT_PHOTOS: Record<FruitPhoto, number> = {
 };
 
 // womb.webp is 600 × 680; the fluid inside is 125/150 of its width.
-const WOMB_WIDTH = 132;
+const WOMB_WIDTH = 120;
 const WOMB_HEIGHT = Math.round((WOMB_WIDTH * 680) / 600);
 const WOMB_INSIDE = (WOMB_WIDTH * 125) / 150;
 const GROW = { duration: 280, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System } as const;
@@ -130,22 +131,24 @@ export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | n
           <View accessibilityLabel={[before, fruit, after].filter(Boolean).join(' ')} accessible style={styles.compare}>
             {before ? <Text style={styles.lead}>{before}</Text> : null}
             <View style={styles.fruitRow}>
-              <Image contentFit="cover" source={FRUIT_PHOTOS[info.photo]} style={styles.fruitPhoto} transition={150} />
+              <Image contentFit="contain" source={FRUIT_PHOTOS[info.photo]} style={styles.fruitPhoto} transition={150} />
               <Text style={styles.fruitName}>{fruit}</Text>
             </View>
             {after ? <Text style={styles.lead}>{after}</Text> : null}
           </View>
 
-          <Stat
-            caption={c('weight')}
-            change={grams === null ? null : `+${say(weightAmount(grams))}`}
-            value={info.weightG === null ? c('underOneGram') : say(weightAmount(info.weightG))}
-          />
-          <Stat
-            caption={c(info.week >= HEAD_TO_HEEL_FROM_WEEK ? 'lengthHeadToHeel' : 'lengthHeadToBottom')}
-            change={cm === null ? null : `+${say(lengthAmount(cm, info.lengthCm))}`}
-            value={say(lengthAmount(info.lengthCm))}
-          />
+          <View style={styles.stats}>
+            <Stat
+              caption={c('weight')}
+              change={grams === null ? null : `+${say(weightAmount(grams))}`}
+              value={info.weightG === null ? c('underOneGram') : say(weightAmount(info.weightG))}
+            />
+            <Stat
+              caption={c(info.week >= HEAD_TO_HEEL_FROM_WEEK ? 'lengthHeadToHeel' : 'lengthHeadToBottom')}
+              change={cm === null ? null : `+${say(lengthAmount(cm, info.lengthCm))}`}
+              value={say(lengthAmount(info.lengthCm))}
+            />
+          </View>
         </View>
       </View>
     </View>
@@ -154,15 +157,9 @@ export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | n
 
 function Stat({ caption, change, value }: { caption: string; change: string | null; value: string }) {
   return (
-    <View>
-      <View style={styles.statLine}>
-        <Text style={styles.statValue}>{value}</Text>
-        {change ? (
-          <View style={styles.change}>
-            <Text style={styles.changeText}>{change}</Text>
-          </View>
-        ) : null}
-      </View>
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      {change ? <Text style={styles.changeText}>{change}</Text> : null}
       <Text style={styles.statCaption}>{caption}</Text>
     </View>
   );
@@ -187,17 +184,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
-  change: {
-    backgroundColor: dashboardColors.successTint,
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-  },
   changeText: {
     color: '#15803D',
     fontFamily: careFonts.bold,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 17,
   },
   compare: {
     gap: 4,
@@ -218,12 +209,8 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   fruitPhoto: {
-    backgroundColor: dashboardColors.bg,
-    borderColor: dashboardColors.track,
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    width: 44,
+    height: 52,
+    width: 52,
   },
   fruitRow: {
     alignItems: 'center',
@@ -266,18 +253,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 17,
   },
-  statLine: {
-    alignItems: 'center',
-    columnGap: 6,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 2,
+  stat: {
+    flex: 1,
+    gap: 1,
   },
   statValue: {
     color: dashboardColors.text,
     fontFamily: careFonts.bold,
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  stats: {
+    flexDirection: 'row',
+    gap: 12,
   },
   titleRow: {
     alignItems: 'center',

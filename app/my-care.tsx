@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { careFonts, careShared } from '../src/components/care/careStyles';
@@ -11,7 +11,7 @@ import { PlanSwitcher } from '../src/components/care/PlanSwitcher';
 import { PregnancySection } from '../src/components/care/PregnancySection';
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { dashboardColors, dashboardLayout, dashboardSpacing } from '../src/dashboardTheme';
-import { fetchMyCare, hideCarePlan, readCachedMyCare, type MyCare } from '../src/lib/care';
+import { fetchMyCare, readCachedMyCare, type MyCare } from '../src/lib/care';
 import { useCareCopy } from '../src/lib/careCopy';
 import { syncCareReminders } from '../src/lib/careReminders';
 import { visitForDate } from '../src/lib/careSchedule';
@@ -91,39 +91,30 @@ export default function MyCareScreen() {
     router.replace({ params: { phone }, pathname: route });
   };
 
-  const confirmHide = (planId: string) => {
-    Alert.alert(c('hideTitle'), c('hideBody'), [
-      { style: 'cancel', text: c('cancel') },
-      {
-        onPress: () => {
-          void hideCarePlan(phone, planId).then(load).catch(() => Alert.alert(c('loadError')));
-        },
-        style: 'destructive',
-        text: c('hide'),
-      },
-    ]);
-  };
-
   const plans = care?.plans ?? [];
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0] ?? null;
   const followup = care?.followup ?? null;
   const followupPlan = plans.find((plan) => plan.id === followup?.planId) ?? selectedPlan;
   const followupVisit = followup && followupPlan ? visitForDate(followupPlan, followup.nextDate) : null;
   const today = care?.today ?? '';
+  // A pregnancy page opens straight on the baby; no page heading.
+  const isPregnancy = selectedPlan?.type === 'pregnancy';
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const scrollBottomPadding = navBottomOffset + dashboardLayout.bottomNavHeight + dashboardSpacing.xl;
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Ionicons color={dashboardColors.primary} name="document-text" size={20} />
+      {isPregnancy ? null : (
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Ionicons color={dashboardColors.primary} name="document-text" size={20} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.headerTitle}>{c('title')}</Text>
+            <Text style={styles.headerSubtitle}>{c('subtitle')}</Text>
+          </View>
         </View>
-        <View style={styles.flex}>
-          <Text style={styles.headerTitle}>{c('title')}</Text>
-          <Text style={styles.headerSubtitle}>{c('subtitle')}</Text>
-        </View>
-      </View>
+      )}
 
       {loadState === 'loading' && !care ? (
         <View style={styles.center}>
@@ -132,7 +123,7 @@ export default function MyCareScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}
+          contentContainerStyle={[styles.content, isPregnancy && styles.contentNoHeader, { paddingBottom: scrollBottomPadding }]}
           refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={refreshing} tintColor={dashboardColors.primary} />}
           showsVerticalScrollIndicator={false}
         >
@@ -173,12 +164,6 @@ export default function MyCareScreen() {
               {selectedPlan?.type === 'child' ? <ChildSection plan={selectedPlan} today={today} /> : null}
 
               <FollowUpCard followup={followup} today={today} visit={followupVisit} />
-
-              {selectedPlan ? (
-                <Pressable accessibilityRole="button" hitSlop={8} onPress={() => confirmHide(selectedPlan.id)} style={styles.notForMe}>
-                  <Text style={styles.notForMeText}>{c('notForMe')}</Text>
-                </Pressable>
-              ) : null}
             </>
           ) : null}
         </ScrollView>
@@ -223,6 +208,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: dashboardSpacing.pagePadding,
     paddingTop: dashboardSpacing.sm,
   },
+  contentNoHeader: {
+    paddingTop: dashboardSpacing.gap,
+  },
   flex: { flex: 1 },
   header: {
     alignItems: 'center',
@@ -252,17 +240,6 @@ const styles = StyleSheet.create({
     fontFamily: careFonts.semiBold,
     fontSize: 22,
     lineHeight: 28,
-  },
-  notForMe: {
-    alignSelf: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  notForMeText: {
-    color: dashboardColors.textMuted,
-    fontFamily: careFonts.semiBold,
-    fontSize: 15,
-    textDecorationLine: 'underline',
   },
   safeArea: {
     backgroundColor: dashboardColors.bg,

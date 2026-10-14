@@ -40,11 +40,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | {n} cm | {n} సెం.మీ. |
 | {n} g | {n} గ్రాములు |
 | {n} kg | {n} కిలోలు |
-| This doesn't apply to me anymore | ఇది ఇప్పుడు నాకు వర్తించదు |
-| Hide this schedule? | ఈ షెడ్యూల్ దాచాలా? |
-| It will not show in your app anymore. Your nurse can still see it. | ఇది మీ యాప్‌లో ఇక కనిపించదు. మీ నర్సు చూడగలరు. |
-| Hide | దాచు |
-| Cancel | రద్దు |
 | 1 week old | 1 వారం వయస్సు |
 | {n} weeks old | {n} వారాల వయస్సు |
 | 1 month old | 1 నెల వయస్సు |
