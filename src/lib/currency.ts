@@ -8,17 +8,19 @@ export function formatRupees(value: number): string {
 }
 
 export const DUMMY_MEDICINE_PRICE = 49;
-export const SHOP_DISCOUNT_PERCENT = 15;
+export const SHOP_DISCOUNT_PERCENT = 5;
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
 
 export function resolveShopProductPrice(price: number | null): number {
-  return price ?? DUMMY_MEDICINE_PRICE;
+  const mrp = resolveShopProductMrp(price);
+  return roundCurrency(mrp * (1 - SHOP_DISCOUNT_PERCENT / 100));
 }
 
 export function resolveShopProductMrp(price: number | null): number {
-  const sellingPrice = resolveShopProductPrice(price);
-  return Math.round(
-    (sellingPrice / (1 - SHOP_DISCOUNT_PERCENT / 100)) * 100,
-  ) / 100;
+  return price ?? DUMMY_MEDICINE_PRICE;
 }
 
 export function formatShopProductMrp(price: number | null): string {

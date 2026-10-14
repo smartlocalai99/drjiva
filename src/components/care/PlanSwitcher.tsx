@@ -1,19 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 
 import { dashboardColors } from '../../dashboardTheme';
 import { PressableScale } from '../PressableScale';
 import { careFonts } from './careStyles';
 
-// Shown when there are 2 or more plans ("Pregnancy" | "Arjun"), or with
-// an action such as "+ Add child".
+// Only shown when there are 2 or more plans ("Pregnancy" | "Arjun").
 export function PlanSwitcher({
-  action,
   items,
   onSelect,
   selectedId,
 }: {
-  action?: { label: string; onPress: () => void } | null;
   items: { id: string; label: string }[];
   onSelect: (id: string) => void;
   selectedId: string | null;
@@ -39,12 +35,6 @@ export function PlanSwitcher({
           </PressableScale>
         );
       })}
-      {action ? (
-        <PressableScale accessibilityRole="button" onPress={action.onPress} style={[styles.pill, styles.pillAction]}>
-          <Ionicons color={dashboardColors.primary} name="add" size={20} />
-          <Text numberOfLines={1} style={[styles.text, styles.textAction]}>{action.label}</Text>
-        </PressableScale>
-      ) : null}
     </ScrollView>
   );
 }
@@ -57,12 +47,6 @@ const styles = StyleSheet.create({
     maxWidth: 220,
     minHeight: 48,
     paddingHorizontal: 20,
-  },
-  pillAction: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    flexDirection: 'row',
-    gap: 6,
   },
   pillActive: {
     backgroundColor: dashboardColors.primary,
@@ -79,9 +63,6 @@ const styles = StyleSheet.create({
     color: dashboardColors.text,
     fontFamily: careFonts.bold,
     fontSize: 17,
-  },
-  textAction: {
-    color: dashboardColors.primary,
   },
   textActive: {
     color: '#FFFFFF',

@@ -101,22 +101,9 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Today: {steps} | ఈరోజు: {steps} |
 | Day {n} of your treatment at {hospital}. | {hospital} లో మీ చికిత్స {n}వ రోజు. |
 | Child Growth Chart | బిడ్డ ఎదుగుదల చార్ట్ |
-| Add your child | మీ బిడ్డను చేర్చండి |
-| Add child | బిడ్డను చేర్చండి |
-| {doctor} at {hospital} looks after the vaccines. You get a reminder before each visit. | {hospital} లో {doctor} టీకాలను చూసుకుంటారు. ప్రతి సందర్శనకు ముందు మీకు గుర్తు చేస్తాం. |
-| Child details | బిడ్డ వివరాలు |
-| Child's name | బిడ్డ పేరు |
 | Child | బిడ్డ |
-| Not named yet? Leave it empty. | ఇంకా పేరు పెట్టలేదా? ఖాళీగా వదిలేయండి. |
 | What most children do at {age} | {age} వయసులో చాలా మంది పిల్లలు చేసేవి |
 | What most newborns do | అప్పుడే పుట్టిన చాలా మంది పిల్లలు చేసేవి |
-| Girl or boy | పాప లేదా బాబు |
-| Girl | పాప |
-| Boy | బాబు |
-| Date of birth | పుట్టిన తేదీ |
-| Every vaccine date is worked out from this. | ప్రతి టీకా తేదీ దీని నుంచే లెక్కిస్తాం. |
-| Save | సేవ్ చేయండి |
-| Edit | మార్చండి |
 | Visit {n} of {total} | {total} లో {n}వ సందర్శన |
 | Upcoming | రాబోయేది |
 | Due | ఇప్పుడు వేయించాలి |
@@ -124,49 +111,14 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Completed | పూర్తయింది |
 | If your child cannot do these yet, tell the doctor at the visit. | మీ బిడ్డ ఇవి ఇంకా చేయలేకపోతే, సందర్శనలో డాక్టర్‌కు చెప్పండి. |
 | Vaccines | టీకాలు |
-| Mark as complete | పూర్తయినట్టు గుర్తించండి |
 | Given on {date} | {date}న వేయించారు |
-| Create reminder | గుర్తు చేయమనండి |
-| Reminder set | గుర్తు చేస్తాం |
-| Reminders 3 days before, 1 day before and on the day, at 9 AM. | మూడు రోజుల ముందు, ఒక రోజు ముందు, ఆ రోజున ఉదయం 9 గంటలకు గుర్తు చేస్తాం. |
-| Due {date} | {date}న వేయించాలి |
 | {vaccine}: not before {date} (an earlier dose was late) | {vaccine}: {date} కంటే ముందు కాదు (ముందటి డోసు ఆలస్యమైంది) |
 | If HPV is started at 15 years or older, 3 doses are needed: day 0, after 2 months and after 6 months. | HPV 15 ఏళ్ళు లేదా ఆ తర్వాత మొదలుపెడితే 3 డోసులు కావాలి: మొదటి రోజు, 2 నెలల తర్వాత, 6 నెలల తర్వాత. |
-| Optional – ask your doctor | ఐచ్ఛికం – మీ డాక్టర్‌ను అడగండి |
-| Remind me | గుర్తు చేయండి |
 | Given | వేయించారు |
 | Birth | పుట్టుక |
 | weeks | వారాలు |
 | months | నెలలు |
 | years | ఏళ్ళు |
-| Given on | వేయించిన తేదీ |
-| Site of injection | ఎక్కడ వేశారు |
-| Left thigh | ఎడమ తొడ |
-| Right thigh | కుడి తొడ |
-| Left arm | ఎడమ చేయి |
-| Right arm | కుడి చేయి |
-| By mouth (drops) | నోటి ద్వారా (చుక్కలు) |
-| Other | ఇతర |
-| Brand | బ్రాండ్ |
-| Batch No. | బ్యాచ్ నంబర్ |
-| Expiry | గడువు తేదీ |
-| Upload label photo | లేబుల్ ఫోటో పెట్టండి |
-| Take photo | ఫోటో తీయండి |
-| Choose photo | ఫోటో ఎంచుకోండి |
-| Remove photo | ఫోటో తీసేయండి |
-| Save | సేవ్ చేయండి |
-| Not given yet | ఇంకా వేయించలేదు |
-| Nurse {nurse} marked this given on {date} | నర్సు {nurse} {date}న వేశారని గుర్తించారు |
-| Choose date | తేదీ ఎంచుకోండి |
-| Done | అయింది |
-| Could not save. Check your internet and try again. | సేవ్ కాలేదు. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి. |
-| Choose girl or boy. | పాప లేదా బాబు ఎంచుకోండి. |
-| Choose a date of birth that is not in the future. | భవిష్యత్ తేదీ కాని పుట్టిన తేదీ ఎంచుకోండి. |
-| Your hospital has no child doctor on DrJiva yet. | మీ హాస్పిటల్‌లో ఇంకా DrJiva లో పిల్లల డాక్టర్ లేరు. |
-| You can add up to 8 children. | గరిష్టంగా 8 మంది పిల్లలను చేర్చవచ్చు. |
-| The date must be between the date of birth and today. | తేదీ పుట్టిన తేదీ నుంచి ఈరోజు మధ్యలో ఉండాలి. |
-| Some vaccines are saved before this date of birth. Check the date. | ఈ పుట్టిన తేదీ కంటే ముందు కొన్ని టీకాలు సేవ్ అయ్యాయి. తేదీ సరిచూడండి. |
-| Could not upload the photo. Try again. | ఫోటో అప్‌లోడ్ కాలేదు. మళ్ళీ ప్రయత్నించండి. |
 | {name}: vaccines in 3 days | {name}: 3 రోజుల్లో టీకాలు |
 | {name}: vaccines tomorrow | {name}: రేపు టీకాలు |
 | {name}: vaccines today | {name}: ఈరోజు టీకాలు |

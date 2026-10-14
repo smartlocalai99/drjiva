@@ -5,7 +5,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { dashboardColors } from '../../dashboardTheme';
 import { useCareCopy } from '../../lib/careCopy';
 import { MILESTONES, type ChildDose, type ChildStage, type ChildVisit } from '../../lib/childGrowth';
-import { PressableScale } from '../PressableScale';
 import { CHILD_STATUS, StatusPill } from './ChildStatus';
 import { careFonts, careShared } from './careStyles';
 
@@ -25,32 +24,10 @@ export const CHILD_IMAGES: Record<ChildStage, number> = {
 
 const GIVEN = '#16A34A';
 
-// The top of the child page: a picture of a child at the chosen visit's
-// age beside the child's name, then what most children do at that age, the
-// exact due date and status, and the vaccines (tap one to record it).
-export function ChildVisitCard({
-  ageNow,
-  autoReminder,
-  childName,
-  onDose,
-  onEdit,
-  onMarkComplete,
-  onToggleReminder,
-  reminderOn,
-  total,
-  visit,
-}: {
-  ageNow: string;
-  autoReminder: boolean;
-  childName: string;
-  onDose: (dose: ChildDose) => void;
-  onEdit: () => void;
-  onMarkComplete: () => void;
-  onToggleReminder: () => void;
-  reminderOn: boolean;
-  total: number;
-  visit: ChildVisit;
-}) {
+// One visit of the child page: a picture of a child at that age beside the
+// visit's date and status, then what most children do at that age and the
+// vaccines. The nurse marks vaccines given in her portal; parents only read.
+export function ChildVisitCard({ ageNow, total, visit }: { ageNow: string; total: number; visit: ChildVisit }) {
   const { c, date, language, pick } = useCareCopy();
   const doses = visit.doses.filter((dose) => dose.kind !== 'optional');
   // Doses that must wait longer than the visit date (an earlier dose was late).
@@ -73,13 +50,7 @@ export function ChildVisitCard({
           />
         </View>
         <View style={styles.heroText}>
-          <View style={styles.heroTitleRow}>
-            <Text style={styles.chartTitle}>{c('childGrowthTitle')}</Text>
-            <PressableScale accessibilityLabel={c('childEditTitle')} accessibilityRole="button" hitSlop={8} onPress={onEdit} style={styles.edit}>
-              <Ionicons color={dashboardColors.primary} name="create-outline" size={18} />
-            </PressableScale>
-          </View>
-          <Text numberOfLines={2} style={styles.name}>{childName}</Text>
+          <Text style={styles.chartTitle}>{c('childGrowthTitle')}</Text>
           <Text style={styles.ageNow}>{ageNow}</Text>
           <View style={styles.visitRow}>
             <Text style={styles.age}>{ageTitle}</Text>
@@ -106,7 +77,7 @@ export function ChildVisitCard({
         <Text style={styles.blockTitle}>{c('vaccinesTitle')}</Text>
         <View style={styles.chips}>
           {doses.map((dose) => (
-            <DoseChip dose={dose} key={dose.item.id} onPress={() => onDose(dose)} status={visit.status} />
+            <DoseChip dose={dose} key={dose.item.id} status={visit.status} />
           ))}
         </View>
         {waiting.map((dose) => (
@@ -126,49 +97,25 @@ export function ChildVisitCard({
         </View>
       ) : null}
 
-      {completed ? (
-        visit.givenOn ? (
-          <View style={styles.given}>
-            <Ionicons color={GIVEN} name="checkmark-circle" size={22} />
-            <Text style={styles.givenText}>{c('givenOnDate', { date: date(visit.givenOn) })}</Text>
-          </View>
-        ) : null
-      ) : (
-        <>
-          <View style={styles.actions}>
-            <PressableScale accessibilityRole="button" onPress={onMarkComplete} style={[styles.button, styles.buttonPrimary]}>
-              <Ionicons color="#FFFFFF" name="checkmark-done" size={20} />
-              <Text style={styles.buttonPrimaryText}>{c('markComplete')}</Text>
-            </PressableScale>
-            <PressableScale
-              accessibilityRole="switch"
-              accessibilityState={{ checked: reminderOn, disabled: autoReminder }}
-              disabled={autoReminder}
-              onPress={onToggleReminder}
-              style={[styles.button, reminderOn && styles.buttonOn]}
-            >
-              <Ionicons color={dashboardColors.primary} name={reminderOn ? 'notifications' : 'notifications-outline'} size={20} />
-              <Text style={styles.buttonText}>{c(reminderOn ? 'reminderSet' : 'createReminder')}</Text>
-            </PressableScale>
-          </View>
-          {reminderOn ? <Text style={styles.note}>{c('reminderAuto')}</Text> : null}
-        </>
-      )}
+      {completed && visit.givenOn ? (
+        <View style={styles.given}>
+          <Ionicons color={GIVEN} name="checkmark-circle" size={22} />
+          <Text style={styles.givenText}>{c('givenOnDate', { date: date(visit.givenOn) })}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function DoseChip({ dose, onPress, status }: { dose: ChildDose; onPress: () => void; status: ChildVisit['status'] }) {
+function DoseChip({ dose, status }: { dose: ChildDose; status: ChildVisit['status'] }) {
   const { c, pick } = useCareCopy();
   const given = Boolean(dose.given);
   const label = pick(dose.item.labelEn, dose.item.labelTe);
   const accent = CHILD_STATUS[status];
   return (
-    <PressableScale
-      accessibilityHint={c('vaccineGivenOn')}
+    <View
       accessibilityLabel={given ? `${label}, ${c('vaccineGiven')}` : label}
-      accessibilityRole="button"
-      onPress={onPress}
+      accessible
       style={[
         styles.chip,
         given
@@ -181,16 +128,11 @@ function DoseChip({ dose, onPress, status }: { dose: ChildDose; onPress: () => v
     >
       {given ? <Ionicons color={GIVEN} name="checkmark-circle" size={18} /> : null}
       <Text style={[styles.chipText, given && styles.chipTextGiven, dose.notNeeded && styles.chipTextSkipped]}>{label}</Text>
-    </PressableScale>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
   age: {
     color: dashboardColors.text,
     fontFamily: careFonts.bold,
@@ -210,14 +152,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
   },
-  edit: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
   hero: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -226,18 +160,6 @@ const styles = StyleSheet.create({
   heroText: {
     flex: 1,
     gap: 3,
-  },
-  heroTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  name: {
-    color: dashboardColors.text,
-    fontFamily: careFonts.bold,
-    fontSize: 24,
-    letterSpacing: -0.3,
-    lineHeight: 29,
   },
   photoBox: {
     alignItems: 'center',
@@ -269,36 +191,6 @@ const styles = StyleSheet.create({
     height: 6,
     marginTop: 8,
     width: 6,
-  },
-  button: {
-    alignItems: 'center',
-    borderColor: dashboardColors.primaryTint,
-    borderCurve: 'continuous',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 14,
-  },
-  buttonOn: {
-    backgroundColor: dashboardColors.primaryTint,
-  },
-  buttonPrimary: {
-    backgroundColor: dashboardColors.primary,
-    borderColor: dashboardColors.primary,
-  },
-  buttonPrimaryText: {
-    color: '#FFFFFF',
-    fontFamily: careFonts.bold,
-    fontSize: 16,
-  },
-  buttonText: {
-    color: dashboardColors.primary,
-    fontFamily: careFonts.bold,
-    fontSize: 16,
   },
   canDo: {
     color: dashboardColors.textMuted,

@@ -2,7 +2,6 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import type { MyCare } from './care';
-import { readChildReminderPrefs, type ChildReminderPrefs } from './careChildPrefs';
 import { careDate, careText, type CareCopyKey } from './careCopy';
 import { cycleDayOf, upcomingStepDays, type CareCycleStep } from './careCycle';
 import { addDaysIso } from './careSchedule';
@@ -44,9 +43,9 @@ const WHO_KEYS: Record<CareCycleStep['who'], CareCopyKey | null> = { couple: 'wh
 
 // Child vaccines (Child Growth Chart): at 9 AM 3 days before, 1 day before
 // and on the due date of each child's next open visit, and once "overdue"
-// 7 days after it. Also the visits and optional vaccines the parent turned
-// on. At most CHILD_REMINDER_SLOTS at a time (phones keep a limited number
-// of scheduled alerts; the medicine reminders need room too), soonest first.
+// 7 days after it. At most CHILD_REMINDER_SLOTS at a time (phones keep a
+// limited number of scheduled alerts; the medicine reminders need room
+// too), soonest first.
 export const CHILD_REMINDER_SLOTS = 12;
 export const CARE_CHILD_REMINDER_IDS = Array.from({ length: CHILD_REMINDER_SLOTS }, (_, index) => `drjiva-care-child-${index}`);
 
@@ -57,12 +56,7 @@ const nineAm = (date: string) => {
   return new Date(y, m - 1, d, 9, 0, 0, 0);
 };
 
-export function childReminders(
-  care: MyCare,
-  language: AppLanguage,
-  prefs: ChildReminderPrefs,
-  now: Date,
-): ChildReminder[] {
+export function childReminders(care: MyCare, language: AppLanguage, now: Date): ChildReminder[] {
   const today = care.today;
   const followupDate = care.followup?.nextDate ?? null;
   const pick = (en: string, te: string) => (language === 'te' && te ? te : en);
@@ -81,10 +75,8 @@ export function childReminders(
       if (at.getTime() > now.getTime()) out.push({ at, body, planId: plan.id, title: careText(language, titleKey, { name }) });
     };
 
-    for (const visit of visits) {
+    for (const visit of auto ? [auto] : []) {
       if (visit.status === 'completed') continue;
-      const isAuto = visit.visit.id === auto?.visit.id;
-      if (!isAuto && !prefs.visits.includes(visit.visit.id)) continue;
       const age = pick(visit.visit.titleEn, visit.visit.titleTe);
       const vaccines = visit.doses
         .filter((dose) => dose.kind !== 'optional' && !dose.given && !dose.notNeeded)
@@ -97,18 +89,7 @@ export function childReminders(
         add(addDaysIso(visit.dueDate, -1), 'vaxReminder1Title', body);
         add(visit.dueDate, 'vaxReminder0Title', body);
       }
-      if (isAuto) {
-        add(addDaysIso(visit.dueDate, 7), 'vaxOverdueTitle', careText(language, 'vaxOverdueBody', { age, date: careDate(language, visit.dueDate), hospital }));
-      }
-    }
-
-    for (const visit of visits) {
-      for (const dose of visit.doses) {
-        if (dose.kind !== 'optional' || dose.given || !prefs.optional.includes(dose.item.id)) continue;
-        const body = careText(language, 'vaxReminderBody', { age: pick(visit.visit.titleEn, visit.visit.titleTe), hospital, vaccines: pick(dose.item.labelEn, dose.item.labelTe) });
-        add(addDaysIso(dose.dueDate, -1), 'vaxReminder1Title', body);
-        add(dose.dueDate, 'vaxReminder0Title', body);
-      }
+      add(addDaysIso(visit.dueDate, 7), 'vaxOverdueTitle', careText(language, 'vaxOverdueBody', { age, date: careDate(language, visit.dueDate), hospital }));
     }
   }
 
@@ -197,7 +178,7 @@ export async function syncCareReminders(
   await ensureCareFollowupChannel(notifications);
 
   const cycleDays = care.today ? cycleReminderDays(care, language, care.today) : [];
-  const vaccines = childReminders(care, language, await readChildReminderPrefs(phone), new Date());
+  const vaccines = childReminders(care, language, new Date());
 
   let granted = (await notifications.getPermissionsAsync()).granted;
   if (!granted && options.askPermission && (care.followup || cycleDays.length || vaccines.length)) {

@@ -88,21 +88,26 @@ describe('child vaccine reminders', () => {
   const at = (list: { at: Date }[]) => list.map((r) => `${r.at.getMonth() + 1}/${r.at.getDate()} ${r.at.getHours()}:00`);
 
   it('reminds 3 days before, 1 day before, on the day and once overdue, at 9 AM', () => {
-    const list = childReminders(care(), 'en', { optional: [], visits: [] }, now);
+    const list = childReminders(care(), 'en', now);
     expect(at(list)).toEqual(['10/17 9:00', '10/19 9:00', '10/20 9:00', '10/27 9:00']);
     expect(list[0]).toMatchObject({ body: '6w visit at Dhruva Hospitals: DHRUVA_CHILD_DTP_1', title: 'Arjun: vaccines in 3 days' });
     expect(list[3]!.title).toBe('Arjun: vaccines are overdue');
   });
 
   it('leaves the day before and the day to the hospital visit reminder on the same date', () => {
-    const list = childReminders(care({ followup: { nextDate: '2026-10-20' } }), 'en', { optional: [], visits: [] }, now);
+    const list = childReminders(care({ followup: { nextDate: '2026-10-20' } }), 'en', now);
     expect(at(list)).toEqual(['10/17 9:00', '10/27 9:00']);
   });
 
-  it('adds visits and optional vaccines the parent turned on', () => {
-    const list = childReminders(care(), 'te', { optional: ['dhruva_child_opt_mcv4_1'], visits: ['10w'] }, now);
-    expect(at(list)).toEqual(['10/17 9:00', '10/19 9:00', '10/20 9:00', '10/27 9:00', '11/14 9:00', '11/16 9:00', '11/17 9:00', '6/7 9:00', '6/8 9:00']);
+  it('reminds only about the next open visit, never optional vaccines', () => {
+    const list = childReminders(care(), 'te', now);
+    expect(list.every((reminder) => !reminder.body.includes('MCV4') && !reminder.body.includes('10w'))).toBe(true);
     expect(list[0]!.title).toBe('Arjun: 3 రోజుల్లో టీకాలు');
+  });
+
+  it('calls a child without a name "Child" / "బిడ్డ"', () => {
+    const unnamed = care({ plans: [{ ...plan, personName: 'Child' }] });
+    expect(childReminders(unnamed, 'te', now)[0]!.title).toBe('బిడ్డ: 3 రోజుల్లో టీకాలు');
   });
 
   it('never uses more than its fixed IDs', () => {
