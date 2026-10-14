@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors } from '../../dashboardTheme';
 import { useCareCopy } from '../../lib/careCopy';
-import { cycleDayOf, nextCycleStep, stepDays, stepsOn, type CareCycle } from '../../lib/careCycle';
+import { bestDates, cycleDayOf, nextCycleStep, stepDays, stepsOn, testCountdown, type CareCycle } from '../../lib/careCycle';
 import { addDaysIso } from '../../lib/careSchedule';
 import { WhoTag } from './CycleWho';
 import { careFonts, careShared } from './careStyles';
@@ -12,9 +12,18 @@ import { careFonts, careShared } from './careStyles';
 const DIAL = 128;
 const RING = 52;
 const DONE = '#16A34A';
+export const HEART = '#DB2777';
+
+// While she waits for the pregnancy test (shown with today's countdown).
+const WAIT_TIPS = [
+  { icon: 'walk-outline', key: 'cycleTipWork' },
+  { icon: 'medkit-outline', key: 'cycleTipTablets' },
+  { icon: 'alert-circle-outline', key: 'cycleTipNoHomeTest' },
+] as const;
 
 // One day of the treatment: a dial of the whole cycle (step days marked)
-// on the left, what happens that day on the right.
+// on the left, what happens that day on the right. After the IUI, today's
+// card counts down to the pregnancy test instead.
 export function CycleDayCard({
   cycle,
   day,
@@ -37,6 +46,8 @@ export function CycleDayCard({
   const notStarted = todayDay < 1;
   const nextLabel = next ? c('cycleNext', { step: pick(next.labelEn, next.labelTe) }) : '';
   const nextWhen = next ? c('cycleNextOn', { date: date(next.date, 'weekdayDayMonth'), n: cycleDayOf(cycle, next.date) }) : '';
+  const wait = day === todayDay && !steps.length ? testCountdown(cycle, today) : null;
+  const bestDay = bestDates(cycle).has(dayDate);
 
   return (
     <View style={careShared.card}>
@@ -76,6 +87,16 @@ export function CycleDayCard({
                 </View>
               );
             })
+          ) : wait ? (
+            <View
+              accessibilityLabel={wait.days === 1 ? `${c('tomorrow')} ${c('cycleWaitTomorrow')}` : `${wait.days} ${c('cycleWaitDays')}, ${date(wait.date, 'weekdayDayMonth')}`}
+              accessible
+              style={styles.wait}
+            >
+              <Text style={wait.days === 1 ? styles.waitWord : styles.waitNumber}>{wait.days === 1 ? c('tomorrow') : wait.days}</Text>
+              <Text style={styles.waitLabel}>{c(wait.days === 1 ? 'cycleWaitTomorrow' : 'cycleWaitDays')}</Text>
+              <Text style={careShared.muted}>{date(wait.date, 'weekdayDayMonth')}</Text>
+            </View>
           ) : (
             <>
               <Text style={careShared.muted}>{c('cycleNoStep')}</Text>
@@ -92,6 +113,24 @@ export function CycleDayCard({
           )}
         </View>
       </View>
+
+      {wait ? (
+        <View style={styles.tips}>
+          {WAIT_TIPS.map((tip) => (
+            <View key={tip.key} style={styles.tip}>
+              <Ionicons color={tip.key === 'cycleTipNoHomeTest' ? '#B45309' : dashboardColors.primary} name={tip.icon} size={22} />
+              <Text style={[styles.tipText, styles.flex]}>{c(tip.key)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {bestDay ? (
+        <View accessible style={styles.best}>
+          <Ionicons color={HEART} name="heart" size={20} />
+          <Text style={styles.bestText}>{c('cycleBestDay')}</Text>
+        </View>
+      ) : null}
 
       {/* On a step day: what comes after it. */}
       {steps.length > 0 && next ? (
@@ -153,6 +192,28 @@ function CycleDial({ cycle, length, selectedDay, todayDay }: { cycle: CareCycle;
 }
 
 const styles = StyleSheet.create({
+  wait: {
+    gap: 2,
+  },
+  waitLabel: {
+    color: dashboardColors.text,
+    fontFamily: careFonts.bold,
+    fontSize: 17,
+    lineHeight: 23,
+  },
+  waitNumber: {
+    color: dashboardColors.primary,
+    fontFamily: careFonts.bold,
+    fontSize: 48,
+    letterSpacing: -1.5,
+    lineHeight: 54,
+  },
+  waitWord: {
+    color: dashboardColors.primary,
+    fontFamily: careFonts.bold,
+    fontSize: 30,
+    lineHeight: 38,
+  },
   after: {
     alignItems: 'center',
     backgroundColor: dashboardColors.bg,
@@ -166,6 +227,23 @@ const styles = StyleSheet.create({
   afterLabel: {
     color: dashboardColors.text,
     fontFamily: careFonts.bold,
+  },
+  best: {
+    alignItems: 'center',
+    backgroundColor: '#FDF2F8',
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  bestText: {
+    color: '#9D174D',
+    flex: 1,
+    fontFamily: careFonts.bold,
+    fontSize: 16,
+    lineHeight: 21,
   },
   body: {
     alignItems: 'center',
@@ -275,6 +353,24 @@ const styles = StyleSheet.create({
   stepText: {
     flex: 1,
     gap: 3,
+  },
+  tip: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  tipText: {
+    color: dashboardColors.text,
+    fontFamily: careFonts.medium,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  tips: {
+    backgroundColor: dashboardColors.bg,
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    gap: 12,
+    padding: 14,
   },
   titleRow: {
     alignItems: 'center',

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bestDates,
   cycleDayOf,
   cycleLength,
   cycleStepDays,
   nextCycleStep,
   stepDays,
   stepsOn,
+  testCountdown,
   upcomingStepDays,
   type CareCycle,
   type CareCycleStep,
@@ -61,5 +63,30 @@ describe('OI-TI / IUI cycle', () => {
   it('shows at least the protocol length, longer if a step moved later', () => {
     expect(cycleLength(cycle)).toBe(31);
     expect(cycleLength({ ...cycle, steps: [...cycle.steps, step('late', 31, '2026-11-08')] })).toBe(34);
+  });
+
+  it('marks the trigger day and the IUI day as the best days', () => {
+    const real = {
+      steps: [
+        step('t', 13, '2026-10-19', { code: 'oi_trigger' }),
+        step('i', 14, '2026-10-20', { code: 'oi_iui', who: 'couple' }),
+        step('f', 9, '2026-10-14', { code: 'oi_follicle_d9' }),
+      ],
+    };
+    expect([...bestDates(real)].sort()).toEqual(['2026-10-19', '2026-10-20']);
+  });
+
+  it('counts down to the pregnancy test only while waiting after the IUI', () => {
+    const real = {
+      steps: [
+        step('i', 14, '2026-10-20', { code: 'oi_iui', who: 'couple' }),
+        step('u', 31, '2026-11-05', { code: 'oi_urine_pregnancy_test' }),
+      ],
+    };
+    expect(testCountdown(real, '2026-10-20')).toBeNull(); // IUI day itself
+    expect(testCountdown(real, '2026-10-21')).toEqual({ date: '2026-11-05', days: 15 });
+    expect(testCountdown(real, '2026-11-04')).toEqual({ date: '2026-11-05', days: 1 });
+    expect(testCountdown(real, '2026-11-05')).toBeNull(); // test day shows the step
+    expect(testCountdown({ steps: [real.steps[0]!, { ...real.steps[1]!, status: 'done' }] }, '2026-10-25')).toBeNull();
   });
 });

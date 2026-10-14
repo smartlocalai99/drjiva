@@ -39,6 +39,27 @@ export type CareCycle = {
   steps: CareCycleStep[];
 };
 
+// Steps of the OI-TI / IUI protocol the app treats specially.
+export const TRIGGER_CODE = 'oi_trigger';
+export const IUI_CODE = 'oi_iui';
+export const TEST_CODE = 'oi_urine_pregnancy_test';
+
+/** Best days for intercourse: the trigger day and the IUI / timed-intercourse day. */
+export function bestDates(cycle: Pick<CareCycle, 'steps'>): Set<string> {
+  return new Set(cycle.steps.filter((step) => step.code === TRIGGER_CODE || step.code === IUI_CODE).map((step) => step.date));
+}
+
+/**
+ * While she waits after the IUI (the day after it until the day before the
+ * test, test not yet done): days left and the test date. Otherwise null.
+ */
+export function testCountdown(cycle: Pick<CareCycle, 'steps'>, today: string): { date: string; days: number } | null {
+  const iui = cycle.steps.find((step) => step.code === IUI_CODE);
+  const test = cycle.steps.find((step) => step.code === TEST_CODE);
+  if (!iui || !test || test.status || today <= iui.date || today >= test.date) return null;
+  return { date: test.date, days: daysBetween(today, test.date) };
+}
+
 /** Day of the cycle for a date (Day 1 = anchor). */
 export function cycleDayOf(cycle: Pick<CareCycle, 'anchorDate'>, date: string): number {
   return daysBetween(cycle.anchorDate, date) + 1;

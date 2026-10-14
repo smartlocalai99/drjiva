@@ -78,13 +78,19 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Fertility treatment | సంతాన చికిత్స |
 | Day {n} | {n}వ రోజు |
 | Day | రోజు |
-| of {n} | మొత్తం {n} |
+| of {n} | {n} లో |
 | Your treatment starts on {date} | మీ చికిత్స {date}న మొదలవుతుంది |
 | No hospital visit this day | ఈ రోజు హాస్పిటల్‌కు రావాల్సిన అవసరం లేదు |
 | Next: {step} | తదుపరి: {step} |
 | Day {n} · {date} | {n}వ రోజు · {date} |
 | All treatment days are over. Your hospital will tell you what comes next. | చికిత్స రోజులు పూర్తయ్యాయి. తర్వాత ఏమి చేయాలో మీ హాస్పిటల్ చెబుతుంది. |
 | Done | పూర్తయింది |
+| days to your pregnancy test | రోజుల్లో గర్భ పరీక్ష |
+| is your pregnancy test | గర్భ పరీక్ష |
+| Do your normal daily work. Avoid lifting heavy things. | రోజువారీ పనులు మామూలుగా చేసుకోండి. బరువులు ఎత్తకండి. |
+| Keep taking the tablets your doctor gave. | డాక్టర్ ఇచ్చిన మాత్రలు ఆపకుండా వేసుకోండి. |
+| Do not test at home before this date. The trigger injection can give a wrong result. | ఈ తేదీకి ముందు ఇంట్లో పరీక్ష చేయకండి. ట్రిగ్గర్ ఇంజెక్షన్ వల్ల తప్పు ఫలితం రావచ్చు. |
+| Best day for intercourse | కలయికకు మంచి రోజు |
 | You | మీరు |
 | Husband | మీ భర్త |
 | Both of you | మీరిద్దరూ |

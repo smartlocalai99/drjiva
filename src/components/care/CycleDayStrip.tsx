@@ -1,10 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors, dashboardSpacing } from '../../dashboardTheme';
 import { useCareCopy } from '../../lib/careCopy';
-import { stepDays, type CareCycle } from '../../lib/careCycle';
+import { bestDates, cycleDayOf, stepDays, type CareCycle } from '../../lib/careCycle';
 import { PressableScale } from '../PressableScale';
+import { HEART } from './CycleDayCard';
 import { careFonts } from './careStyles';
 
 const CHIP_WIDTH = 52;
@@ -12,8 +14,8 @@ const CHIP_GAP = 6;
 const SIDE = dashboardSpacing.pagePadding;
 
 // Day 1 … 31 side by side (like the pregnancy week strip); a dot under
-// the days with a hospital step, green once done. The picked day stays in
-// the middle.
+// the days with a hospital step, green once done, and a heart on the best
+// days for intercourse. The picked day stays in the middle.
 export function CycleDayStrip({
   cycle,
   length,
@@ -32,6 +34,7 @@ export function CycleDayStrip({
   const placed = useRef(false);
   const [viewWidth, setViewWidth] = useState(0);
   const marks = useMemo(() => stepDays(cycle), [cycle]);
+  const hearts = useMemo(() => new Set([...bestDates(cycle)].map((date) => cycleDayOf(cycle, date))), [cycle]);
   const contentWidth = SIDE * 2 + length * CHIP_WIDTH + (length - 1) * CHIP_GAP;
 
   useEffect(() => {
@@ -57,10 +60,11 @@ export function CycleDayStrip({
         const selected = day === selectedDay;
         const now = day === todayDay;
         const mark = marks.get(day);
-        const label = c('cycleDay', { n: day });
+        const heart = hearts.has(day);
+        const label = [c('cycleDay', { n: day }), now ? c('today') : '', heart ? c('cycleBestDay') : ''].filter(Boolean).join(', ');
         return (
           <PressableScale
-            accessibilityLabel={now ? `${label}, ${c('today')}` : label}
+            accessibilityLabel={label}
             accessibilityState={{ selected }}
             key={day}
             onPress={() => onSelect(day)}
@@ -68,12 +72,18 @@ export function CycleDayStrip({
           >
             <Text style={[styles.label, selected && styles.textSelected]}>{c('dayShort')}</Text>
             <Text style={[styles.number, selected && styles.textSelected]}>{day}</Text>
-            <View
-              style={[
-                styles.dot,
-                mark && { backgroundColor: selected ? '#FFFFFF' : mark.done ? '#16A34A' : dashboardColors.primary },
-              ]}
-            />
+            <View style={styles.markRow}>
+              {heart ? (
+                <Ionicons color={selected ? '#FFFFFF' : HEART} name="heart" size={10} />
+              ) : (
+                <View
+                  style={[
+                    styles.dot,
+                    mark && { backgroundColor: selected ? '#FFFFFF' : mark.done ? '#16A34A' : dashboardColors.primary },
+                  ]}
+                />
+              )}
+            </View>
           </PressableScale>
         );
       })}
@@ -103,7 +113,6 @@ const styles = StyleSheet.create({
   dot: {
     borderRadius: 3,
     height: 6,
-    marginTop: 3,
     width: 6,
   },
   label: {
@@ -111,6 +120,12 @@ const styles = StyleSheet.create({
     fontFamily: careFonts.semiBold,
     fontSize: 11,
     lineHeight: 14,
+  },
+  markRow: {
+    alignItems: 'center',
+    height: 10,
+    justifyContent: 'center',
+    marginTop: 2,
   },
   number: {
     color: dashboardColors.text,
