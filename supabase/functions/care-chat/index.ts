@@ -8,8 +8,8 @@
 // last ~10 messages. Never the mobile number or names.
 //
 // Free AI, no paid key needed:
-//   1. Google Gemini free tier, if the secret GEMINI_API_KEY is set
-//      (free key from aistudio.google.com; better answers, good Telugu).
+//   1. Google Gemini free tier (secret GEMINI_API_KEY, free key from
+//      aistudio.google.com): models in GEMINI_MODELS, first one that answers.
 //   2. Otherwise Pollinations' free, keyless text API.
 // If neither answers, the patient gets a safe "try again" reply.
 import { createClient } from 'npm:@supabase/supabase-js@2.110.8';
@@ -24,7 +24,11 @@ import {
 } from '../_shared/careChatSafety.ts';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
-const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
+// Fast free model first; the bigger one when the first is busy.
+const GEMINI_MODELS = (Deno.env.get('GEMINI_MODELS') ?? 'gemini-flash-lite-latest,gemini-flash-latest')
+  .split(',')
+  .map((model) => model.trim())
+  .filter(Boolean);
 const POLLINATIONS_URL = 'https://text.pollinations.ai/openai';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -84,35 +88,40 @@ function clean(text: unknown): string | null {
 
 async function askGemini(turns: Turn[]): Promise<string | null> {
   if (!GEMINI_API_KEY) return null;
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
+  // A busy answer (503/429) is usually gone a moment later: the first
+  // model gets one quick retry before moving on.
+  const attempts = GEMINI_MODELS.length ? [GEMINI_MODELS[0]!, ...GEMINI_MODELS] : [];
+  for (const [index, model] of attempts.entries()) {
+    if (index === 1) await new Promise((resolve) => setTimeout(resolve, 1_500));
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         body: JSON.stringify({
           contents: turns.map((turn) => ({ parts: [{ text: turn.content }], role: turn.role === 'assistant' ? 'model' : 'user' })),
-          generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
+          generationConfig: { maxOutputTokens: 800, temperature: 0.3 },
           systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         }),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
         method: 'POST',
-        signal: AbortSignal.timeout(25_000),
-      },
-    );
-    if (!response.ok) {
-      console.error('[care-chat] Gemini', response.status, (await response.text()).slice(0, 300));
-      return null;
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const reply = clean(data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join(''));
+        if (reply) return reply;
+      } else {
+        // 429 / 503 = busy: try the next model.
+        console.error('[care-chat] Gemini', model, response.status, (await response.text()).slice(0, 200));
+      }
+    } catch (error) {
+      console.error('[care-chat] Gemini failed', model, error);
     }
-    const data = await response.json();
-    return clean(data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join(''));
-  } catch (error) {
-    console.error('[care-chat] Gemini failed', error);
-    return null;
   }
+  return null;
 }
 
 async function askPollinations(turns: Turn[]): Promise<string | null> {
-  // The keyless tier allows about one request every few seconds, so one
-  // retry after a short wait covers most busy moments.
+  // Last resort: keyless and slow, so one short try (plus one retry when
+  // it says "too many requests").
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(POLLINATIONS_URL, {
@@ -124,19 +133,19 @@ async function askPollinations(turns: Turn[]): Promise<string | null> {
         }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(20_000),
       });
       if (response.ok) {
         const data = await response.json();
-        const reply = clean(data?.choices?.[0]?.message?.content);
-        if (reply) return reply;
-      } else {
-        console.error('[care-chat] Pollinations', response.status, (await response.text()).slice(0, 200));
+        return clean(data?.choices?.[0]?.message?.content);
       }
+      console.error('[care-chat] Pollinations', response.status, (await response.text()).slice(0, 200));
+      if (response.status !== 429) return null;
     } catch (error) {
       console.error('[care-chat] Pollinations failed', error);
+      return null;
     }
-    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 6_000));
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
   }
   return null;
 }

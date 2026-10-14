@@ -5,9 +5,9 @@ import { dashboardColors } from '../../dashboardTheme';
 import type { CareExtraItem, CareFollowup } from '../../lib/care';
 import { useCareCopy } from '../../lib/careCopy';
 import { daysUntil, dialableIndianPhone, type CareVisit } from '../../lib/careSchedule';
-import { DoctorAvatar } from '../DoctorAvatar';
 import { HospitalLogo } from '../HospitalLogo';
 import { CallButton } from './CallButton';
+import { DoctorPhoto } from './DoctorPhoto';
 import { careFonts, careShared } from './careStyles';
 
 // Always the first card: when to go back, where, and who set it.
@@ -54,23 +54,19 @@ export function FollowUpCard({
         </View>
       </View>
 
-      <Text style={styles.date}>{date(followup.nextDate, 'weekdayDayMonth')}</Text>
-
-      <View style={styles.placeRow}>
-        {followup.doctorName ? (
-          <DoctorAvatar doctorName={followup.doctorName} hospitalName={followup.hospital.name} size={56} />
-        ) : (
-          <HospitalLogo hospitalName={followup.hospital.name} logoUrl={followup.hospital.logoUrl} roundedSquare size={40} />
-        )}
-        <View style={styles.flex}>
+      {/* Date and doctor on the left, the doctor's photo on the right. */}
+      <View style={styles.mainRow}>
+        <View style={styles.mainText}>
+          <Text style={styles.date}>{date(followup.nextDate, 'weekdayDayMonth')}</Text>
           {followup.doctorName ? <Text style={styles.doctor}>{followup.doctorName}</Text> : null}
           <View style={styles.hospitalRow}>
-            {followup.doctorName ? (
-              <HospitalLogo hospitalName={followup.hospital.name} logoUrl={followup.hospital.logoUrl} roundedSquare size={24} />
-            ) : null}
+            <HospitalLogo hospitalName={followup.hospital.name} logoUrl={followup.hospital.logoUrl} roundedSquare size={24} />
             <Text style={[careShared.muted, styles.flex]}>{followup.hospital.name}</Text>
           </View>
         </View>
+        {followup.doctorName ? (
+          <DoctorPhoto doctorName={followup.doctorName} height={124} hospitalName={followup.hospital.name} width={100} />
+        ) : null}
       </View>
 
       {(visitItems.length > 0 && visit) || extras.length > 0 ? (
@@ -142,9 +138,9 @@ const styles = StyleSheet.create({
   date: {
     color: dashboardColors.text,
     fontFamily: careFonts.bold,
-    fontSize: 32,
-    letterSpacing: -0.6,
-    lineHeight: 38,
+    fontSize: 28,
+    letterSpacing: -0.5,
+    lineHeight: 34,
   },
   doctor: {
     color: dashboardColors.text,
@@ -189,10 +185,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  placeRow: {
+  mainRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
+  },
+  mainText: {
+    flex: 1,
+    gap: 6,
   },
   topRow: {
     alignItems: 'center',

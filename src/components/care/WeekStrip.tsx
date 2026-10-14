@@ -1,12 +1,10 @@
-import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors, dashboardSpacing } from '../../dashboardTheme';
-import { BABY_WEEKS, FIRST_BABY_WEEK, babyScale, clampBabyWeek } from '../../lib/babySize';
+import { BABY_WEEKS, FIRST_BABY_WEEK, clampBabyWeek } from '../../lib/babySize';
 import { useCareCopy } from '../../lib/careCopy';
 import { PressableScale } from '../PressableScale';
-import { BABY_IMAGES } from './BabyWeekCard';
 import { careFonts } from './careStyles';
 
 const CHIP_WIDTH = 52;
@@ -48,10 +46,9 @@ export function WeekStrip({
       showsHorizontalScrollIndicator={false}
       style={styles.strip}
     >
-      {BABY_WEEKS.map(({ stage, week }) => {
+      {BABY_WEEKS.map(({ week }) => {
         const selected = week === selectedWeek;
         const now = week === currentWeek;
-        const icon = Math.round(14 + 12 * babyScale(week));
         return (
           <PressableScale
             accessibilityLabel={now ? `${c('week', { week })}, ${c('thisWeek')}` : c('week', { week })}
@@ -60,9 +57,6 @@ export function WeekStrip({
             onPress={() => onSelect(week)}
             style={[styles.chip, now && styles.chipNow, selected && styles.chipSelected]}
           >
-            <View style={styles.iconWell}>
-              <Image contentFit="contain" source={BABY_IMAGES[stage]} style={{ height: icon, width: icon }} />
-            </View>
             <Text style={[styles.label, selected && styles.textSelected]}>{c('weekShort')}</Text>
             <Text style={[styles.number, selected && styles.textSelected]}>{week}</Text>
           </PressableScale>
@@ -81,8 +75,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1.5,
     gap: 0,
-    paddingBottom: 6,
-    paddingTop: 6,
+    paddingBottom: 8,
+    paddingTop: 7,
     width: CHIP_WIDTH,
   },
   chipNow: {
@@ -91,15 +85,6 @@ const styles = StyleSheet.create({
   chipSelected: {
     backgroundColor: dashboardColors.primary,
     borderColor: dashboardColors.primary,
-  },
-  iconWell: {
-    alignItems: 'center',
-    backgroundColor: '#C4614B',
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    marginBottom: 3,
-    width: 32,
   },
   label: {
     color: dashboardColors.textMuted,
