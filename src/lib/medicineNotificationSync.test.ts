@@ -3,21 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   cancelDoseNotifications,
   cancelScheduledDoseNotificationsForEvents,
-  fetchScheduledDoseRemindersFromToday,
+  fetchDeviceDoseRemindersFromToday,
   queueNotificationCancellations,
   saveNotificationIds,
   scheduleGroupedDoseNotifications,
 } = vi.hoisted(() => ({
   cancelDoseNotifications: vi.fn(async () => undefined),
   cancelScheduledDoseNotificationsForEvents: vi.fn(async () => undefined),
-  fetchScheduledDoseRemindersFromToday: vi.fn(),
+  fetchDeviceDoseRemindersFromToday: vi.fn(),
   queueNotificationCancellations: vi.fn(async () => undefined),
   saveNotificationIds: vi.fn(async () => undefined),
   scheduleGroupedDoseNotifications: vi.fn(),
 }));
 
 vi.mock('./medicineCourses', () => ({
-  fetchScheduledDoseRemindersFromToday,
+  fetchDeviceDoseRemindersFromToday,
   saveNotificationIds,
 }));
 vi.mock('./medicineNotifications', () => ({
@@ -41,7 +41,7 @@ const reminder = {
 describe('syncDoseNotifications', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    fetchScheduledDoseRemindersFromToday.mockResolvedValue([reminder]);
+    fetchDeviceDoseRemindersFromToday.mockResolvedValue([reminder]);
     scheduleGroupedDoseNotifications.mockResolvedValue([
       { eventId: 'event-1', notificationId: 'new-id' },
     ]);
@@ -77,7 +77,7 @@ describe('syncDoseNotifications', () => {
 
   it('fetches each patient schedule inside the queue after the previous sync saves', async () => {
     const operations: string[] = [];
-    fetchScheduledDoseRemindersFromToday.mockImplementation(async () => {
+    fetchDeviceDoseRemindersFromToday.mockImplementation(async () => {
       operations.push('fetch');
       return [reminder];
     });

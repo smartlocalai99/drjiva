@@ -1,5 +1,5 @@
 import {
-  fetchScheduledDoseRemindersFromToday,
+  fetchDeviceDoseRemindersFromToday,
   saveNotificationIds,
   type FutureDoseReminder,
 } from './medicineCourses';
@@ -66,12 +66,13 @@ export function syncDoseNotifications(
   return enqueueDoseNotificationSync(async () => reminders);
 }
 
+// Called after a patient's medicines change. Rebuilds the alarms of every
+// patient on this phone together, so one time rings once, however many
+// medicines or people are due then.
 export function syncPatientDoseNotifications(
-  patientId: string,
+  _patientId: string,
 ): Promise<{ cleanupPending: boolean }> {
   // Fetch inside the queue so an overlapping app resume or medicine save
   // cannot replace newer alarms with a snapshot loaded before the last sync.
-  return enqueueDoseNotificationSync(
-    () => fetchScheduledDoseRemindersFromToday(patientId),
-  );
+  return enqueueDoseNotificationSync(fetchDeviceDoseRemindersFromToday);
 }

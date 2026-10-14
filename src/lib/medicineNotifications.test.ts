@@ -213,6 +213,39 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     ]);
   });
 
+  it('rings once per minute: doses a few seconds apart share the earliest alert', () => {
+    const groups = groupDoseNotificationRequests([
+      {
+        eventId: 'late-seconds',
+        medicineName: 'Metformin',
+        scheduledFor: '2026-08-03T08:00:40.000Z',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 2,
+      },
+      {
+        eventId: 'on-the-minute',
+        medicineName: 'Dolo 650',
+        scheduledFor: '2026-08-03T08:00:00.000Z',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 1,
+      },
+      {
+        eventId: 'next-minute',
+        medicineName: 'Pan 40',
+        scheduledFor: '2026-08-03T08:01:00.000Z',
+        slot: 'Morning',
+        slotKey: 'morning',
+        tablets: 1,
+      },
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toMatchObject({ scheduledFor: '2026-08-03T08:00:00.000Z' });
+    expect(groups[0]?.reminders.map((item) => item.eventId)).toEqual(['late-seconds', 'on-the-minute']);
+  });
+
   it('links one grouped phone alert to every dose event at that time', async () => {
     const identifiers = await scheduleGroupedDoseNotificationsWithAdapter(
       {

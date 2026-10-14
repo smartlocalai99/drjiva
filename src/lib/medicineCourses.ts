@@ -240,11 +240,19 @@ export async function saveNotificationIds(
   identifiers: readonly { eventId: string; notificationId: string }[],
 ): Promise<void> {
   await ensureSecureReportSession();
+  // One update per phone alert (all the doses it covers), not per dose.
+  const byNotification = new Map<string, string[]>();
   for (const item of identifiers) {
+    byNotification.set(item.notificationId, [
+      ...(byNotification.get(item.notificationId) ?? []),
+      item.eventId,
+    ]);
+  }
+  for (const [notificationId, eventIds] of byNotification) {
     const { error } = await supabase
       .from('patient_medicine_dose_events')
-      .update({ notification_id: item.notificationId })
-      .eq('id', item.eventId);
+      .update({ notification_id: notificationId })
+      .in('id', eventIds);
     if (error) throw error;
   }
 }
@@ -281,19 +289,33 @@ export type FutureDoseReminder = {
   tablets: number;
 };
 
-export async function fetchScheduledDoseRemindersFromToday(
+export function fetchScheduledDoseRemindersFromToday(
   patientId: string,
+): Promise<FutureDoseReminder[]> {
+  return fetchDoseRemindersFromToday(patientId);
+}
+
+// Every upcoming dose this phone should ring for: all patients linked to
+// this device (database access rules limit the rows to them), so doses of
+// two family members at the same time share one alert.
+export function fetchDeviceDoseRemindersFromToday(): Promise<FutureDoseReminder[]> {
+  return fetchDoseRemindersFromToday(null);
+}
+
+async function fetchDoseRemindersFromToday(
+  patientId: string | null,
 ): Promise<FutureDoseReminder[]> {
   await ensureSecureReportSession();
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  const { data, error } = await supabase
+  let query = supabase
     .from('patient_medicine_dose_events')
     .select(
       'id, scheduled_for, slot, notification_id, patient_medicine_courses!inner(tablets_per_dose, medicines(name), patient_custom_medicines(name))',
     )
-    .eq('patient_id', patientId)
-    .eq('status', 'scheduled')
+    .eq('status', 'scheduled');
+  if (patientId) query = query.eq('patient_id', patientId);
+  const { data, error } = await query
     .gte('scheduled_for', startOfToday.toISOString())
     .order('scheduled_for');
   if (error) throw error;

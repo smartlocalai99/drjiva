@@ -115,6 +115,8 @@ export async function scheduleDoseNotificationsWithAdapter(
   }
 }
 
+// One alert (one sound) per minute: every medicine due in the same minute
+// shares it, however many there are. It rings at the earliest of them.
 export function groupDoseNotificationRequests(
   reminders: readonly DoseNotificationRequest[],
 ): DoseNotificationGroup[] {
@@ -122,11 +124,15 @@ export function groupDoseNotificationRequests(
   for (const reminder of reminders) {
     const timestamp = new Date(reminder.scheduledFor).getTime();
     if (!Number.isFinite(timestamp)) continue;
-    const group = groups.get(timestamp);
+    const minute = Math.floor(timestamp / 60_000);
+    const group = groups.get(minute);
     if (group) {
       group.reminders.push(reminder);
+      if (timestamp < new Date(group.scheduledFor).getTime()) {
+        group.scheduledFor = reminder.scheduledFor;
+      }
     } else {
-      groups.set(timestamp, {
+      groups.set(minute, {
         reminders: [reminder],
         scheduledFor: reminder.scheduledFor,
       });

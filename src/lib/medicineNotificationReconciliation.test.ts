@@ -13,12 +13,12 @@ type PendingNotification = {
 };
 
 const {
-  fetchScheduledDoseRemindersFromToday,
+  fetchDeviceDoseRemindersFromToday,
   requireExpoNotifications,
   saveNotificationIds,
   storage,
 } = vi.hoisted(() => ({
-  fetchScheduledDoseRemindersFromToday: vi.fn(),
+  fetchDeviceDoseRemindersFromToday: vi.fn(),
   requireExpoNotifications: vi.fn(),
   saveNotificationIds: vi.fn(),
   storage: new Map<string, string>(),
@@ -44,7 +44,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 vi.mock('./expoNotifications', () => ({ requireExpoNotifications }));
 vi.mock('./medicineCourses', () => ({
-  fetchScheduledDoseRemindersFromToday,
+  fetchDeviceDoseRemindersFromToday,
   saveNotificationIds,
 }));
 
@@ -118,7 +118,7 @@ describe('medicine notification reconciliation', () => {
       },
       setNotificationChannelAsync: async () => undefined,
     });
-    fetchScheduledDoseRemindersFromToday.mockImplementation(async () =>
+    fetchDeviceDoseRemindersFromToday.mockImplementation(async () =>
       [...database.values()].map((reminder) => ({ ...reminder })),
     );
     saveNotificationIds.mockImplementation(async (
@@ -181,6 +181,29 @@ describe('medicine notification reconciliation', () => {
     expect(medicineAlerts()[0]!.content.data.eventIds).toHaveLength(6);
     expect(new Set([...database.values()].map((reminder) => reminder.notificationId)))
       .toEqual(new Set([medicineAlerts()[0]!.identifier]));
+  });
+
+  it('rings once when two people on this phone have medicines at the same time', async () => {
+    // Each person's earlier sync left its own 8 AM alert, so the phone rang twice.
+    const mother = sixMedicines().slice(0, 2).map((item) => ({ ...item, notificationId: 'mother-alert' }));
+    const father = [{ ...sixMedicines(morning, 'morning', 'father')[0]!, notificationId: 'father-alert' }];
+    for (const reminder of [...mother, ...father]) database.set(reminder.eventId, { ...reminder });
+    pending.set('mother-alert', {
+      identifier: 'mother-alert',
+      content: { data: { eventIds: mother.map((item) => item.eventId), route: '/home' } },
+    });
+    pending.set('father-alert', {
+      identifier: 'father-alert',
+      content: { data: { eventIds: father.map((item) => item.eventId), route: '/home' } },
+    });
+
+    await syncPatientDoseNotifications('mother');
+
+    const alerts = medicineAlerts();
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.content.title).toBe('Time for 3 medicines');
+    expect(alerts[0]?.content.data.eventIds).toEqual(['morning-1', 'morning-2', 'father-1']);
+    expect([...database.values()].every((item) => item.notificationId === alerts[0]?.identifier)).toBe(true);
   });
 
   it('keeps morning, afternoon, night, and the next morning as four separate reminders', async () => {
