@@ -81,6 +81,20 @@ begin
   select e ->> 'doctorId' into v_text from jsonb_array_elements(v_dir) e where e ->> 'id' = v_patient::text;
   insert into t_results values (default, 'patient list shows her doctor (Mounika)', v_text = v_mounika::text, coalesce(v_text, 'null'));
 
+  -- Her baby's vaccines with the pediatrician: she shows in both lists.
+  insert into public.care_followups (patient_id, hospital_id, nurse_name, doctor_name, care_doctor_id, department, next_date, created_at)
+  select v_patient, n.hospital_id, 'Cycle Nurse', d.display_name, d.id, 'pediatrics', public.care_today() + 7, now() + interval '1 minute'
+  from public.care_nurses n, public.care_doctors d
+  where n.id = v_nurse and d.display_name = 'Dr. Sudarshan Reddy';
+  v_dir := public.care_nurse_directory(v_nurse);
+  select e into v_step from jsonb_array_elements(v_dir) e where e ->> 'id' = v_patient::text;
+  insert into t_results values (default, 'patient of two doctors is in both lists',
+    jsonb_array_length(v_step -> 'doctorIds') = 2
+      and (v_step -> 'doctorIds') ? v_mounika::text
+      and (v_step -> 'doctorIds') ? (select id::text from public.care_doctors where display_name = 'Dr. Sudarshan Reddy')
+      and v_step ->> 'doctorId' = (select id::text from public.care_doctors where display_name = 'Dr. Sudarshan Reddy'),
+    v_step::text);
+
   -- Patient app sees the cycle.
   insert into auth.users (id, instance_id, aud, role, is_anonymous, created_at, updated_at)
   values (v_uid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', true, now(), now());
