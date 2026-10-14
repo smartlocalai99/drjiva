@@ -335,15 +335,26 @@ describe('Health Feed interactions', () => {
   });
 
   it('excludes the Tip of the Day account from the main reels feed', async () => {
-    const neqMock = vi.fn(() => ({
-      order: () => ({ limit: async () => ({ data: [], error: null }) }),
-    }));
+    const neqMock = vi.fn(() => ({ limit: async () => ({ data: [], error: null }) }));
     const eqMock = vi.fn(() => ({ neq: neqMock }));
-    fromMock.mockReturnValue({ select: () => ({ eq: eqMock }) });
+    rpcMock.mockReturnValue({ select: () => ({ eq: eqMock }) });
 
     await fetchHealthFeed();
 
     expect(neqMock).toHaveBeenCalledWith('doctor_phone', HEALTH_TIPS_DOCTOR_PHONE);
+  });
+
+  it('reads the feed through the hospital-aware function after signing in', async () => {
+    const eqMock = vi.fn(() => ({
+      neq: () => ({ limit: async () => ({ data: [{ id: 'post-1' }], error: null }) }),
+    }));
+    rpcMock.mockReturnValue({ select: () => ({ eq: eqMock }) });
+
+    await expect(fetchHealthFeed()).resolves.toEqual([{ id: 'post-1' }]);
+
+    expect(ensureSessionMock).toHaveBeenCalled();
+    expect(rpcMock).toHaveBeenCalledWith('health_feed_posts');
+    expect(eqMock).toHaveBeenCalledWith('status', 'published');
   });
 
   it('fetches the latest tip from the Tip of the Day account only', async () => {

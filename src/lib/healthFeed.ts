@@ -99,13 +99,17 @@ const HEALTH_POST_SELECT = `
   )
 `;
 
+// health_feed_posts = health_posts, newest first, except that patients of a
+// hospital that asked for it (Dhruva) get only their own hospital's
+// doctors' reels. The database decides from this phone's login, in the same
+// single request.
 export async function fetchHealthFeed(): Promise<HealthFeedPost[]> {
+  await ensureSecureReportSession();
   const { data, error } = await supabase
-    .from('health_posts')
+    .rpc('health_feed_posts')
     .select(HEALTH_POST_SELECT)
     .eq('status', 'published')
     .neq('doctor_phone', HEALTH_TIPS_DOCTOR_PHONE)
-    .order('published_at', { ascending: false })
     .limit(50);
 
   if (error) throw new Error(error.message);
