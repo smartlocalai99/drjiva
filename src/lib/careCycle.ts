@@ -2,6 +2,7 @@
 // the woman's period; the database works out every step's date (a step on
 // day N is on Day 1 + (N - 1); IUI is always the trigger date + 1).
 
+import type { CareFollowup } from './care';
 import { daysBetween } from './careSchedule';
 
 export type CycleWho = 'wife' | 'husband' | 'couple';
@@ -35,6 +36,8 @@ export type CareCycle = {
   status: 'active' | 'positive' | 'negative' | 'stopped';
   hospitalId: string;
   hospitalName: string;
+  hospitalPhone?: string | null;
+  hospitalLogoUrl?: string | null;
   doctorName: string | null;
   steps: CareCycleStep[];
 };
@@ -103,6 +106,27 @@ export function upcomingStepDays(cycle: Pick<CareCycle, 'anchorDate' | 'steps'>,
     .filter((group) => group.date >= today && group.steps.some((step) => !isFinished(step)))
     .map((group) => ({ ...group, steps: group.steps.filter((step) => !isFinished(step)) }))
     .slice(0, limit);
+}
+
+/**
+ * The next-visit card for the cycle's next step, used until the nurse saves
+ * a visit date (a new cycle has none yet). No nurse line: nobody set it.
+ */
+export function cycleNextVisit(cycle: CareCycle, today: string): CareFollowup | null {
+  const next = nextCycleStep(cycle, today);
+  if (!next) return null;
+  return {
+    department: 'gynecology',
+    doctorName: cycle.doctorName,
+    hospital: { id: cycle.hospitalId, logoUrl: cycle.hospitalLogoUrl ?? null, name: cycle.hospitalName, phone: cycle.hospitalPhone ?? null },
+    id: `cycle:${cycle.id}`,
+    nextDate: next.date,
+    note: null,
+    nurseName: '',
+    planId: null,
+    updatedAt: '',
+    visitDate: today,
+  };
 }
 
 /** Days of the cycle that have a step, with whether all of that day's steps are done. */

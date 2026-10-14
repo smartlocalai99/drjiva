@@ -32,6 +32,7 @@ begin
   v_cycle := v_view -> 'cycles' -> 0;
   v_cycle_id := (v_cycle ->> 'id')::uuid;
   insert into t_results values (default, 'cycle started with 11 steps', jsonb_array_length(v_cycle -> 'steps') = 11 and v_cycle ->> 'doctorName' = 'Dr. Mounika', v_cycle ->> 'doctorName');
+  insert into t_results values (default, 'cycle carries the hospital phone and logo', v_cycle ? 'hospitalPhone' and v_cycle ? 'hospitalLogoUrl', v_cycle::text);
 
   select s into v_step from jsonb_array_elements(v_cycle -> 'steps') s where s ->> 'code' = 'oi_baseline_scan';
   insert into t_results values (default, 'Day 2 = Day 1 + 1', (v_step ->> 'date')::date = v_anchor + 1, v_step ->> 'date');

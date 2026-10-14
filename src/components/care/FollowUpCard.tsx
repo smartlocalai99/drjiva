@@ -98,12 +98,15 @@ export function FollowUpCard({
         </View>
       ) : null}
 
-      <View style={styles.nurseRow}>
-        <Ionicons color={dashboardColors.textMuted} name="person-circle-outline" size={20} />
-        <Text style={[careShared.muted, styles.flex]}>
-          {c('updatedBy', { date: date(followup.updatedAt.slice(0, 10), 'dayMonth'), nurse: followup.nurseName })}
-        </Text>
-      </View>
+      {/* Only for a date a nurse saved (a treatment plan's own next step has none). */}
+      {followup.nurseName && followup.updatedAt ? (
+        <View style={styles.nurseRow}>
+          <Ionicons color={dashboardColors.textMuted} name="person-circle-outline" size={20} />
+          <Text style={[careShared.muted, styles.flex]}>
+            {c('updatedBy', { date: date(followup.updatedAt.slice(0, 10), 'dayMonth'), nurse: followup.nurseName })}
+          </Text>
+        </View>
+      ) : null}
 
       {phone ? <CallButton label={c('callHospital')} number={phone} /> : null}
     </View>

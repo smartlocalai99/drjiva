@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bestDates,
   cycleDayOf,
+  cycleNextVisit,
   cycleLength,
   cycleStepDays,
   nextCycleStep,
@@ -88,5 +89,26 @@ describe('OI-TI / IUI cycle', () => {
     expect(testCountdown(real, '2026-11-04')).toEqual({ date: '2026-11-05', days: 1 });
     expect(testCountdown(real, '2026-11-05')).toBeNull(); // test day shows the step
     expect(testCountdown({ steps: [real.steps[0]!, { ...real.steps[1]!, status: 'done' }] }, '2026-10-25')).toBeNull();
+  });
+
+  it('builds a next-visit card from the next step when the nurse saved none', () => {
+    const full = {
+      ...cycle,
+      doctorName: 'Dr. Mounika',
+      hospitalId: 'h1',
+      hospitalName: 'Dhruva Hospitals',
+      hospitalPhone: '0000000000',
+      id: 'c1',
+      kind: 'cycle' as const,
+      partnerName: null,
+      personName: 'A',
+      protocol: 'oi_ti_iui',
+      status: 'active' as const,
+      titleEn: 'OI-TI / IUI',
+      titleTe: 'OI-TI / IUI',
+    };
+    const card = cycleNextVisit(full, '2026-10-15');
+    expect(card).toMatchObject({ doctorName: 'Dr. Mounika', nextDate: '2026-10-19', nurseName: '', hospital: { id: 'h1', logoUrl: null, name: 'Dhruva Hospitals', phone: '0000000000' } });
+    expect(cycleNextVisit(full, '2026-11-06')).toBeNull();
   });
 });

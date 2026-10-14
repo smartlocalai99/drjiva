@@ -16,7 +16,7 @@ import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav
 import { dashboardColors, dashboardLayout, dashboardSpacing } from '../src/dashboardTheme';
 import { fetchMyCare, readCachedMyCare, type CareExtraItem, type MyCare } from '../src/lib/care';
 import { useCareCopy } from '../src/lib/careCopy';
-import type { CareCycle } from '../src/lib/careCycle';
+import { cycleNextVisit, type CareCycle } from '../src/lib/careCycle';
 import { syncCareReminders } from '../src/lib/careReminders';
 import { dialableIndianPhone, visitForDate, type CarePlan } from '../src/lib/careSchedule';
 import { getTabRoute } from '../src/lib/dashboardNav';
@@ -109,7 +109,13 @@ export default function MyCareScreen() {
   const selected = sections.find((section) => section.id === selectedId) ?? sections[0] ?? null;
   const selectedPlan = selected?.kind === 'plan' ? selected.plan : null;
   const selectedCycle = selected?.kind === 'cycle' ? selected.cycle : null;
-  const followup = care?.followup ?? null;
+  const today = care?.today ?? '';
+  const savedFollowup = care?.followup ?? null;
+  // In a treatment cycle, the cycle's next step stands in until the nurse
+  // saves a visit date that is still ahead.
+  const followup = selectedCycle
+    ? (savedFollowup && savedFollowup.nextDate >= today ? savedFollowup : null) ?? cycleNextVisit(selectedCycle, today) ?? savedFollowup
+    : savedFollowup;
   const followupPlan = plans.find((plan) => plan.id === followup?.planId) ?? selectedPlan;
   const followupVisit = followup && followupPlan ? visitForDate(followupPlan, followup.nextDate) : null;
   // Cycle steps still to do show on the next-visit card like case-sheet tests.
@@ -126,7 +132,6 @@ export default function MyCareScreen() {
         })),
     ),
   ];
-  const today = care?.today ?? '';
   // A pregnancy or treatment page opens straight on the day; no page heading.
   const isPregnancy = selectedPlan?.type === 'pregnancy';
   const noHeader = isPregnancy || Boolean(selectedCycle);
@@ -206,8 +211,7 @@ export default function MyCareScreen() {
 
               {selectedCycle ? (
                 <CycleSection cycle={selectedCycle} key={selectedCycle.id} today={today}>
-                  {/* The plan already shows the next step; the card only adds the nurse's date. */}
-                  {followup ? <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} /> : null}
+                  <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />
                 </CycleSection>
               ) : (
                 <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />

@@ -45,7 +45,7 @@ export function CycleDayCard({
   const notes = steps.filter((step) => !step.status).map((step) => pick(step.noteEn ?? '', step.noteTe ?? '')).filter(Boolean);
   const notStarted = todayDay < 1;
   const nextLabel = next ? c('cycleNext', { step: pick(next.labelEn, next.labelTe) }) : '';
-  const nextWhen = next ? c('cycleNextOn', { date: date(next.date, 'weekdayDayMonth'), n: cycleDayOf(cycle, next.date) }) : '';
+  const nextWhen = next ? date(next.date, 'weekdayDayMonth') : '';
   const wait = day === todayDay && !steps.length ? testCountdown(cycle, today) : null;
   const bestDay = bestDates(cycle).has(dayDate);
 
@@ -53,7 +53,7 @@ export function CycleDayCard({
     <View style={careShared.card}>
       <View>
         <View style={styles.titleRow}>
-          <Text style={styles.day}>{c('cycleDay', { n: day })}</Text>
+          <Text style={styles.day}>{date(dayDate, 'dayMonth')}</Text>
           {day === todayDay ? (
             <View style={styles.nowPill}>
               <Text style={styles.nowText}>{c('today')}</Text>
@@ -61,7 +61,9 @@ export function CycleDayCard({
           ) : null}
         </View>
         <Text style={[careShared.muted, styles.meta]}>
-          {notStarted ? c('cycleStarts', { date: date(cycle.anchorDate, 'weekdayDayMonth') }) : `${date(dayDate, 'weekdayDayMonth')} · ${pick(cycle.titleEn, cycle.titleTe)}`}
+          {notStarted
+            ? c('cycleStarts', { date: date(cycle.anchorDate, 'weekdayDayMonth') })
+            : `${date(dayDate, 'weekday')} · ${c('cycleDay', { n: day })} · ${pick(cycle.titleEn, cycle.titleTe)}`}
         </Text>
       </View>
 

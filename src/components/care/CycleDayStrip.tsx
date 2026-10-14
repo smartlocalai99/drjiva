@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { dashboardColors, dashboardSpacing } from '../../dashboardTheme';
 import { useCareCopy } from '../../lib/careCopy';
 import { bestDates, cycleDayOf, stepDays, type CareCycle } from '../../lib/careCycle';
+import { addDaysIso } from '../../lib/careSchedule';
 import { PressableScale } from '../PressableScale';
 import { HEART } from './CycleDayCard';
 import { careFonts } from './careStyles';
@@ -13,9 +14,10 @@ const CHIP_WIDTH = 52;
 const CHIP_GAP = 6;
 const SIDE = dashboardSpacing.pagePadding;
 
-// Day 1 … 31 side by side (like the pregnancy week strip); a dot under
-// the days with a hospital step, green once done, and a heart on the best
-// days for intercourse. The picked day stays in the middle.
+// The treatment days as real dates ("Oct 14"), side by side like the
+// pregnancy week strip; a dot under the days with a hospital step (green
+// once done) and a heart on the best days for intercourse. The picked day
+// stays in the middle.
 export function CycleDayStrip({
   cycle,
   length,
@@ -29,7 +31,7 @@ export function CycleDayStrip({
   selectedDay: number;
   todayDay: number;
 }) {
-  const { c } = useCareCopy();
+  const { c, date } = useCareCopy();
   const scrollRef = useRef<ScrollView>(null);
   const placed = useRef(false);
   const [viewWidth, setViewWidth] = useState(0);
@@ -61,7 +63,10 @@ export function CycleDayStrip({
         const now = day === todayDay;
         const mark = marks.get(day);
         const heart = hearts.has(day);
-        const label = [c('cycleDay', { n: day }), now ? c('today') : '', heart ? c('cycleBestDay') : ''].filter(Boolean).join(', ');
+        const iso = addDaysIso(cycle.anchorDate, index);
+        const label = [date(iso, 'weekdayDayMonth'), c('cycleDay', { n: day }), now ? c('today') : '', heart ? c('cycleBestDay') : '']
+          .filter(Boolean)
+          .join(', ');
         return (
           <PressableScale
             accessibilityLabel={label}
@@ -70,8 +75,8 @@ export function CycleDayStrip({
             onPress={() => onSelect(day)}
             style={[styles.chip, now && styles.chipNow, selected && styles.chipSelected]}
           >
-            <Text style={[styles.label, selected && styles.textSelected]}>{c('dayShort')}</Text>
-            <Text style={[styles.number, selected && styles.textSelected]}>{day}</Text>
+            <Text numberOfLines={1} style={[styles.label, selected && styles.textSelected]}>{date(iso, 'monthShort')}</Text>
+            <Text style={[styles.number, selected && styles.textSelected]}>{Number(iso.slice(8, 10))}</Text>
             <View style={styles.markRow}>
               {heart ? (
                 <Ionicons color={selected ? '#FFFFFF' : HEART} name="heart" size={10} />

@@ -82,7 +82,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Your treatment starts on {date} | మీ చికిత్స {date}న మొదలవుతుంది |
 | No hospital visit this day | ఈ రోజు హాస్పిటల్‌కు రావాల్సిన అవసరం లేదు |
 | Next: {step} | తదుపరి: {step} |
-| Day {n} · {date} | {n}వ రోజు · {date} |
 | All treatment days are over. Your hospital will tell you what comes next. | చికిత్స రోజులు పూర్తయ్యాయి. తర్వాత ఏమి చేయాలో మీ హాస్పిటల్ చెబుతుంది. |
 | Done | పూర్తయింది |
 | days to your pregnancy test | రోజుల్లో గర్భ పరీక్ష |

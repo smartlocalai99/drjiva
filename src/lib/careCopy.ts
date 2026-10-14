@@ -76,7 +76,6 @@ const en = {
   cycleStarts: 'Your treatment starts on {date}',
   cycleNoStep: 'No hospital visit this day',
   cycleNext: 'Next: {step}',
-  cycleNextOn: 'Day {n} · {date}',
   cycleOver: 'All treatment days are over. Your hospital will tell you what comes next.',
   cycleDone: 'Done',
   cycleWaitDays: 'days to your pregnancy test',
@@ -168,7 +167,6 @@ const te: Record<CareCopyKey, string> = {
   cycleStarts: 'మీ చికిత్స {date}న మొదలవుతుంది',
   cycleNoStep: 'ఈ రోజు హాస్పిటల్‌కు రావాల్సిన అవసరం లేదు',
   cycleNext: 'తదుపరి: {step}',
-  cycleNextOn: '{n}వ రోజు · {date}',
   cycleOver: 'చికిత్స రోజులు పూర్తయ్యాయి. తర్వాత ఏమి చేయాలో మీ హాస్పిటల్ చెబుతుంది.',
   cycleDone: 'పూర్తయింది',
   cycleWaitDays: 'రోజుల్లో గర్భ పరీక్ష',
@@ -195,6 +193,12 @@ const MONTHS: Record<AppLanguage, readonly string[]> = {
   te: ['జనవరి', 'ఫిబ్రవరి', 'మార్చి', 'ఏప్రిల్', 'మే', 'జూన్', 'జూలై', 'ఆగస్టు', 'సెప్టెంబర్', 'అక్టోబర్', 'నవంబర్', 'డిసెంబర్'],
 };
 
+// Short month names for small date chips ("Oct" / "అక్టో").
+const MONTHS_SHORT: Record<AppLanguage, readonly string[]> = {
+  en: MONTHS.en,
+  te: ['జన', 'ఫిబ్ర', 'మార్చి', 'ఏప్రి', 'మే', 'జూన్', 'జులై', 'ఆగ', 'సెప్టెం', 'అక్టో', 'నవం', 'డిసెం'],
+};
+
 const WEEKDAYS: Record<AppLanguage, readonly string[]> = {
   en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   te: ['ఆదివారం', 'సోమవారం', 'మంగళవారం', 'బుధవారం', 'గురువారం', 'శుక్రవారం', 'శనివారం'],
@@ -219,7 +223,7 @@ export function careMonth(language: AppLanguage, month: number): string {
   return careText(language, 'pregnancyMonth', { n: `${month}${suffix}` });
 }
 
-export type CareDateStyle = 'dayMonth' | 'dayMonthYear' | 'weekdayDayMonth';
+export type CareDateStyle = 'dayMonth' | 'dayMonthYear' | 'monthShort' | 'weekday' | 'weekdayDayMonth';
 
 // 'YYYY-MM-DD' → "Tue, 20 Oct" / "మంగళవారం, 20 అక్టోబర్".
 export function careDate(language: AppLanguage, iso: string, style: CareDateStyle = 'dayMonthYear'): string {
@@ -227,6 +231,8 @@ export function careDate(language: AppLanguage, iso: string, style: CareDateStyl
   const month = MONTHS[language][m - 1] ?? '';
   const weekday = WEEKDAYS[language][new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? '';
   if (style === 'dayMonth') return `${d} ${month}`;
+  if (style === 'monthShort') return MONTHS_SHORT[language][m - 1] ?? '';
+  if (style === 'weekday') return weekday;
   if (style === 'weekdayDayMonth') return `${weekday}, ${d} ${month}`;
   return `${d} ${month} ${y}`;
 }
