@@ -1,9 +1,13 @@
 -- My Care database test (safe on production: everything is rolled back).
 -- Paste into the Supabase SQL editor and run. Last result = pass/fail list.
--- Uses made-up numbers 99999000xx; creates and removes its own test nurse.
+-- Uses made-up numbers 99998000xx; creates and removes its own test nurse.
 begin;
 
 create temp table t_results (seq serial, name text, ok boolean, detail text) on commit drop;
+
+-- This file checks the standard schedule; hospital schedules (Dhruva) are
+-- checked in my_care_part4_rollback_test.sql. Off for this transaction only.
+update public.care_schedule_visits set is_active = false where hospital_id is not null;
 
 do $$
 declare
@@ -54,21 +58,21 @@ begin
   left join lateral public.care_match_doctor(t.h, t.n) m on true;
 
   -- 2. Nurse login: 4-digit PIN, lockout after 5 wrong tries
-  v_nurse := public.care_add_nurse('Dhruva Hospitals', 'Test Nurse', '9999900001', '4821');
-  v_nurse_shankar := public.care_add_nurse('SHANKAR', 'Shankar Nurse', '9999900009', '1111');
-  v_res := public.care_nurse_login('9999900001', '4821');
+  v_nurse := public.care_add_nurse('Dhruva Hospitals', 'Test Nurse', '9999800001', '4821');
+  v_nurse_shankar := public.care_add_nurse('SHANKAR', 'Shankar Nurse', '9999800009', '1111');
+  v_res := public.care_nurse_login('9999800001', '4821');
   insert into t_results values (default, 'nurse logs in with mobile + 4-digit PIN', (v_res->>'ok')::boolean and v_res->'nurse'->>'hospitalName' = 'Dhruva Hospitals', v_res->'nurse'->>'name' || ' @ ' || (v_res->'nurse'->>'hospitalName'));
-  v_res := public.care_nurse_login('9999900001', '0000');
+  v_res := public.care_nurse_login('9999800001', '0000');
   insert into t_results values (default, 'wrong PIN rejected', not (v_res->>'ok')::boolean, null);
-  perform public.care_nurse_login('9999900001', '0000');
-  perform public.care_nurse_login('9999900001', '0000');
-  perform public.care_nurse_login('9999900001', '0000');
-  v_res := public.care_nurse_login('9999900001', '0000');
+  perform public.care_nurse_login('9999800001', '0000');
+  perform public.care_nurse_login('9999800001', '0000');
+  perform public.care_nurse_login('9999800001', '0000');
+  v_res := public.care_nurse_login('9999800001', '0000');
   insert into t_results values (default, '5 wrong PINs lock login for 15 min', (v_res->>'lockedUntil') is not null, null);
-  v_res := public.care_nurse_login('9999900001', '4821');
+  v_res := public.care_nurse_login('9999800001', '4821');
   insert into t_results values (default, 'correct PIN still refused while locked', not (v_res->>'ok')::boolean, null);
-  perform public.care_set_nurse_pin('9999900001', '4821');
-  v_res := public.care_nurse_login('9999900001', '4821');
+  perform public.care_set_nurse_pin('9999800001', '4821');
+  v_res := public.care_nurse_login('9999800001', '4821');
   insert into t_results values (default, 'PIN reset unlocks', (v_res->>'ok')::boolean, null);
 
   -- 3. A nurse only reaches her own hospital's patients
@@ -97,15 +101,15 @@ begin
   end;
 
   -- 4. Add patient + hospital patient ID
-  v_view := public.care_nurse_add_patient(v_nurse, '9999900002', 'TEST Mounika Patient', 'DH-001');
+  v_view := public.care_nurse_add_patient(v_nurse, '9999800002', 'TEST Mounika Patient', 'DH-001');
   v_patient := (v_view->'patient'->>'id')::uuid;
   insert into t_results values (default, 'add patient (mobile + name + UHID)', v_patient is not null and v_view->'patient'->>'hospitalPatientId' = 'DH-001', null);
   v_res := public.care_nurse_find(v_nurse, 'dh 001');
   insert into t_results values (default, 'find by hospital patient ID, any spacing/case', (v_res->>'patientId')::uuid = v_patient, null);
-  v_res := public.care_nurse_find(v_nurse_shankar, '9999900002');
+  v_res := public.care_nurse_find(v_nurse_shankar, '9999800002');
   insert into t_results values (default, 'Shankar nurse cannot find Dhruva''s new patient', not (v_res->>'found')::boolean, null);
   begin
-    perform public.care_nurse_add_patient(v_nurse, '9999900005', 'Another', 'DH001');
+    perform public.care_nurse_add_patient(v_nurse, '9999800005', 'Another', 'DH001');
     insert into t_results values (default, 'same hospital patient ID twice is rejected', false, 'accepted!');
   exception when others then
     insert into t_results values (default, 'same hospital patient ID twice is rejected', sqlerrm = 'hospital_id_taken', sqlerrm);
@@ -152,7 +156,7 @@ begin
   insert into t_results values (default, 'a tick can be cleared again', (select count(*) from public.care_plan_items where plan_id = v_plan_id) = 1, null);
 
   -- 7. Dr. Sudarshan Reddy: child born 5 weeks ago
-  v_view := public.care_nurse_add_patient(v_nurse, '9999900003', 'TEST Parent', null);
+  v_view := public.care_nurse_add_patient(v_nurse, '9999800003', 'TEST Parent', null);
   v_child_patient := (v_view->'patient'->>'id')::uuid;
   v_view := public.care_nurse_add_child(v_nurse, v_child_patient, 'Arjun', v_today - 35, 'male', v_sudarshan, null);
   v_plan := v_view->'plans'->0;
@@ -182,33 +186,33 @@ begin
   insert into public.patient_device_links (patient_id, owner_user_id) values (v_patient, v_uid);
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_other_uid, 'role', 'authenticated')::text, true);
-  v_res := public.care_get_my_care('9999900002');
+  v_res := public.care_get_my_care('9999800002');
   insert into t_results values (default, 'a device NOT linked to the number sees nothing', (v_res->>'linked')::boolean = false, null);
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_uid, 'role', 'authenticated')::text, true);
-  v_res := public.care_get_my_care('9999900002');
+  v_res := public.care_get_my_care('9999800002');
   insert into t_results values (default, 'linked device sees its pregnancy plan', (v_res->>'linked')::boolean and jsonb_array_length(v_res->'plans') = 1, null);
   insert into t_results values (default, 'app shows next visit + nurse who set it', v_res->'followup'->>'nurseName' = 'Test Nurse' and (v_res->'followup'->>'nextDate')::date = v_today + 1, (v_res->'followup'->>'nurseName') || ', ' || (v_res->'followup'->'hospital'->>'name'));
   insert into t_results values (default, 'app knows the doctor is gynecology', v_res->'currentDoctor'->>'department' = 'gynecology', v_res->'currentDoctor'->>'name');
 
-  perform public.care_hide_plan('9999900002', v_plan_id);
-  v_res := public.care_get_my_care('9999900002');
+  perform public.care_hide_plan('9999800002', v_plan_id);
+  v_res := public.care_get_my_care('9999800002');
   insert into t_results values (default, '"This doesn''t apply to me" hides the plan', jsonb_array_length(v_res->'plans') = 0, null);
   update public.care_plans set hidden_by_patient_at = null where id = v_plan_id;
 
   -- 9. Chat: allowed context, saving, 30/day limit
-  v_res := public.care_chat_begin('9999900002', 'What can I eat?');
+  v_res := public.care_chat_begin('9999800002', 'What can I eat?');
   insert into t_results values (default, 'AI context: week + hospital, no mobile, no names',
     (v_res->'context'->>'pregnancyWeek')::integer = 10
-      and position('9999900002' in v_res::text) = 0
+      and position('9999800002' in v_res::text) = 0
       and position('TEST' in (v_res->'context')::text) = 0
       and position('Test Nurse' in (v_res->'context')::text) = 0,
     (v_res->'context')::text);
-  v_res := public.care_chat_finish('9999900002', (v_res->>'messageId')::uuid, 'Eat home food.', false);
+  v_res := public.care_chat_finish('9999800002', (v_res->>'messageId')::uuid, 'Eat home food.', false);
   insert into t_results values (default, 'AI reply saved to the chat', v_res->>'role' = 'assistant', null);
   begin
     for v_count in 1..30 loop
-      perform public.care_chat_begin('9999900002', 'question ' || v_count);
+      perform public.care_chat_begin('9999800002', 'question ' || v_count);
     end loop;
     insert into t_results values (default, 'limit: 30 questions a day', false, 'no limit hit');
   exception when others then
@@ -216,7 +220,7 @@ begin
   end;
 
   -- 10. Follow-up reminders
-  perform public.care_register_push_token('9999900002', 'ExponentPushToken[TestToken1234567]', 'android', 'te');
+  perform public.care_register_push_token('9999800002', 'ExponentPushToken[TestToken1234567]', 'android', 'te');
   v_count := public.care_send_followup_reminders('eve');
   insert into t_results values (default, '6 PM reminder queued for tomorrow''s visit', v_count = 1, v_count::text);
   v_count := public.care_send_followup_reminders('eve');
@@ -234,7 +238,7 @@ begin
   insert into t_results values (default, '8 AM reminder sent on the visit day', v_count = 1, v_count::text);
 
   -- 11. Other doctor: follow-up only
-  v_view := public.care_nurse_add_patient(v_nurse, '9999900004', 'TEST General', null);
+  v_view := public.care_nurse_add_patient(v_nurse, '9999800004', 'TEST General', null);
   v_general_patient := (v_view->'patient'->>'id')::uuid;
   v_view := public.care_nurse_save_visit(v_nurse, v_general_patient, '[]'::jsonb, v_today + 14, 'Review with reports', null, 'Dr. Someshwar Reddy', null);
   insert into t_results values (default, 'other doctor -> general, follow-up only, no plans',
@@ -256,7 +260,7 @@ begin
   end;
   begin
     set local role anon;
-    perform public.care_get_my_care('9999900002');
+    perform public.care_get_my_care('9999800002');
     reset role;
     insert into t_results values (default, 'public key cannot call My Care', false, 'call allowed!');
   exception when others then
@@ -264,7 +268,7 @@ begin
   end;
   begin
     set local role authenticated;
-    perform public.care_nurse_login('9999900001', '4821');
+    perform public.care_nurse_login('9999800001', '4821');
     reset role;
     insert into t_results values (default, 'app users cannot call nurse login', false, 'call allowed!');
   exception when others then

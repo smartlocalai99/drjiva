@@ -15,8 +15,8 @@ import {
   type BabyStage,
   type FruitPhoto,
 } from '../../lib/babySize';
-import { useCareCopy } from '../../lib/careCopy';
-import { trimester } from '../../lib/careSchedule';
+import { careMonth, useCareCopy } from '../../lib/careCopy';
+import { pregnancyMonth } from '../../lib/careSchedule';
 import { careFonts, careShared } from './careStyles';
 
 // Free pictures (public domain / CC BY-SA), credited in Profile → Photo
@@ -81,7 +81,7 @@ const GROW = { duration: 280, easing: Easing.out(Easing.cubic), reduceMotion: Re
 // bigger each week; on the right what it is as big as (with a photo),
 // its average weight and its length.
 export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | null; isCurrent: boolean; week: number }) {
-  const { c, date, pick } = useCareCopy();
+  const { c, date, language, pick } = useCareCopy();
   const info = babyWeek(week);
   const babySize = Math.round(WOMB_INSIDE * babyScale(week));
   const babyStyle = useAnimatedStyle(
@@ -111,7 +111,7 @@ export function BabyWeekCard({ dueDate, isCurrent, week }: { dueDate: string | n
           ) : null}
         </View>
         <View style={styles.metaRow}>
-          <Text style={careShared.muted}>{c(`trimester${trimester(info.week)}`)}</Text>
+          <Text style={careShared.muted}>{careMonth(language, pregnancyMonth(info.week))}</Text>
           {dueDate ? (
             <>
               <View style={styles.metaDot} />

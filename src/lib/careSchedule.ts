@@ -95,6 +95,14 @@ export function pregnancyWeek(plan: Pick<CarePlan, 'startDate'>, today: string):
   return Math.max(0, Math.floor(daysBetween(plan.startDate, today) / 7));
 }
 
+// Month of pregnancy the way families count it (weeks 0–4 = 1st month …
+// 36+ = 9th month). Same table as the nurse page.
+const MONTH_ENDS = [4, 8, 13, 17, 22, 27, 31, 35];
+export function pregnancyMonth(week: number): number {
+  const index = MONTH_ENDS.findIndex((end) => week <= end);
+  return index === -1 ? 9 : index + 1;
+}
+
 export function trimester(week: number): 1 | 2 | 3 {
   if (week < 14) return 1;
   if (week < 28) return 2;

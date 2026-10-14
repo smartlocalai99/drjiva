@@ -19,10 +19,8 @@ const en = {
   callHospital: 'Call hospital',
   noDateYet: 'Your nurse will add your next visit date after your consultation.',
   pregnancy: 'Pregnancy',
-  dueDate: 'Due date {date}',
-  trimester1: '1st trimester',
-  trimester2: '2nd trimester',
-  trimester3: '3rd trimester',
+  dueDate: 'Expected delivery {date}',
+  pregnancyMonth: '{n} month',
   week: 'Week {week}',
   weekShort: 'Week',
   thisWeek: 'This week',
@@ -67,10 +65,8 @@ const te: Record<CareCopyKey, string> = {
   callHospital: 'హాస్పిటల్‌కు కాల్ చేయండి',
   noDateYet: 'డాక్టర్‌ను కలిసిన తర్వాత మీ నర్సు తదుపరి సందర్శన తేదీని ఇక్కడ చేర్చుతారు.',
   pregnancy: 'గర్భధారణ',
-  dueDate: 'డెలివరీ తేదీ {date}',
-  trimester1: 'మొదటి త్రైమాసికం',
-  trimester2: 'రెండవ త్రైమాసికం',
-  trimester3: 'మూడవ త్రైమాసికం',
+  dueDate: 'అంచనా డెలివరీ తేదీ {date}',
+  pregnancyMonth: '{n}వ నెల',
   week: '{week}వ వారం',
   weekShort: 'వారం',
   thisWeek: 'ఈ వారం',
@@ -122,6 +118,13 @@ export function careText(
   return template.replace(/\{(\w+)\}/g, (match, name: string) =>
     name in values ? String(values[name]) : match,
   );
+}
+
+// "3rd month" / "3వ నెల" (month of pregnancy, 1-9).
+export function careMonth(language: AppLanguage, month: number): string {
+  if (language === 'te') return careText(language, 'pregnancyMonth', { n: month });
+  const suffix = month === 1 ? 'st' : month === 2 ? 'nd' : month === 3 ? 'rd' : 'th';
+  return careText(language, 'pregnancyMonth', { n: `${month}${suffix}` });
 }
 
 export type CareDateStyle = 'dayMonth' | 'dayMonthYear' | 'weekdayDayMonth';

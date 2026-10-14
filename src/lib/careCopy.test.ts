@@ -17,3 +17,15 @@ describe('My Care copy', () => {
     expect(careDate('en', '2027-03-12')).toBe('12 Mar 2027');
   });
 });
+
+describe('pregnancy month and delivery wording', () => {
+  it('says the month the way families count it', async () => {
+    const { careMonth } = await import('./careCopy');
+    const { pregnancyMonth } = await import('./careSchedule');
+    expect([4, 5, 9, 13, 14, 27, 28, 36, 40].map(pregnancyMonth)).toEqual([1, 2, 3, 3, 4, 6, 7, 9, 9]);
+    expect(careMonth('en', 3)).toBe('3rd month');
+    expect(careMonth('en', 1)).toBe('1st month');
+    expect(careMonth('te', 3)).toBe('3వ నెల');
+    expect(careText('en', 'dueDate', { date: '26 May 2027' })).toBe('Expected delivery 26 May 2027');
+  });
+});
