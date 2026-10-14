@@ -11,6 +11,8 @@ export type CareItem = {
   labelEn: string;
   labelTe: string;
   conditional: boolean;
+  /** Optional vaccine ("ask your doctor"); reminders only if the parent turns them on. */
+  optional?: boolean;
   fromDate: string;
   toDate: string;
   status: CareItemStatus;

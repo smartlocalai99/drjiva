@@ -4,7 +4,8 @@ Every new piece of Telugu text, next to its English. Where to change it:
 
 - App screen text: `src/lib/careCopy.ts` (the `te` block) – needs an app update.
 - Baby size comparisons (week 4–40): `src/lib/babySize.ts` – needs an app update.
-- Visit names and checklist items: Supabase tables `care_schedule_visits` / `care_schedule_items` (`title_te`, `label_te`) – changes show at once, no app update.
+- What most children do at each age: `src/lib/childGrowth.ts` (`MILESTONES`) – needs an app update.
+- Visit names and checklist items / vaccines: Supabase tables `care_schedule_visits` / `care_schedule_items` (`title_te`, `label_te`) – changes show at once, no app update.
 - Reminder push text: function `care_send_followup_reminders` in the database.
 - OI-TI / IUI step names and notes: Supabase table `care_cycle_protocol_steps` (`label_te`, `note_te`) – changes show at once, no app update.
 
@@ -99,6 +100,77 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Tomorrow: {steps} | రేపు: {steps} |
 | Today: {steps} | ఈరోజు: {steps} |
 | Day {n} of your treatment at {hospital}. | {hospital} లో మీ చికిత్స {n}వ రోజు. |
+| Child Growth Chart | బిడ్డ ఎదుగుదల చార్ట్ |
+| Add your child | మీ బిడ్డను చేర్చండి |
+| Add child | బిడ్డను చేర్చండి |
+| {doctor} at {hospital} looks after the vaccines. You get a reminder before each visit. | {hospital} లో {doctor} టీకాలను చూసుకుంటారు. ప్రతి సందర్శనకు ముందు మీకు గుర్తు చేస్తాం. |
+| Child details | బిడ్డ వివరాలు |
+| Child's name | బిడ్డ పేరు |
+| Girl or boy | పాప లేదా బాబు |
+| Girl | పాప |
+| Boy | బాబు |
+| Date of birth | పుట్టిన తేదీ |
+| Every vaccine date is worked out from this. | ప్రతి టీకా తేదీ దీని నుంచే లెక్కిస్తాం. |
+| Save | సేవ్ చేయండి |
+| Edit | మార్చండి |
+| Visit {n} of {total} | {total} లో {n}వ సందర్శన |
+| Upcoming | రాబోయేది |
+| Due | ఇప్పుడు వేయించాలి |
+| Overdue | ఆలస్యం అయింది |
+| Completed | పూర్తయింది |
+| What most children do at this age | ఈ వయసులో చాలా మంది పిల్లలు చేసేవి |
+| If your child cannot do these yet, tell the doctor at the visit. | మీ బిడ్డ ఇవి ఇంకా చేయలేకపోతే, సందర్శనలో డాక్టర్‌కు చెప్పండి. |
+| Vaccines | టీకాలు |
+| Mark as complete | పూర్తయినట్టు గుర్తించండి |
+| Given on {date} | {date}న వేయించారు |
+| Create reminder | గుర్తు చేయమనండి |
+| Reminder set | గుర్తు చేస్తాం |
+| Reminders 3 days before, 1 day before and on the day, at 9 AM. | మూడు రోజుల ముందు, ఒక రోజు ముందు, ఆ రోజున ఉదయం 9 గంటలకు గుర్తు చేస్తాం. |
+| Due {date} | {date}న వేయించాలి |
+| {vaccine}: not before {date} (an earlier dose was late) | {vaccine}: {date} కంటే ముందు కాదు (ముందటి డోసు ఆలస్యమైంది) |
+| If HPV is started at 15 years or older, 3 doses are needed: day 0, after 2 months and after 6 months. | HPV 15 ఏళ్ళు లేదా ఆ తర్వాత మొదలుపెడితే 3 డోసులు కావాలి: మొదటి రోజు, 2 నెలల తర్వాత, 6 నెలల తర్వాత. |
+| Optional – ask your doctor | ఐచ్ఛికం – మీ డాక్టర్‌ను అడగండి |
+| Remind me | గుర్తు చేయండి |
+| Given | వేయించారు |
+| Birth | పుట్టుక |
+| weeks | వారాలు |
+| months | నెలలు |
+| years | ఏళ్ళు |
+| Given on | వేయించిన తేదీ |
+| Site of injection | ఎక్కడ వేశారు |
+| Left thigh | ఎడమ తొడ |
+| Right thigh | కుడి తొడ |
+| Left arm | ఎడమ చేయి |
+| Right arm | కుడి చేయి |
+| By mouth (drops) | నోటి ద్వారా (చుక్కలు) |
+| Other | ఇతర |
+| Brand | బ్రాండ్ |
+| Batch No. | బ్యాచ్ నంబర్ |
+| Expiry | గడువు తేదీ |
+| Upload label photo | లేబుల్ ఫోటో పెట్టండి |
+| Take photo | ఫోటో తీయండి |
+| Choose photo | ఫోటో ఎంచుకోండి |
+| Remove photo | ఫోటో తీసేయండి |
+| Save | సేవ్ చేయండి |
+| Not given yet | ఇంకా వేయించలేదు |
+| Nurse {nurse} marked this given on {date} | నర్సు {nurse} {date}న వేశారని గుర్తించారు |
+| Choose date | తేదీ ఎంచుకోండి |
+| Done | అయింది |
+| Could not save. Check your internet and try again. | సేవ్ కాలేదు. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి. |
+| Enter the child's name. | బిడ్డ పేరు రాయండి. |
+| Choose girl or boy. | పాప లేదా బాబు ఎంచుకోండి. |
+| Choose a date of birth that is not in the future. | భవిష్యత్ తేదీ కాని పుట్టిన తేదీ ఎంచుకోండి. |
+| Your hospital has no child doctor on DrJiva yet. | మీ హాస్పిటల్‌లో ఇంకా DrJiva లో పిల్లల డాక్టర్ లేరు. |
+| You can add up to 8 children. | గరిష్టంగా 8 మంది పిల్లలను చేర్చవచ్చు. |
+| The date must be between the date of birth and today. | తేదీ పుట్టిన తేదీ నుంచి ఈరోజు మధ్యలో ఉండాలి. |
+| Some vaccines are saved before this date of birth. Check the date. | ఈ పుట్టిన తేదీ కంటే ముందు కొన్ని టీకాలు సేవ్ అయ్యాయి. తేదీ సరిచూడండి. |
+| Could not upload the photo. Try again. | ఫోటో అప్‌లోడ్ కాలేదు. మళ్ళీ ప్రయత్నించండి. |
+| {name}: vaccines in 3 days | {name}: 3 రోజుల్లో టీకాలు |
+| {name}: vaccines tomorrow | {name}: రేపు టీకాలు |
+| {name}: vaccines today | {name}: ఈరోజు టీకాలు |
+| {name}: vaccines are overdue | {name}: టీకాలు ఆలస్యం అయ్యాయి |
+| {age} visit at {hospital}: {vaccines} | {hospital} లో {age} సందర్శన: {vaccines} |
+| The {age} vaccines were due on {date}. Please visit {hospital}. | {age} టీకాలు {date}న వేయించాల్సింది. దయచేసి {hospital} కు వెళ్ళండి. |
 
 ## Baby size ("As big as …")
 
@@ -142,6 +214,50 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | 39 | a small watermelon | చిన్న పుచ్చకాయ |
 | 40 | a watermelon | పుచ్చకాయ |
 
+## What most children do at each age (Child Growth Chart)
+
+| Age | English | Telugu |
+|---|---|---|
+| birth | Looks at your face up close | దగ్గరగా మీ ముఖం చూస్తుంది |
+| birth | Moves arms and legs | చేతులు, కాళ్ళు కదుపుతుంది |
+| birth | Startles at loud sounds | పెద్ద శబ్దాలకు ఉలిక్కిపడుతుంది |
+| 6w | Smiles back at you | మీరు నవ్వితే తిరిగి నవ్వుతుంది |
+| 6w | Lifts head a little on the tummy | బోర్లా పడుకున్నప్పుడు తల కొంచెం ఎత్తుతుంది |
+| 6w | Follows your face with the eyes | కళ్ళతో మీ ముఖాన్ని చూస్తూ ఉంటుంది |
+| 10w | Smiles when you talk | మీరు మాట్లాడితే నవ్వుతుంది |
+| 10w | Holds head up on the tummy | బోర్లా పడుకున్నప్పుడు తల పైకి ఎత్తుతుంది |
+| 10w | Makes cooing sounds | "ఊ", "ఆ" అని శబ్దాలు చేస్తుంది |
+| 14w | Holds head steady | తలను నిలకడగా ఉంచుతుంది |
+| 14w | Pushes up on elbows on the tummy | బోర్లా పడుకుని మోచేతులపై లేస్తుంది |
+| 14w | Laughs and brings hands to mouth | నవ్వుతుంది, చేతులు నోట్లో పెట్టుకుంటుంది |
+| 6m | Rolls from tummy to back | బోర్లా నుంచి వెల్లకిలా దొర్లుతుంది |
+| 6m | Sits with support | ఆసరాతో కూర్చుంటుంది |
+| 6m | Reaches for toys and laughs | బొమ్మలు అందుకుంటుంది, నవ్వుతుంది |
+| 7m | Sits with a little support | కొంచెం ఆసరాతో కూర్చుంటుంది |
+| 7m | Moves a toy from one hand to the other | బొమ్మను ఒక చేతి నుంచి మరో చేతికి మారుస్తుంది |
+| 7m | Babbles "ba-ba", "da-da" | "బ-బ", "ద-ద" అంటుంది |
+| 9m | Sits without support | ఆసరా లేకుండా కూర్చుంటుంది |
+| 9m | Many babies start to crawl | చాలా మంది పిల్లలు పాకడం మొదలుపెడతారు |
+| 9m | Says "ma-ma-ma", "ba-ba-ba" | "మ-మ-మ", "బ-బ-బ" అంటుంది |
+| 12m | Pulls up to stand | పట్టుకుని లేచి నిలబడుతుంది |
+| 12m | Walks holding on to furniture | ఫర్నిచర్ పట్టుకుని నడుస్తుంది |
+| 12m | Says "amma" or "nanna", waves bye-bye | "అమ్మ" లేదా "నాన్న" అంటుంది, టాటా చెబుతుంది |
+| 15m | Takes a few steps alone | ఒంటరిగా కొన్ని అడుగులు వేస్తుంది |
+| 15m | Says one or two words | ఒకటి రెండు మాటలు అంటుంది |
+| 15m | Points to show what it wants | కావలసిన దాన్ని వేలితో చూపిస్తుంది |
+| 16m | Walks alone | తనంతట తానే నడుస్తుంది |
+| 16m | Drinks from a cup | కప్పుతో తాగుతుంది |
+| 16m | Understands simple words like "give" | "ఇవ్వు" వంటి చిన్న మాటలు అర్థం చేసుకుంటుంది |
+| 18m | Walks without holding on | పట్టుకోకుండా నడుస్తుంది |
+| 18m | Says three or more words | మూడు లేదా ఎక్కువ మాటలు అంటుంది |
+| 18m | Eats with fingers or a spoon | వేళ్ళతో లేదా చెంచాతో తింటుంది |
+| 4y | Hops and catches a big ball | గెంతుతుంది, పెద్ద బంతిని పట్టుకుంటుంది |
+| 4y | Talks in short sentences | చిన్న వాక్యాల్లో మాట్లాడుతుంది |
+| 4y | Draws a person | మనిషి బొమ్మ గీస్తుంది |
+| 10y | Reads and writes well | బాగా చదువుతుంది, రాస్తుంది |
+| 10y | Plays team games with friends | స్నేహితులతో జట్టు ఆటలు ఆడుతుంది |
+| 10y | Looks after own things | తన వస్తువులను తానే చూసుకుంటుంది |
+
 ## Schedule headings and every-visit lines
 
 | English | Telugu |
@@ -175,6 +291,20 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | child | 9–14 years | 9–14 ఏళ్లు |
 | child | 10–12 years | 10–12 ఏళ్లు |
 | child | 16–18 years | 16–18 ఏళ్లు |
+| child – Dhruva Hospitals | Birth | పుట్టినప్పుడు |
+| child – Dhruva Hospitals | 6 weeks | 6 వారాలు |
+| child – Dhruva Hospitals | 10 weeks | 10 వారాలు |
+| child – Dhruva Hospitals | 14 weeks | 14 వారాలు |
+| child – Dhruva Hospitals | 6 months | 6 నెలలు |
+| child – Dhruva Hospitals | 7 months | 7 నెలలు |
+| child – Dhruva Hospitals | 9 months | 9 నెలలు |
+| child – Dhruva Hospitals | 12 months | 12 నెలలు |
+| child – Dhruva Hospitals | 15 months | 15 నెలలు |
+| child – Dhruva Hospitals | 16 months | 16 నెలలు |
+| child – Dhruva Hospitals | 18 months | 18 నెలలు |
+| child – Dhruva Hospitals | 4 years | 4 సంవత్సరాలు |
+| child – Dhruva Hospitals | 10 years | 10 సంవత్సరాలు |
+| child – Dhruva Hospitals | 10½ years | 10½ సంవత్సరాలు |
 | pregnancy | First visit | మొదటి సందర్శన |
 | pregnancy | NT scan visit | NT స్కాన్ సందర్శన |
 | pregnancy | Week 16 visit | 16వ వారం సందర్శన |
@@ -204,7 +334,7 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | pregnancy – Dhruva Hospitals | Week 39 check-up | 39వ వారం పరీక్ష |
 | pregnancy – Dhruva Hospitals | Week 40 check-up | 40వ వారం పరీక్ష |
 
-## Checklist items
+## Checklist items and vaccines
 
 | Visit | English | Telugu |
 |---|---|---|
@@ -254,6 +384,54 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | 9–14 years | HPV – dose 2 (boys only, 6 months after dose 1) | HPV – 2వ డోసు (అబ్బాయిలకు మాత్రమే, 1వ డోసు తర్వాత 6 నెలలకు) |
 | 10–12 years | Tdap | Tdap |
 | 16–18 years | Td | Td |
+| Birth (DHRUVA) | BCG | BCG (క్షయ నుంచి రక్షణ) |
+| Birth (DHRUVA) | OPV | OPV (పోలియో చుక్కలు) |
+| Birth (DHRUVA) | Hep B-1 | హెపటైటిస్ బి-1 |
+| 6 weeks (DHRUVA) | DTwP/DTaP-1 | DTwP/DTaP-1 |
+| 6 weeks (DHRUVA) | IPV-1 | IPV-1 (పోలియో ఇంజెక్షన్) |
+| 6 weeks (DHRUVA) | Hib-1 | Hib-1 |
+| 6 weeks (DHRUVA) | Hep B-2 | హెపటైటిస్ బి-2 |
+| 6 weeks (DHRUVA) | Rotavirus-1 | రోటావైరస్-1 |
+| 6 weeks (DHRUVA) | PCV-1 | PCV-1 (న్యుమోనియా నుంచి రక్షణ) |
+| 10 weeks (DHRUVA) | DTwP/DTaP-2 | DTwP/DTaP-2 |
+| 10 weeks (DHRUVA) | IPV-2 | IPV-2 (పోలియో ఇంజెక్షన్) |
+| 10 weeks (DHRUVA) | Hib-2 | Hib-2 |
+| 10 weeks (DHRUVA) | Hep B-3 | హెపటైటిస్ బి-3 |
+| 10 weeks (DHRUVA) | Rotavirus-2 | రోటావైరస్-2 |
+| 10 weeks (DHRUVA) | PCV-2 | PCV-2 (న్యుమోనియా నుంచి రక్షణ) |
+| 14 weeks (DHRUVA) | DTwP/DTaP-3 | DTwP/DTaP-3 |
+| 14 weeks (DHRUVA) | IPV-3 | IPV-3 (పోలియో ఇంజెక్షన్) |
+| 14 weeks (DHRUVA) | Hib-3 | Hib-3 |
+| 14 weeks (DHRUVA) | Hep B-4 | హెపటైటిస్ బి-4 |
+| 14 weeks (DHRUVA) | Rotavirus-3 | రోటావైరస్-3 |
+| 14 weeks (DHRUVA) | PCV-3 | PCV-3 (న్యుమోనియా నుంచి రక్షణ) |
+| 6 months (DHRUVA) | Influenza-1 | ఇన్‌ఫ్లుయెంజా (ఫ్లూ)-1 |
+| 6 months (DHRUVA) | Typhoid Conjugate Vaccine (TCV) | టైఫాయిడ్ టీకా (TCV) |
+| 7 months (DHRUVA) | Influenza-2 | ఇన్‌ఫ్లుయెంజా (ఫ్లూ)-2 |
+| 9 months (DHRUVA) | MMR-1 | MMR-1 (తట్టు, గవదబిళ్ళలు, రుబెల్లా) |
+| 9 months (DHRUVA) | Vitamin A-1 | విటమిన్ A-1 |
+| 9 months (DHRUVA) | Meningococcal MCV4-1 | మెనింగోకోకల్ MCV4-1 |
+| 12 months (DHRUVA) | Hepatitis A-1 | హెపటైటిస్ ఎ-1 |
+| 12 months (DHRUVA) | Meningococcal MCV4-2 | మెనింగోకోకల్ MCV4-2 |
+| 12 months (DHRUVA) | Japanese Encephalitis-1 (high-risk areas only) | జపనీస్ ఎన్‌సెఫలైటిస్-1 (మెదడువాపు ఎక్కువగా ఉన్న ప్రాంతాల్లో మాత్రమే) |
+| 12 months (DHRUVA) | Japanese Encephalitis-2 | జపనీస్ ఎన్‌సెఫలైటిస్-2 |
+| 12 months (DHRUVA) | Cholera-1 (high-risk areas only) | కలరా-1 (కలరా ఎక్కువగా ఉన్న ప్రాంతాల్లో మాత్రమే) |
+| 12 months (DHRUVA) | Cholera-2 | కలరా-2 |
+| 15 months (DHRUVA) | MMR-2 | MMR-2 (తట్టు, గవదబిళ్ళలు, రుబెల్లా) |
+| 15 months (DHRUVA) | Varicella-1 | ఆటలమ్మ (వారిసెల్లా)-1 |
+| 15 months (DHRUVA) | PCV Booster | PCV బూస్టర్ |
+| 16 months (DHRUVA) | DTwP/DTaP-B1 | DTwP/DTaP బూస్టర్-1 |
+| 16 months (DHRUVA) | Hib-B1 | Hib బూస్టర్ |
+| 16 months (DHRUVA) | IPV-B1 | IPV బూస్టర్-1 |
+| 16 months (DHRUVA) | Vitamin A-2 | విటమిన్ A-2 |
+| 18 months (DHRUVA) | Hepatitis A-2 (only if inactivated vaccine) | హెపటైటిస్ ఎ-2 (ఇనాక్టివేటెడ్ టీకా ఇచ్చి ఉంటేనే) |
+| 18 months (DHRUVA) | Varicella-2 | ఆటలమ్మ (వారిసెల్లా)-2 |
+| 4 years (DHRUVA) | DTwP/DTaP-B2 | DTwP/DTaP బూస్టర్-2 |
+| 4 years (DHRUVA) | IPV-B2 | IPV బూస్టర్-2 |
+| 4 years (DHRUVA) | MMR-3 | MMR-3 (తట్టు, గవదబిళ్ళలు, రుబెల్లా) |
+| 10 years (DHRUVA) | Tdap | Tdap |
+| 10 years (DHRUVA) | HPV-1 | HPV-1 |
+| 10½ years (DHRUVA) | HPV-2 | HPV-2 |
 | First visit | Dating / viability scan | మొదటి స్కాన్ (గర్భం వయస్సు, గుండె చప్పుడు) |
 | First visit | Blood tests: Hb/CBC, blood group & Rh, sugar, thyroid (TSH), HIV, Hepatitis B, VDRL | రక్త పరీక్షలు: Hb/CBC, బ్లడ్ గ్రూప్ & Rh, షుగర్, థైరాయిడ్ (TSH), HIV, హెపటైటిస్ B, VDRL |
 | First visit | Urine routine test | మూత్ర పరీక్ష (రొటీన్) |
@@ -285,28 +463,28 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Week 39 check | NST (if advised) | NST (డాక్టర్ సూచిస్తే) |
 | Due-date review | Due-date review | డెలివరీ తేదీ సమీక్ష |
 | Due-date review | NST (if advised) | NST (డాక్టర్ సూచిస్తే) |
-| First tests (Dhruva Hospitals) | Blood sugar test | రక్తంలో షుగర్ పరీక్ష |
-| First tests (Dhruva Hospitals) | CBC blood test | CBC రక్త పరీక్ష |
-| First tests (Dhruva Hospitals) | TD vaccine – 1st dose | TD టీకా – 1వ డోసు |
-| Dating scan (Dhruva Hospitals) | Dating scan | డేటింగ్ స్కాన్ |
-| NT scan (Dhruva Hospitals) | NT scan | NT స్కాన్ |
-| NT scan (Dhruva Hospitals) | Double marker test | డబుల్ మార్కర్ పరీక్ష |
-| NT scan (Dhruva Hospitals) | TD vaccine – 2nd dose | TD టీకా – 2వ డోసు |
-| Week 14 check-up (Dhruva Hospitals) | Doctor check-up | డాక్టర్ పరీక్ష |
-| TIFFA scan (Dhruva Hospitals) | TIFFA scan (baby’s organs and growth) | TIFFA స్కాన్ (బిడ్డ అవయవాలు, ఎదుగుదల) |
-| Sugar test (OGTT) (Dhruva Hospitals) | OGTT sugar test | OGTT షుగర్ పరీక్ష |
-| Week 28 check-up (Dhruva Hospitals) | Doctor check-up | డాక్టర్ పరీక్ష |
-| Week 28 check-up (Dhruva Hospitals) | ICT test (only if her blood group is negative) | ICT పరీక్ష (బ్లడ్ గ్రూప్ నెగటివ్ అయితే మాత్రమే) |
-| Growth scan (Dhruva Hospitals) | CBP blood test | CBP రక్త పరీక్ష |
-| Growth scan (Dhruva Hospitals) | Hemoglobin test | హిమోగ్లోబిన్ పరీక్ష |
-| Growth scan (Dhruva Hospitals) | Growth scan and Doppler | గ్రోత్ స్కాన్, డాప్లర్ |
-| Week 34 check-up (Dhruva Hospitals) | Basic checks (BP, weight) | సాధారణ పరీక్షలు (BP, బరువు) |
-| Week 36 check-up (Dhruva Hospitals) | CBP blood test | CBP రక్త పరీక్ష |
-| Week 36 check-up (Dhruva Hospitals) | Basic checks (BP, weight) | సాధారణ పరీక్షలు (BP, బరువు) |
-| Week 37 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
-| Week 38 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
-| Week 39 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
-| Week 40 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
+| First tests (DHRUVA) | Blood sugar test | రక్తంలో షుగర్ పరీక్ష |
+| First tests (DHRUVA) | CBC blood test | CBC రక్త పరీక్ష |
+| First tests (DHRUVA) | TD vaccine – 1st dose | TD టీకా – 1వ డోసు |
+| Dating scan (DHRUVA) | Dating scan | డేటింగ్ స్కాన్ |
+| NT scan (DHRUVA) | NT scan | NT స్కాన్ |
+| NT scan (DHRUVA) | Double marker test | డబుల్ మార్కర్ పరీక్ష |
+| NT scan (DHRUVA) | TD vaccine – 2nd dose | TD టీకా – 2వ డోసు |
+| Week 14 check-up (DHRUVA) | Doctor check-up | డాక్టర్ పరీక్ష |
+| TIFFA scan (DHRUVA) | TIFFA scan (baby’s organs and growth) | TIFFA స్కాన్ (బిడ్డ అవయవాలు, ఎదుగుదల) |
+| Sugar test (OGTT) (DHRUVA) | OGTT sugar test | OGTT షుగర్ పరీక్ష |
+| Week 28 check-up (DHRUVA) | Doctor check-up | డాక్టర్ పరీక్ష |
+| Week 28 check-up (DHRUVA) | ICT test (only if her blood group is negative) | ICT పరీక్ష (బ్లడ్ గ్రూప్ నెగటివ్ అయితే మాత్రమే) |
+| Growth scan (DHRUVA) | CBP blood test | CBP రక్త పరీక్ష |
+| Growth scan (DHRUVA) | Hemoglobin test | హిమోగ్లోబిన్ పరీక్ష |
+| Growth scan (DHRUVA) | Growth scan and Doppler | గ్రోత్ స్కాన్, డాప్లర్ |
+| Week 34 check-up (DHRUVA) | Basic checks (BP, weight) | సాధారణ పరీక్షలు (BP, బరువు) |
+| Week 36 check-up (DHRUVA) | CBP blood test | CBP రక్త పరీక్ష |
+| Week 36 check-up (DHRUVA) | Basic checks (BP, weight) | సాధారణ పరీక్షలు (BP, బరువు) |
+| Week 37 check-up (DHRUVA) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
+| Week 38 check-up (DHRUVA) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
+| Week 39 check-up (DHRUVA) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
+| Week 40 check-up (DHRUVA) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
 
 ## OI-TI / IUI steps (database: `care_cycle_protocol_steps`, changes show at once)
 

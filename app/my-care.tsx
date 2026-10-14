@@ -6,7 +6,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { careFonts, careShared } from '../src/components/care/careStyles';
 import { ChatBubble } from '../src/components/care/ChatBubble';
-import { ChildSection } from '../src/components/care/ChildSection';
+import { ChildAddCard } from '../src/components/care/ChildAddCard';
+import { ChildFormSheet } from '../src/components/care/ChildFormSheet';
+import { ChildGrowthSection } from '../src/components/care/ChildGrowthSection';
 import { WHO_COPY } from '../src/components/care/CycleWho';
 import { CycleSection } from '../src/components/care/CycleSection';
 import { FollowUpCard } from '../src/components/care/FollowUpCard';
@@ -14,7 +16,8 @@ import { PlanSwitcher } from '../src/components/care/PlanSwitcher';
 import { PregnancySection } from '../src/components/care/PregnancySection';
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { dashboardColors, dashboardLayout, dashboardSpacing } from '../src/dashboardTheme';
-import { fetchMyCare, readCachedMyCare, type CareExtraItem, type MyCare } from '../src/lib/care';
+import { fetchMyCare, readCachedMyCare, type CareExtraItem, type CareVaccineRecord, type MyCare } from '../src/lib/care';
+import { readChildReminderPrefs, writeChildReminderPrefs, type ChildReminderPrefs } from '../src/lib/careChildPrefs';
 import { useCareCopy } from '../src/lib/careCopy';
 import { cycleNextVisit, type CareCycle } from '../src/lib/careCycle';
 import { syncCareReminders } from '../src/lib/careReminders';
@@ -39,6 +42,8 @@ export default function MyCareScreen() {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [childPrefs, setChildPrefs] = useState<ChildReminderPrefs>({ optional: [], visits: [] });
+  const [addingChild, setAddingChild] = useState(false);
   const hasCare = useRef(false);
 
   const load = useCallback(async () => {
@@ -69,6 +74,10 @@ export default function MyCareScreen() {
     useCallback(() => {
       let active = true;
       void (async () => {
+        if (phone) {
+          const prefs = await readChildReminderPrefs(phone);
+          if (active) setChildPrefs(prefs);
+        }
         if (!hasCare.current && phone) {
           const cached = await readCachedMyCare(phone);
           if (active && cached && !hasCare.current) {
@@ -83,6 +92,27 @@ export default function MyCareScreen() {
       };
     }, [load, phone]),
   );
+
+  // A change made on this page: show it at once and refresh the reminders.
+  const applyChange = (next: MyCare) => {
+    setCare(next);
+    void syncCareReminders(phone, next, language).catch(() => undefined);
+  };
+  const updateRecords = (planId: string, records: CareVaccineRecord[]) => {
+    if (!care) return;
+    applyChange({ ...care, vaccineRecords: [...(care.vaccineRecords ?? []).filter((record) => record.planId !== planId), ...records] });
+  };
+  const updatePlan = (plan: CarePlan) => {
+    if (!care) return;
+    const others = (care.plans ?? []).filter((item) => item.id !== plan.id);
+    applyChange({ ...care, plans: [...others, plan] });
+    setSelectedId(plan.id);
+  };
+  const changeChildPrefs = async (prefs: ChildReminderPrefs) => {
+    setChildPrefs(prefs);
+    await writeChildReminderPrefs(phone, prefs);
+    if (care) void syncCareReminders(phone, care, language, { askPermission: true }).catch(() => undefined);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -132,9 +162,13 @@ export default function MyCareScreen() {
         })),
     ),
   ];
-  // A pregnancy or treatment page opens straight on the day; no page heading.
+  // A pregnancy, treatment or child page opens straight on its picture; no page heading.
   const isPregnancy = selectedPlan?.type === 'pregnancy';
-  const noHeader = isPregnancy || Boolean(selectedCycle);
+  const isChild = selectedPlan?.type === 'child';
+  const noHeader = isPregnancy || isChild || Boolean(selectedCycle);
+  // Parents of Dr. Sudarshan Reddy's patients (a child doctor at their hospital) can add a child.
+  const childDesk = care?.childDesk ?? null;
+  const hasChild = plans.some((plan) => plan.type === 'child');
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const chatBottom = navBottomOffset + dashboardLayout.bottomNavHeight + 14;
   // Room so the chat button never covers the last card.
@@ -187,8 +221,9 @@ export default function MyCareScreen() {
 
           {care?.linked ? (
             <>
-              {sections.length >= 2 ? (
+              {sections.length >= 2 || (childDesk && hasChild) ? (
                 <PlanSwitcher
+                  action={childDesk && hasChild ? { label: c('childAddButton'), onPress: () => setAddingChild(true) } : null}
                   items={sections.map((section) => ({
                     id: section.id,
                     label:
@@ -207,9 +242,23 @@ export default function MyCareScreen() {
                 <PregnancySection key={selectedPlan.id} plan={selectedPlan} today={today} />
               ) : null}
 
-              {selectedPlan?.type === 'child' ? <ChildSection plan={selectedPlan} today={today} /> : null}
+              {childDesk && sections.length === 0 ? <ChildAddCard desk={childDesk} onAdd={() => setAddingChild(true)} /> : null}
 
-              {selectedCycle ? (
+              {selectedPlan?.type === 'child' ? (
+                <ChildGrowthSection
+                  key={selectedPlan.id}
+                  onPlanChanged={updatePlan}
+                  onPrefs={(prefs) => void changeChildPrefs(prefs)}
+                  onRecords={(records) => updateRecords(selectedPlan.id, records)}
+                  phone={phone}
+                  plan={selectedPlan}
+                  prefs={childPrefs}
+                  records={(care.vaccineRecords ?? []).filter((record) => record.planId === selectedPlan.id)}
+                  today={today}
+                >
+                  <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />
+                </ChildGrowthSection>
+              ) : selectedCycle ? (
                 <CycleSection cycle={selectedCycle} key={selectedCycle.id} today={today}>
                   <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />
                 </CycleSection>
@@ -220,6 +269,18 @@ export default function MyCareScreen() {
           ) : null}
         </ScrollView>
       )}
+
+      {childDesk ? (
+        <ChildFormSheet
+          child={null}
+          onClose={() => setAddingChild(false)}
+          onSaved={updatePlan}
+          phone={phone}
+          subtitle={c('childAddBody', { doctor: childDesk.doctorName, hospital: childDesk.hospitalName })}
+          today={today}
+          visible={addingChild}
+        />
+      ) : null}
 
       {care?.linked ? (
         <ChatBubble

@@ -30,6 +30,22 @@ export type CareChatMessage = {
   createdAt: string;
 };
 
+// A vaccine the parent recorded (from the child's card or the vial label).
+export type VaccineSite = 'left_thigh' | 'right_thigh' | 'left_arm' | 'right_arm' | 'oral' | 'other';
+export type CareVaccineRecord = {
+  planId: string;
+  itemId: string;
+  givenOn: string;
+  site: VaccineSite | null;
+  brand: string | null;
+  batchNo: string | null;
+  expiry: string | null;
+  photoPath: string | null;
+};
+
+// Where a parent can add a child (the child doctor at one of their hospitals).
+export type CareChildDesk = { hospitalId: string; hospitalName: string; doctorId: string; doctorName: string };
+
 // A test or scan the nurse added from the case sheet, still to do.
 export type CareExtraItem = { id: string; hospitalId: string; label: string; dueDate: string };
 
@@ -44,6 +60,9 @@ export type MyCare = {
   extraItems?: CareExtraItem[];
   // Active OI-TI / IUI cycles (v2 only).
   cycles?: CareCycle[];
+  // Child Growth Chart (v2 only).
+  vaccineRecords?: CareVaccineRecord[];
+  childDesk?: CareChildDesk | null;
   chat?: { messages: CareChatMessage[]; remainingToday: number; dailyLimit: number };
 };
 

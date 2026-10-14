@@ -4,8 +4,10 @@ vi.mock('expo-constants', () => ({ default: { expoConfig: { extra: {} } } }));
 vi.mock('react-native', () => ({ Platform: { OS: 'android' } }));
 vi.mock('./supabase', () => ({ supabase: { rpc: vi.fn() } }));
 vi.mock('./expoNotifications', () => ({ loadExpoNotifications: vi.fn() }));
+vi.mock('@react-native-async-storage/async-storage', () => ({ default: { getItem: vi.fn(async () => null), setItem: vi.fn() } }));
 
-const { CARE_CYCLE_REMINDER_IDS, CARE_REMINDER_IDS, cycleReminderDays, followupReminderTimes } = await import('./careReminders');
+const { CARE_CHILD_REMINDER_IDS, CARE_CYCLE_REMINDER_IDS, CARE_REMINDER_IDS, CHILD_REMINDER_SLOTS, childReminders, cycleReminderDays, followupReminderTimes } =
+  await import('./careReminders');
 
 describe('follow-up reminder times', () => {
   it('fires at 6 PM the day before and 8 AM on the day (phone time)', () => {
@@ -62,5 +64,49 @@ describe('fertility cycle reminders', () => {
     const ids = CARE_CYCLE_REMINDER_IDS.flatMap((pair) => [pair.eve, pair.day]);
     expect(ids).toHaveLength(6);
     expect(ids.every((id) => id.startsWith('drjiva-care-cycle-'))).toBe(true);
+  });
+});
+
+describe('child vaccine reminders', () => {
+  const item = (code: string, fromDate: string, extra = {}) => ({
+    code, conditional: false, doneOn: null, fromDate, id: code, labelEn: code.toUpperCase(), labelTe: code, nurseName: null, optional: false, status: null, toDate: fromDate, ...extra,
+  });
+  const visit = (code: string, fromDate: string, items: ReturnType<typeof item>[]) => ({ code, fromDate, id: code, items, titleEn: code, titleTe: code, toDate: fromDate });
+  const plan = {
+    birthDate: '2026-09-08', createdAt: '', doctorName: null, eddDate: null, gender: 'male' as const, hiddenByPatient: false, hospitalId: 'h', hospitalName: 'Dhruva Hospitals',
+    id: 'arjun', lmpDate: null, personName: 'Arjun', startDate: '2026-09-08', startedByNurse: null, status: 'active' as const, type: 'child' as const,
+    visits: [
+      visit('birth', '2026-09-08', [item('dhruva_child_bcg_1', '2026-09-08')]),
+      visit('6w', '2026-10-20', [item('dhruva_child_dtp_1', '2026-10-20')]),
+      visit('10w', '2026-11-17', [item('dhruva_child_dtp_2', '2026-11-17')]),
+      visit('9m', '2027-06-08', [item('dhruva_child_opt_mcv4_1', '2027-06-08', { conditional: true, optional: true })]),
+    ],
+  };
+  const records = [{ batchNo: null, brand: null, expiry: null, givenOn: '2026-09-08', itemId: 'dhruva_child_bcg_1', photoPath: null, planId: 'arjun', site: null }];
+  const care = (extra = {}) => ({ linked: true, plans: [plan], today: '2026-10-15', vaccineRecords: records, ...extra }) as never;
+  const now = new Date(2026, 9, 15, 10, 0);
+  const at = (list: { at: Date }[]) => list.map((r) => `${r.at.getMonth() + 1}/${r.at.getDate()} ${r.at.getHours()}:00`);
+
+  it('reminds 3 days before, 1 day before, on the day and once overdue, at 9 AM', () => {
+    const list = childReminders(care(), 'en', { optional: [], visits: [] }, now);
+    expect(at(list)).toEqual(['10/17 9:00', '10/19 9:00', '10/20 9:00', '10/27 9:00']);
+    expect(list[0]).toMatchObject({ body: '6w visit at Dhruva Hospitals: DHRUVA_CHILD_DTP_1', title: 'Arjun: vaccines in 3 days' });
+    expect(list[3]!.title).toBe('Arjun: vaccines are overdue');
+  });
+
+  it('leaves the day before and the day to the hospital visit reminder on the same date', () => {
+    const list = childReminders(care({ followup: { nextDate: '2026-10-20' } }), 'en', { optional: [], visits: [] }, now);
+    expect(at(list)).toEqual(['10/17 9:00', '10/27 9:00']);
+  });
+
+  it('adds visits and optional vaccines the parent turned on', () => {
+    const list = childReminders(care(), 'te', { optional: ['dhruva_child_opt_mcv4_1'], visits: ['10w'] }, now);
+    expect(at(list)).toEqual(['10/17 9:00', '10/19 9:00', '10/20 9:00', '10/27 9:00', '11/14 9:00', '11/16 9:00', '11/17 9:00', '6/7 9:00', '6/8 9:00']);
+    expect(list[0]!.title).toBe('Arjun: 3 రోజుల్లో టీకాలు');
+  });
+
+  it('never uses more than its fixed IDs', () => {
+    expect(CARE_CHILD_REMINDER_IDS).toHaveLength(CHILD_REMINDER_SLOTS);
+    expect(CARE_CHILD_REMINDER_IDS.every((id) => id.startsWith('drjiva-care-child-'))).toBe(true);
   });
 });
