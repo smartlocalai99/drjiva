@@ -6,7 +6,7 @@ import { readChildReminderPrefs, type ChildReminderPrefs } from './careChildPref
 import { careDate, careText, type CareCopyKey } from './careCopy';
 import { cycleDayOf, upcomingStepDays, type CareCycleStep } from './careCycle';
 import { addDaysIso } from './careSchedule';
-import { childVisits, currentChildVisit } from './childGrowth';
+import { childDisplayName, childVisits, currentChildVisit } from './childGrowth';
 import { loadExpoNotifications } from './expoNotifications';
 import type { AppLanguage } from './i18n';
 import { toIndianE164 } from './phone';
@@ -73,7 +73,7 @@ export function childReminders(
     const records = (care.vaccineRecords ?? []).filter((record) => record.planId === plan.id);
     const visits = childVisits(plan, records, today);
     const auto = currentChildVisit(visits);
-    const name = plan.personName;
+    const name = childDisplayName(plan.personName, careText(language, 'childNoName'));
     const hospital = plan.hospitalName;
 
     const add = (date: string, titleKey: CareCopyKey, body: string) => {

@@ -25,19 +25,26 @@ export const CHILD_IMAGES: Record<ChildStage, number> = {
 
 const GIVEN = '#16A34A';
 
-// One visit: the child at that age and what most children do then, the
+// The top of the child page: a picture of a child at the chosen visit's
+// age beside the child's name, then what most children do at that age, the
 // exact due date and status, and the vaccines (tap one to record it).
 export function ChildVisitCard({
+  ageNow,
   autoReminder,
+  childName,
   onDose,
+  onEdit,
   onMarkComplete,
   onToggleReminder,
   reminderOn,
   total,
   visit,
 }: {
+  ageNow: string;
   autoReminder: boolean;
+  childName: string;
   onDose: (dose: ChildDose) => void;
+  onEdit: () => void;
   onMarkComplete: () => void;
   onToggleReminder: () => void;
   reminderOn: boolean;
@@ -50,38 +57,50 @@ export function ChildVisitCard({
   const waiting = doses.filter((dose) => dose.shifted && !dose.given && !dose.notNeeded && dose.dueDate > visit.dueDate);
   const completed = visit.status === 'completed';
   const isTenYears = /_10y$/.test(visit.visit.code);
+  const ageTitle = pick(visit.visit.titleEn, visit.visit.titleTe);
 
   return (
     <View style={careShared.card}>
-      <View>
-        <View style={styles.titleRow}>
-          <Text style={styles.age}>{pick(visit.visit.titleEn, visit.visit.titleTe)}</Text>
-          <StatusPill status={visit.status} />
+      <View style={styles.hero}>
+        <View style={styles.photoBox}>
+          <Image
+            accessibilityIgnoresInvertColors
+            accessibilityLabel={ageTitle}
+            contentFit="contain"
+            source={CHILD_IMAGES[visit.age.stage]}
+            style={styles.photo}
+            transition={200}
+          />
         </View>
-        <Text style={[careShared.muted, styles.meta]}>
-          {c('visitOf', { n: visit.number, total })} · {date(visit.dueDate)}
-        </Text>
+        <View style={styles.heroText}>
+          <View style={styles.heroTitleRow}>
+            <Text style={styles.chartTitle}>{c('childGrowthTitle')}</Text>
+            <PressableScale accessibilityLabel={c('childEditTitle')} accessibilityRole="button" hitSlop={8} onPress={onEdit} style={styles.edit}>
+              <Ionicons color={dashboardColors.primary} name="create-outline" size={18} />
+            </PressableScale>
+          </View>
+          <Text numberOfLines={2} style={styles.name}>{childName}</Text>
+          <Text style={styles.ageNow}>{ageNow}</Text>
+          <View style={styles.visitRow}>
+            <Text style={styles.age}>{ageTitle}</Text>
+            <StatusPill status={visit.status} />
+          </View>
+          <Text style={styles.meta}>
+            {date(visit.dueDate)} · {c('visitOf', { n: visit.number, total })}
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.body}>
-        <Image
-          accessibilityIgnoresInvertColors
-          contentFit="contain"
-          source={CHILD_IMAGES[visit.age.stage]}
-          style={styles.photo}
-          transition={200}
-        />
-        <View style={styles.facts}>
-          <Text style={styles.canDo}>{c('childCanDo')}</Text>
-          {MILESTONES[visit.age.milestones].map(([en, te]) => (
-            <View key={en} style={styles.milestone}>
-              <View style={styles.bullet} />
-              <Text style={styles.milestoneText}>{language === 'te' ? te : en}</Text>
-            </View>
-          ))}
-        </View>
+      <View style={styles.facts}>
+        <Text style={styles.canDo}>{visit.age.unit === 'birth' ? c('childCanDoBirth') : c('childCanDoAt', { age: ageTitle })}</Text>
+        {MILESTONES[visit.age.milestones].map(([en, te]) => (
+          <View key={en} style={styles.milestone}>
+            <View style={styles.bullet} />
+            <Text style={styles.milestoneText}>{language === 'te' ? te : en}</Text>
+          </View>
+        ))}
+        <Text style={styles.note}>{c('childCanDoNote')}</Text>
       </View>
-      <Text style={styles.note}>{c('childCanDoNote')}</Text>
 
       <View style={styles.block}>
         <Text style={styles.blockTitle}>{c('vaccinesTitle')}</Text>
@@ -174,11 +193,66 @@ const styles = StyleSheet.create({
   },
   age: {
     color: dashboardColors.text,
-    flexShrink: 1,
     fontFamily: careFonts.bold,
-    fontSize: 26,
-    letterSpacing: -0.4,
-    lineHeight: 32,
+    fontSize: 18,
+    lineHeight: 23,
+  },
+  ageNow: {
+    color: dashboardColors.textMuted,
+    fontFamily: careFonts.semiBold,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  chartTitle: {
+    color: dashboardColors.primary,
+    flex: 1,
+    fontFamily: careFonts.bold,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  edit: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.primaryTint,
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  hero: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+  },
+  heroText: {
+    flex: 1,
+    gap: 3,
+  },
+  heroTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  name: {
+    color: dashboardColors.text,
+    fontFamily: careFonts.bold,
+    fontSize: 24,
+    letterSpacing: -0.3,
+    lineHeight: 29,
+  },
+  photoBox: {
+    alignItems: 'center',
+    backgroundColor: '#F3F7FB',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    height: 172,
+    justifyContent: 'center',
+    width: 132,
+  },
+  visitRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: 6,
+    marginTop: 8,
   },
   block: {
     gap: 10,
@@ -188,11 +262,6 @@ const styles = StyleSheet.create({
     fontFamily: careFonts.bold,
     fontSize: 17,
     lineHeight: 22,
-  },
-  body: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 14,
   },
   bullet: {
     backgroundColor: dashboardColors.primary,
@@ -278,7 +347,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   facts: {
-    flex: 1,
     gap: 8,
   },
   flex: { flex: 1 },
@@ -306,7 +374,10 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   meta: {
-    marginTop: 2,
+    color: dashboardColors.textMuted,
+    fontFamily: careFonts.semiBold,
+    fontSize: 14,
+    lineHeight: 19,
   },
   milestone: {
     flexDirection: 'row',
@@ -326,8 +397,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   photo: {
-    height: 150,
-    width: 118,
+    height: 156,
+    width: 120,
   },
   shift: {
     alignItems: 'center',
@@ -344,11 +415,5 @@ const styles = StyleSheet.create({
     fontFamily: careFonts.semiBold,
     fontSize: 14,
     lineHeight: 19,
-  },
-  titleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
   },
 });

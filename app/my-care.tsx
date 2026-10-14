@@ -20,6 +20,7 @@ import { fetchMyCare, readCachedMyCare, type CareExtraItem, type CareVaccineReco
 import { readChildReminderPrefs, writeChildReminderPrefs, type ChildReminderPrefs } from '../src/lib/careChildPrefs';
 import { useCareCopy } from '../src/lib/careCopy';
 import { cycleNextVisit, type CareCycle } from '../src/lib/careCycle';
+import { childDisplayName } from '../src/lib/childGrowth';
 import { syncCareReminders } from '../src/lib/careReminders';
 import { dialableIndianPhone, visitForDate, type CarePlan } from '../src/lib/careSchedule';
 import { getTabRoute } from '../src/lib/dashboardNav';
@@ -231,7 +232,7 @@ export default function MyCareScreen() {
                         ? c('cycleTab')
                         : section.plan.type === 'pregnancy'
                           ? c('pregnancy')
-                          : section.plan.personName,
+                          : childDisplayName(section.plan.personName, c('childNoName')),
                   }))}
                   onSelect={setSelectedId}
                   selectedId={selected?.id ?? null}

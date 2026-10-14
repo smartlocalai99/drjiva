@@ -5,6 +5,7 @@ import { dashboardColors } from '../../dashboardTheme';
 import { addChild, ChildCareError, updateChild, type ChildInput } from '../../lib/careChild';
 import { useCareCopy } from '../../lib/careCopy';
 import type { CarePlan } from '../../lib/careSchedule';
+import { UNNAMED_CHILD } from '../../lib/childGrowth';
 import { PressableScale } from '../PressableScale';
 import { CareDateField } from './CareDateField';
 import { CareSheet } from './CareSheet';
@@ -50,7 +51,8 @@ function ChildForm({
   today: string;
 }) {
   const { c } = useCareCopy();
-  const [name, setName] = useState(child?.personName ?? '');
+  // No name yet is fine: saved as "Child".
+  const [name, setName] = useState(child && child.personName !== UNNAMED_CHILD ? child.personName : '');
   const [gender, setGender] = useState<ChildInput['gender'] | null>(child?.gender ?? null);
   const [birthDate, setBirthDate] = useState<string | null>(child?.birthDate ?? null);
   const [busy, setBusy] = useState(false);
@@ -59,13 +61,12 @@ function ChildForm({
   const oldest = `${y - 18}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   const save = async () => {
-    if (!name.trim()) return setError(c('childErrName'));
     if (!gender) return setError(c('childErrGender'));
     if (!birthDate) return setError(c('childErrBirthDate'));
     setBusy(true);
     setError(null);
     try {
-      const input = { birthDate, gender, name };
+      const input = { birthDate, gender, name: name.trim() || UNNAMED_CHILD };
       onSaved(child ? await updateChild(phone, child.id, input) : await addChild(phone, input));
       onClose();
     } catch (saveError) {
@@ -93,13 +94,17 @@ function ChildForm({
       <View style={styles.group}>
         <Text style={styles.label}>{c('childName')}</Text>
         <TextInput
+          accessibilityHint={c('childNameHint')}
           accessibilityLabel={c('childName')}
           autoCapitalize="words"
           maxLength={60}
           onChangeText={setName}
+          placeholder={c('childNoName')}
+          placeholderTextColor={dashboardColors.textFaint}
           style={styles.input}
           value={name}
         />
+        <Text style={styles.note}>{c('childNameHint')}</Text>
       </View>
 
       <View style={styles.group}>

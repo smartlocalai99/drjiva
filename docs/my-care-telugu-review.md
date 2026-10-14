@@ -106,6 +106,10 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | {doctor} at {hospital} looks after the vaccines. You get a reminder before each visit. | {hospital} లో {doctor} టీకాలను చూసుకుంటారు. ప్రతి సందర్శనకు ముందు మీకు గుర్తు చేస్తాం. |
 | Child details | బిడ్డ వివరాలు |
 | Child's name | బిడ్డ పేరు |
+| Child | బిడ్డ |
+| Not named yet? Leave it empty. | ఇంకా పేరు పెట్టలేదా? ఖాళీగా వదిలేయండి. |
+| What most children do at {age} | {age} వయసులో చాలా మంది పిల్లలు చేసేవి |
+| What most newborns do | అప్పుడే పుట్టిన చాలా మంది పిల్లలు చేసేవి |
 | Girl or boy | పాప లేదా బాబు |
 | Girl | పాప |
 | Boy | బాబు |
@@ -118,7 +122,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Due | ఇప్పుడు వేయించాలి |
 | Overdue | ఆలస్యం అయింది |
 | Completed | పూర్తయింది |
-| What most children do at this age | ఈ వయసులో చాలా మంది పిల్లలు చేసేవి |
 | If your child cannot do these yet, tell the doctor at the visit. | మీ బిడ్డ ఇవి ఇంకా చేయలేకపోతే, సందర్శనలో డాక్టర్‌కు చెప్పండి. |
 | Vaccines | టీకాలు |
 | Mark as complete | పూర్తయినట్టు గుర్తించండి |
@@ -157,7 +160,6 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Choose date | తేదీ ఎంచుకోండి |
 | Done | అయింది |
 | Could not save. Check your internet and try again. | సేవ్ కాలేదు. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి. |
-| Enter the child's name. | బిడ్డ పేరు రాయండి. |
 | Choose girl or boy. | పాప లేదా బాబు ఎంచుకోండి. |
 | Choose a date of birth that is not in the future. | భవిష్యత్ తేదీ కాని పుట్టిన తేదీ ఎంచుకోండి. |
 | Your hospital has no child doctor on DrJiva yet. | మీ హాస్పిటల్‌లో ఇంకా DrJiva లో పిల్లల డాక్టర్ లేరు. |

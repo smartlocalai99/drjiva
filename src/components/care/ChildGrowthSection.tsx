@@ -1,6 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 
 import { dashboardColors } from '../../dashboardTheme';
 import type { CareVaccineRecord } from '../../lib/care';
@@ -8,7 +7,7 @@ import { markVisitGiven, ChildCareError } from '../../lib/careChild';
 import type { ChildReminderPrefs } from '../../lib/careChildPrefs';
 import { useCareCopy } from '../../lib/careCopy';
 import { childAge, type CarePlan } from '../../lib/careSchedule';
-import { childVisits, currentChildVisit, type ChildDose, type ChildVisit } from '../../lib/childGrowth';
+import { childDisplayName, childVisits, currentChildVisit, type ChildDose, type ChildVisit } from '../../lib/childGrowth';
 import { PressableScale } from '../PressableScale';
 import { CareDateField } from './CareDateField';
 import { CareSheet } from './CareSheet';
@@ -65,22 +64,12 @@ export function ChildGrowthSection({
   if (!selected) return null;
   return (
     <>
-      <View style={styles.head}>
-        <View style={styles.flex}>
-          <Text style={styles.screenTitle}>{c('childGrowthTitle')}</Text>
-          <Text style={styles.child}>
-            {plan.personName} · {ageText(c, birthDate, today)}
-          </Text>
-        </View>
-        <PressableScale accessibilityLabel={c('childEditTitle')} accessibilityRole="button" onPress={() => setEditing(true)} style={styles.edit}>
-          <Ionicons color={dashboardColors.primary} name="create-outline" size={18} />
-          <Text style={styles.editText}>{c('childEdit')}</Text>
-        </PressableScale>
-      </View>
-
       <ChildVisitCard
+        ageNow={ageText(c, birthDate, today)}
         autoReminder={selected.visit.id === current?.visit.id}
+        childName={childDisplayName(plan.personName, c('childNoName'))}
         onDose={setDose}
+        onEdit={() => setEditing(true)}
         onMarkComplete={() => setMarking(selected)}
         onToggleReminder={() => toggleVisitReminder(selected.visit.id)}
         reminderOn={selected.visit.id === current?.visit.id || prefs.visits.includes(selected.visit.id)}
@@ -184,38 +173,11 @@ const styles = StyleSheet.create({
   busy: {
     opacity: 0.6,
   },
-  child: {
-    color: dashboardColors.text,
-    fontFamily: careFonts.semiBold,
-    fontSize: 17,
-    lineHeight: 23,
-    marginTop: 2,
-  },
-  edit: {
-    alignItems: 'center',
-    backgroundColor: dashboardColors.primaryTint,
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  editText: {
-    color: dashboardColors.primary,
-    fontFamily: careFonts.bold,
-    fontSize: 15,
-  },
   error: {
     color: '#B91C1C',
     fontFamily: careFonts.semiBold,
     fontSize: 15,
     lineHeight: 21,
-  },
-  flex: { flex: 1 },
-  head: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
   },
   save: {
     alignItems: 'center',
@@ -229,11 +191,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: careFonts.bold,
     fontSize: 17,
-  },
-  screenTitle: {
-    color: dashboardColors.text,
-    fontFamily: careFonts.semiBold,
-    fontSize: 22,
-    lineHeight: 28,
   },
 });

@@ -34,7 +34,6 @@ const ERROR_COPY: Record<string, CareCopyKey> = {
   invalid_birth_date: 'childErrBirthDate',
   invalid_gender: 'childErrGender',
   invalid_given_on: 'childErrGivenOn',
-  invalid_name: 'childErrName',
   no_child_doctor: 'childErrNoDoctor',
   too_many_children: 'childErrTooMany',
 };

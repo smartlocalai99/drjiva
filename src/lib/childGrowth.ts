@@ -7,6 +7,15 @@ import type { CareVaccineRecord } from './care';
 import { addDaysIso, daysBetween, type CareItem, type CarePlan, type CareVisit } from './careSchedule';
 
 export type ChildVisitStatus = 'completed' | 'due' | 'overdue' | 'upcoming';
+
+// A newborn often has no name yet: saved as "Child", shown as "Child" /
+// "బిడ్డ" in the app.
+export const UNNAMED_CHILD = 'Child';
+
+export function childDisplayName(personName: string, unnamed: string): string {
+  const name = personName.trim();
+  return !name || name === UNNAMED_CHILD ? unnamed : name;
+}
 export type DoseKind = 'required' | 'onlyIf' | 'optional';
 
 export type ChildDose = {
