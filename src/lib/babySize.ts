@@ -54,7 +54,7 @@ const ROWS: readonly (readonly [number, number, number | null, string, string, F
   [24, 30, 600, 'a corn cob', 'మొక్కజొన్న కంకి', 'corn'],
   [25, 34.6, 660, 'a radish', 'ముల్లంగి', 'radish'],
   [26, 35.6, 760, 'a cauliflower', 'కాలీఫ్లవర్', 'cauliflower'],
-  [27, 36.6, 875, 'a yellow cucumber', 'దోసకాయ', 'cucumber'],
+  [27, 36.6, 875, 'a cucumber', 'కీర దోసకాయ', 'cucumber'],
   [28, 37.6, 1005, 'a large brinjal', 'పెద్ద వంకాయ', 'brinjal'],
   [29, 38.6, 1153, 'a cabbage', 'క్యాబేజీ', 'cabbage'],
   [30, 39.9, 1319, 'a bottle gourd', 'సొరకాయ', 'bottlegourd'],

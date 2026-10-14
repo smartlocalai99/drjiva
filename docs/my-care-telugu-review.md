@@ -3,7 +3,7 @@
 Every new piece of Telugu text, next to its English. Where to change it:
 
 - App screen text: `src/lib/careCopy.ts` (the `te` block) – needs an app update.
-- Baby size comparisons (week 4–40): `src/lib/babySize.ts` – needs an app update.
+- Baby size comparisons (week 4–40): `src/lib/babySize.ts` – needs an app update. Picture credits: `src/lib/careCredits.ts`.
 - Visit names and checklist items: Supabase tables `care_schedule_visits` / `care_schedule_items` (`title_te`, `label_te`) – changes show at once, no app update.
 - Reminder push text: function `care_send_followup_reminders` in the database.
 
@@ -83,7 +83,7 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | 24 | a corn cob | మొక్కజొన్న కంకి |
 | 25 | a radish | ముల్లంగి |
 | 26 | a cauliflower | కాలీఫ్లవర్ |
-| 27 | a yellow cucumber | దోసకాయ |
+| 27 | a cucumber | కీర దోసకాయ |
 | 28 | a large brinjal | పెద్ద వంకాయ |
 | 29 | a cabbage | క్యాబేజీ |
 | 30 | a bottle gourd | సొరకాయ |

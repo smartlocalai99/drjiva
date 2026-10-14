@@ -19,17 +19,21 @@ import { useCareCopy } from '../../lib/careCopy';
 import { trimester } from '../../lib/careSchedule';
 import { careFonts, careShared } from './careStyles';
 
+// Free pictures (public domain / CC BY-SA), credited in Profile → Photo
+// credits (src/lib/careCredits.ts). Weeks 9–27 share one drawing; it is
+// drawn bigger each week.
+const FETUS_IMAGE = require('../../../assets/care/baby-fetus.webp');
 export const BABY_IMAGES: Record<BabyStage, number> = {
   cells: require('../../../assets/care/baby-cells.webp'),
-  early: require('../../../assets/care/baby-early.webp'),
+  early: FETUS_IMAGE,
   embryo: require('../../../assets/care/baby-embryo.webp'),
-  fetus: require('../../../assets/care/baby-fetus.webp'),
+  fetus: FETUS_IMAGE,
   grown: require('../../../assets/care/baby-grown.webp'),
 };
 const WOMB_IMAGE = require('../../../assets/care/womb.webp');
 
-// Real photos cut out of their background (public domain, see
-// assets/care/fruits/SOURCES.md).
+// Real photos, one item cut out of each (free licences, credited in
+// src/lib/careCredits.ts).
 const FRUIT_PHOTOS: Record<FruitPhoto, number> = {
   amla: require('../../../assets/care/fruits/amla.webp'),
   apple: require('../../../assets/care/fruits/apple.webp'),

@@ -675,6 +675,13 @@ export default function ProfileScreen() {
                 <View style={styles.rowSpacer} />
                 <Ionicons color={dashboardColors.textFaint} name="chevron-forward" size={18} />
               </Pressable>
+              <Divider />
+              <Pressable onPress={() => router.push('/photo-credits')} style={styles.row}>
+                <Ionicons color={dashboardColors.text} name="images-outline" size={20} />
+                <Text style={styles.rowLabel}>Photo credits</Text>
+                <View style={styles.rowSpacer} />
+                <Ionicons color={dashboardColors.textFaint} name="chevron-forward" size={18} />
+              </Pressable>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
