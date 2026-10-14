@@ -30,10 +30,13 @@ export function CycleDayCard({
   const todayDay = cycleDayOf(cycle, today);
   const dayDate = addDaysIso(cycle.anchorDate, day - 1);
   const steps = stepsOn(cycle, dayDate);
-  const next = steps.length ? null : nextCycleStep(cycle, dayDate);
+  // The next step after this day (or from this day, if it has none).
+  const next = nextCycleStep(cycle, steps.length ? addDaysIso(dayDate, 1) : dayDate);
   // Advice is for before a step ("avoid intercourse 3–5 days before").
   const notes = steps.filter((step) => !step.status).map((step) => pick(step.noteEn ?? '', step.noteTe ?? '')).filter(Boolean);
   const notStarted = todayDay < 1;
+  const nextLabel = next ? c('cycleNext', { step: pick(next.labelEn, next.labelTe) }) : '';
+  const nextWhen = next ? c('cycleNextOn', { date: date(next.date, 'weekdayDayMonth'), n: cycleDayOf(cycle, next.date) }) : '';
 
   return (
     <View style={careShared.card}>
@@ -78,18 +81,28 @@ export function CycleDayCard({
               <Text style={careShared.muted}>{c('cycleNoStep')}</Text>
               {next ? (
                 <View style={styles.next}>
-                  <Text style={styles.nextLabel}>{c('cycleNext', { step: pick(next.labelEn, next.labelTe) })}</Text>
-                  <Text style={careShared.muted}>
-                    {c('cycleNextOn', { date: date(next.date, 'weekdayDayMonth'), n: cycleDayOf(cycle, next.date) })}
-                  </Text>
+                  <Text style={styles.nextLabel}>{nextLabel}</Text>
+                  <Text style={careShared.muted}>{nextWhen}</Text>
                 </View>
-              ) : day > todayDay ? null : (
+              ) : (
+                // Nothing left to do from this day on.
                 <Text style={careShared.body}>{c('cycleOver')}</Text>
               )}
             </>
           )}
         </View>
       </View>
+
+      {/* On a step day: what comes after it. */}
+      {steps.length > 0 && next ? (
+        <View accessibilityLabel={`${nextLabel}, ${nextWhen}`} accessible style={styles.after}>
+          <Ionicons color={dashboardColors.primary} name="arrow-forward-circle" size={22} />
+          <Text style={[careShared.muted, styles.flex]}>
+            <Text style={styles.afterLabel}>{nextLabel}</Text>
+            {` · ${nextWhen}`}
+          </Text>
+        </View>
+      ) : null}
 
       {notes.map((note) => (
         <View key={note} style={styles.note}>
@@ -140,6 +153,20 @@ function CycleDial({ cycle, length, selectedDay, todayDay }: { cycle: CareCycle;
 }
 
 const styles = StyleSheet.create({
+  after: {
+    alignItems: 'center',
+    backgroundColor: dashboardColors.bg,
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  afterLabel: {
+    color: dashboardColors.text,
+    fontFamily: careFonts.bold,
+  },
   body: {
     alignItems: 'center',
     flexDirection: 'row',

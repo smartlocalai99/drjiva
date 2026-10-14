@@ -79,13 +79,10 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Day {n} | {n}వ రోజు |
 | Day | రోజు |
 | of {n} | మొత్తం {n} |
-| Day 1 (period started): {date} | 1వ రోజు (నెలసరి మొదలైన రోజు): {date} |
-| Your treatment plan | మీ చికిత్స ప్లాన్ |
 | Your treatment starts on {date} | మీ చికిత్స {date}న మొదలవుతుంది |
 | No hospital visit this day | ఈ రోజు హాస్పిటల్‌కు రావాల్సిన అవసరం లేదు |
 | Next: {step} | తదుపరి: {step} |
 | Day {n} · {date} | {n}వ రోజు · {date} |
-| Next | తదుపరి |
 | All treatment days are over. Your hospital will tell you what comes next. | చికిత్స రోజులు పూర్తయ్యాయి. తర్వాత ఏమి చేయాలో మీ హాస్పిటల్ చెబుతుంది. |
 | Done | పూర్తయింది |
 | You | మీరు |
