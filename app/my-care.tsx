@@ -7,23 +7,29 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { careFonts, careShared } from '../src/components/care/careStyles';
 import { ChatBubble } from '../src/components/care/ChatBubble';
 import { ChildSection } from '../src/components/care/ChildSection';
+import { WHO_COPY } from '../src/components/care/CycleWho';
+import { CycleSection } from '../src/components/care/CycleSection';
 import { FollowUpCard } from '../src/components/care/FollowUpCard';
 import { PlanSwitcher } from '../src/components/care/PlanSwitcher';
 import { PregnancySection } from '../src/components/care/PregnancySection';
 import { BottomNav, type NavTabKey } from '../src/components/dashboard/BottomNav';
 import { dashboardColors, dashboardLayout, dashboardSpacing } from '../src/dashboardTheme';
-import { fetchMyCare, readCachedMyCare, type MyCare } from '../src/lib/care';
+import { fetchMyCare, readCachedMyCare, type CareExtraItem, type MyCare } from '../src/lib/care';
 import { useCareCopy } from '../src/lib/careCopy';
+import type { CareCycle } from '../src/lib/careCycle';
 import { syncCareReminders } from '../src/lib/careReminders';
-import { dialableIndianPhone, visitForDate } from '../src/lib/careSchedule';
+import { dialableIndianPhone, visitForDate, type CarePlan } from '../src/lib/careSchedule';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 
 type LoadState = 'loading' | 'ready' | 'offline' | 'error';
 
+// What the page can show: a pregnancy or child plan, or a fertility cycle.
+type Section = { id: string; kind: 'plan'; plan: CarePlan } | { id: string; kind: 'cycle'; cycle: CareCycle };
+
 export default function MyCareScreen() {
   const router = useRouter();
-  const { c, language } = useCareCopy();
+  const { c, language, pick } = useCareCopy();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ phone?: string | string[] }>();
   const phone = normalizeRoutePhone(params.phone);
@@ -32,7 +38,7 @@ export default function MyCareScreen() {
   const [care, setCare] = useState<MyCare | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const hasCare = useRef(false);
 
   const load = useCallback(async () => {
@@ -93,13 +99,37 @@ export default function MyCareScreen() {
   };
 
   const plans = care?.plans ?? [];
-  const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? plans[0] ?? null;
+  const cycles = care?.cycles ?? [];
+  // Pregnancy first, then a fertility cycle, then children.
+  const sections: Section[] = [
+    ...plans.filter((plan) => plan.type === 'pregnancy').map((plan) => ({ id: plan.id, kind: 'plan' as const, plan })),
+    ...cycles.map((cycle) => ({ cycle, id: cycle.id, kind: 'cycle' as const })),
+    ...plans.filter((plan) => plan.type !== 'pregnancy').map((plan) => ({ id: plan.id, kind: 'plan' as const, plan })),
+  ];
+  const selected = sections.find((section) => section.id === selectedId) ?? sections[0] ?? null;
+  const selectedPlan = selected?.kind === 'plan' ? selected.plan : null;
+  const selectedCycle = selected?.kind === 'cycle' ? selected.cycle : null;
   const followup = care?.followup ?? null;
   const followupPlan = plans.find((plan) => plan.id === followup?.planId) ?? selectedPlan;
   const followupVisit = followup && followupPlan ? visitForDate(followupPlan, followup.nextDate) : null;
+  // Cycle steps still to do show on the next-visit card like case-sheet tests.
+  const extraItems: CareExtraItem[] = [
+    ...(care?.extraItems ?? []),
+    ...cycles.flatMap((cycle) =>
+      cycle.steps
+        .filter((step) => !step.status)
+        .map((step) => ({
+          dueDate: step.date,
+          hospitalId: cycle.hospitalId,
+          id: step.id,
+          label: step.who === 'wife' ? pick(step.labelEn, step.labelTe) : `${pick(step.labelEn, step.labelTe)} (${c(WHO_COPY[step.who])})`,
+        })),
+    ),
+  ];
   const today = care?.today ?? '';
-  // A pregnancy page opens straight on the baby; no page heading.
+  // A pregnancy or treatment page opens straight on the day; no page heading.
   const isPregnancy = selectedPlan?.type === 'pregnancy';
+  const noHeader = isPregnancy || Boolean(selectedCycle);
   const navBottomOffset = insets.bottom + dashboardLayout.navBottomGap;
   const chatBottom = navBottomOffset + dashboardLayout.bottomNavHeight + 14;
   // Room so the chat button never covers the last card.
@@ -107,7 +137,7 @@ export default function MyCareScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      {isPregnancy ? null : (
+      {noHeader ? null : (
         <View style={styles.header}>
           <View style={styles.headerIcon}>
             <Ionicons color={dashboardColors.primary} name="document-text" size={20} />
@@ -126,7 +156,7 @@ export default function MyCareScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={[styles.content, isPregnancy && styles.contentNoHeader, { paddingBottom: scrollBottomPadding }]}
+          contentContainerStyle={[styles.content, noHeader && styles.contentNoHeader, { paddingBottom: scrollBottomPadding }]}
           refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={refreshing} tintColor={dashboardColors.primary} />}
           showsVerticalScrollIndicator={false}
         >
@@ -152,11 +182,19 @@ export default function MyCareScreen() {
 
           {care?.linked ? (
             <>
-              {plans.length >= 2 ? (
+              {sections.length >= 2 ? (
                 <PlanSwitcher
-                  items={plans.map((plan) => ({ id: plan.id, label: plan.type === 'pregnancy' ? c('pregnancy') : plan.personName }))}
-                  onSelect={setSelectedPlanId}
-                  selectedId={selectedPlan?.id ?? null}
+                  items={sections.map((section) => ({
+                    id: section.id,
+                    label:
+                      section.kind === 'cycle'
+                        ? c('cycleTab')
+                        : section.plan.type === 'pregnancy'
+                          ? c('pregnancy')
+                          : section.plan.personName,
+                  }))}
+                  onSelect={setSelectedId}
+                  selectedId={selected?.id ?? null}
                 />
               ) : null}
 
@@ -166,7 +204,14 @@ export default function MyCareScreen() {
 
               {selectedPlan?.type === 'child' ? <ChildSection plan={selectedPlan} today={today} /> : null}
 
-              <FollowUpCard extraItems={care.extraItems} followup={followup} today={today} visit={followupVisit} />
+              {selectedCycle ? (
+                <CycleSection cycle={selectedCycle} key={selectedCycle.id} today={today}>
+                  {/* The plan already shows the next step; the card only adds the nurse's date. */}
+                  {followup ? <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} /> : null}
+                </CycleSection>
+              ) : (
+                <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />
+              )}
             </>
           ) : null}
         </ScrollView>
@@ -177,8 +222,8 @@ export default function MyCareScreen() {
           bottom={chatBottom}
           chat={care.chat}
           hospitalPhone={dialableIndianPhone(followup?.hospital.phone)}
-          isPregnancy={isPregnancy}
           phone={phone}
+          topic={isPregnancy ? 'pregnancy' : selectedCycle ? 'cycle' : 'general'}
         />
       ) : null}
 

@@ -34,6 +34,10 @@ import { careFonts } from './careStyles';
 const MARK = require('../../../assets/care/chat-mark.webp');
 const PREGNANCY_SUGGESTIONS: CareCopyKey[] = ['suggestFoodWeek', 'suggestAvoid', 'suggestSleep', 'suggestNextVisit'];
 const GENERAL_SUGGESTIONS: CareCopyKey[] = ['suggestFood', 'suggestTablets', 'suggestNextVisit'];
+const CYCLE_SUGGESTIONS: CareCopyKey[] = ['suggestCycleNext', 'suggestCycleIui', 'suggestCycleFood'];
+const SUGGESTIONS = { cycle: CYCLE_SUGGESTIONS, general: GENERAL_SUGGESTIONS, pregnancy: PREGNANCY_SUGGESTIONS } as const;
+
+export type ChatTopic = keyof typeof SUGGESTIONS;
 
 type ChatState = { messages: CareChatMessage[]; remainingToday: number };
 
@@ -72,14 +76,14 @@ export function ChatBubble({
   bottom,
   chat,
   hospitalPhone,
-  isPregnancy,
   phone,
+  topic,
 }: {
   bottom: number;
   chat: ChatState | undefined;
   hospitalPhone: string | null;
-  isPregnancy: boolean;
   phone: string;
+  topic: ChatTopic;
 }) {
   const { c, language } = useCareCopy();
   const insets = useSafeAreaInsets();
@@ -121,7 +125,7 @@ export function ChatBubble({
     }
   };
 
-  const suggestions = isPregnancy ? PREGNANCY_SUGGESTIONS : GENERAL_SUGGESTIONS;
+  const suggestions = SUGGESTIONS[topic];
   const asked = state.messages.some((message) => message.role === 'user');
   const canSend = Boolean(text.trim()) && !sending;
 

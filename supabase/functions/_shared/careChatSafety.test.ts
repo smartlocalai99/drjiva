@@ -56,4 +56,21 @@ describe('context note', () => {
     expect(note).toContain('Folic acid (morning)');
     expect(note).not.toMatch(/\+91|\d{10}/);
   });
+
+  it('adds the fertility treatment day and steps', () => {
+    const note = buildContextNote({
+      cycle: {
+        day1: '2026-10-06',
+        dayOfCycle: 9,
+        steps: [
+          { date: '2026-10-07', day: 2, done: true, step: 'Semen analysis', who: 'husband' },
+          { date: '2026-10-19', day: 14, done: false, step: 'IUI / Timed intercourse', who: 'couple' },
+        ],
+        treatment: 'OI-TI / IUI',
+      },
+    });
+    expect(note).toContain('Today is day 9.');
+    expect(note).toContain('2026-10-07 (day 2) Semen analysis, for her husband, done');
+    expect(note).toContain('2026-10-19 (day 14) IUI / Timed intercourse, for both of them');
+  });
 });

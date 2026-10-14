@@ -6,6 +6,7 @@ Every new piece of Telugu text, next to its English. Where to change it:
 - Baby size comparisons (week 4–40): `src/lib/babySize.ts` – needs an app update.
 - Visit names and checklist items: Supabase tables `care_schedule_visits` / `care_schedule_items` (`title_te`, `label_te`) – changes show at once, no app update.
 - Reminder push text: function `care_send_followup_reminders` in the database.
+- OI-TI / IUI step names and notes: Supabase table `care_cycle_protocol_steps` (`label_te`, `note_te`) – changes show at once, no app update.
 
 ## App screen
 
@@ -74,6 +75,28 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Your follow-up visit at {hospital} is tomorrow. | {hospital} లో మీ ఫాలో-అప్ సందర్శన రేపు ఉంది. |
 | Hospital visit today | ఈరోజు హాస్పిటల్ సందర్శన |
 | Your follow-up visit at {hospital} is today. | {hospital} లో మీ ఫాలో-అప్ సందర్శన ఈరోజు ఉంది. |
+| Fertility treatment | సంతాన చికిత్స |
+| Day {n} | {n}వ రోజు |
+| Day | రోజు |
+| of {n} | మొత్తం {n} |
+| Day 1 (period started): {date} | 1వ రోజు (నెలసరి మొదలైన రోజు): {date} |
+| Your treatment plan | మీ చికిత్స ప్లాన్ |
+| Your treatment starts on {date} | మీ చికిత్స {date}న మొదలవుతుంది |
+| No hospital visit this day | ఈ రోజు హాస్పిటల్‌కు రావాల్సిన అవసరం లేదు |
+| Next: {step} | తదుపరి: {step} |
+| Day {n} · {date} | {n}వ రోజు · {date} |
+| Next | తదుపరి |
+| All treatment days are over. Your hospital will tell you what comes next. | చికిత్స రోజులు పూర్తయ్యాయి. తర్వాత ఏమి చేయాలో మీ హాస్పిటల్ చెబుతుంది. |
+| Done | పూర్తయింది |
+| You | మీరు |
+| Husband | మీ భర్త |
+| Both of you | మీరిద్దరూ |
+| What happens at my next step? | నా తదుపరి దశలో ఏమి చేస్తారు? |
+| What should I eat during treatment? | చికిత్స సమయంలో ఏమి తినాలి? |
+| How do I get ready for IUI? | IUI కి ఎలా సిద్ధం కావాలి? |
+| Tomorrow: {steps} | రేపు: {steps} |
+| Today: {steps} | ఈరోజు: {steps} |
+| Day {n} of your treatment at {hospital}. | {hospital} లో మీ చికిత్స {n}వ రోజు. |
 
 ## Baby size ("As big as …")
 
@@ -282,6 +305,23 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Week 38 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
 | Week 39 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
 | Week 40 check-up (Dhruva Hospitals) | Weekly doctor check-up | వారం వారం డాక్టర్ పరీక్ష |
+
+## OI-TI / IUI steps (database: `care_cycle_protocol_steps`, changes show at once)
+
+| Day | English | Telugu |
+|---|---|---|
+| 2 | Baseline scan | బేస్‌లైన్ స్కాన్ |
+| 2 | Blood test | రక్త పరీక్ష |
+| 2 | Semen analysis | వీర్య పరీక్ష |
+| 2 (note) | Avoid intercourse 3–5 days before the test | పరీక్షకు 3–5 రోజుల ముందు కలయిక వద్దు |
+| 5 | Injection | ఇంజెక్షన్ |
+| 7 | Injection | ఇంజెక్షన్ |
+| 7 | HSG – tube test | HSG – ట్యూబ్ పరీక్ష |
+| 9 | Follicle scan | ఫాలికల్ స్కాన్ |
+| 11 | Follicle scan | ఫాలికల్ స్కాన్ |
+| 13 | Trigger injection | ట్రిగ్గర్ ఇంజెక్షన్ |
+| 14 | IUI / Timed intercourse | IUI / నిర్ణీత సమయంలో కలయిక |
+| 31 | Urine pregnancy test | మూత్ర గర్భ పరీక్ష |
 
 ## Follow-up reminder push (database, 6 PM / 8 AM)
 

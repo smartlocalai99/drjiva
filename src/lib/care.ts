@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { CareCycle } from './careCycle';
 import type { CarePlan } from './careSchedule';
 import { linkPatientDevice } from './hospitalMedicineClaims';
 import { toIndianE164 } from './phone';
@@ -41,6 +42,8 @@ export type MyCare = {
   plans?: CarePlan[];
   everyVisit?: Partial<Record<CarePlan['type'], { en: string | null; te: string | null; untilMonths: number | null }>>;
   extraItems?: CareExtraItem[];
+  // Active OI-TI / IUI cycles (v2 only).
+  cycles?: CareCycle[];
   chat?: { messages: CareChatMessage[]; remainingToday: number; dailyLimit: number };
 };
 
@@ -48,7 +51,8 @@ export type CachedMyCare = { data: MyCare; savedAt: number };
 
 const cacheKey = (phone: string) => `drjiva.myCare.v1.${phone}`;
 
-// v2 = the same answer plus extra tests from the case sheet, in one call.
+// v2 = the same answer plus extra tests from the case sheet and active
+// fertility cycles, in one call.
 // Falls back to v1 if the database does not have v2 yet.
 async function getMyCare(mobile: string): Promise<MyCare> {
   const v2 = await supabase.rpc('care_get_my_care_v2', { p_mobile: mobile });
