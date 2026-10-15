@@ -1,22 +1,28 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { StyleSheet, Text } from 'react-native';
 
+import { dashboardColors } from '../../dashboardTheme';
 import type { CareVaccineRecord } from '../../lib/care';
 import { useCareCopy } from '../../lib/careCopy';
 import { childAge, type CarePlan } from '../../lib/careSchedule';
-import { childVisits, currentChildVisit } from '../../lib/childGrowth';
+import { childDisplayName, childVisits, currentChildVisit } from '../../lib/childGrowth';
 import { ChildAgeStrip } from './ChildAgeStrip';
+import { ChildHero } from './ChildHero';
 import { ChildVisitCard } from './ChildVisitCard';
+import { careFonts } from './careStyles';
 
-// Child Growth Chart: the strip of visits by age on top, the chosen visit
-// (picture of a child that age, what most children do, the vaccines with
-// exact dates), then `children` (the next visit card). Read only: the nurse
-// marks vaccines given in her portal.
+// The child page: a photo for the child's age, the name, age and date of
+// birth, then `children` (the next visit card), then the Child Growth
+// Chart (visits by age, each with its vaccines). Read only: the nurse marks
+// vaccines given in her portal.
 export function ChildGrowthSection({
+  bleedTop,
   children,
   plan,
   records,
   today,
 }: {
+  bleedTop: boolean;
   children?: ReactNode;
   plan: CarePlan;
   records: readonly CareVaccineRecord[];
@@ -29,12 +35,23 @@ export function ChildGrowthSection({
   const selected = visits.find((visit) => visit.visit.id === selectedId) ?? current;
   const birthDate = plan.birthDate ?? plan.startDate;
 
-  if (!selected) return null;
   return (
     <>
-      <ChildAgeStrip onSelect={setSelectedId} selectedId={selected.visit.id} visits={visits} />
-      <ChildVisitCard ageNow={ageText(c, birthDate, today)} total={visits.length} visit={selected} />
+      <ChildHero
+        ageText={ageText(c, birthDate, today)}
+        birthDate={birthDate}
+        bleedTop={bleedTop}
+        name={childDisplayName(plan.personName, c('childNoName'))}
+        today={today}
+      />
       {children}
+      {selected ? (
+        <>
+          <Text accessibilityRole="header" style={styles.title}>{c('childGrowthTitle')}</Text>
+          <ChildAgeStrip onSelect={setSelectedId} selectedId={selected.visit.id} visits={visits} />
+          <ChildVisitCard total={visits.length} visit={selected} />
+        </>
+      ) : null}
     </>
   );
 }
@@ -45,3 +62,14 @@ function ageText(c: ReturnType<typeof useCareCopy>['c'], birthDate: string, toda
   if (age.unit === 'month') return age.value === 1 ? c('ageMonth1') : c('ageMonths', { n: age.value });
   return age.value === 1 ? c('ageYear1') : c('ageYears', { n: age.value });
 }
+
+const styles = StyleSheet.create({
+  title: {
+    color: dashboardColors.text,
+    fontFamily: careFonts.bold,
+    fontSize: 21,
+    lineHeight: 27,
+    marginBottom: -4,
+    marginTop: 6,
+  },
+});

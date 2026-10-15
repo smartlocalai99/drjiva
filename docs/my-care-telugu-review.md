@@ -102,6 +102,7 @@ Every new piece of Telugu text, next to its English. Where to change it:
 | Day {n} of your treatment at {hospital}. | {hospital} లో మీ చికిత్స {n}వ రోజు. |
 | Child Growth Chart | బిడ్డ ఎదుగుదల చార్ట్ |
 | Child | బిడ్డ |
+| Born on {date} | పుట్టిన తేదీ {date} |
 | What most children do at {age} | {age} వయసులో చాలా మంది పిల్లలు చేసేవి |
 | What most newborns do | అప్పుడే పుట్టిన చాలా మంది పిల్లలు చేసేవి |
 | Visit {n} of {total} | {total} లో {n}వ సందర్శన |

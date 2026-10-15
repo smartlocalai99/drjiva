@@ -211,6 +211,7 @@ export default function MyCareScreen() {
 
               {selectedPlan?.type === 'child' ? (
                 <ChildGrowthSection
+                  bleedTop={sections.length < 2}
                   key={selectedPlan.id}
                   plan={selectedPlan}
                   records={(care.vaccineRecords ?? []).filter((record) => record.planId === selectedPlan.id)}

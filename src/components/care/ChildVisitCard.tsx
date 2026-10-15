@@ -1,33 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors } from '../../dashboardTheme';
 import { useCareCopy } from '../../lib/careCopy';
-import { MILESTONES, type ChildDose, type ChildStage, type ChildVisit } from '../../lib/childGrowth';
+import { MILESTONES, type ChildDose, type ChildVisit } from '../../lib/childGrowth';
 import { CHILD_STATUS, StatusPill } from './ChildStatus';
 import { careFonts, careShared } from './careStyles';
 
-// Free photos (credited in Profile → Photo credits), one child cut out of
-// each: what a child of that age looks like.
-export const CHILD_IMAGES: Record<ChildStage, number> = {
-  crawl: require('../../../assets/care/child/crawl.webp'),
-  headup: require('../../../assets/care/child/headup.webp'),
-  newborn: require('../../../assets/care/child/newborn.webp'),
-  run: require('../../../assets/care/child/run.webp'),
-  school: require('../../../assets/care/child/school.webp'),
-  sit: require('../../../assets/care/child/sit.webp'),
-  smile: require('../../../assets/care/child/smile.webp'),
-  stand: require('../../../assets/care/child/stand.webp'),
-  walk: require('../../../assets/care/child/walk.webp'),
-};
-
 const GIVEN = '#16A34A';
 
-// One visit of the child page: a picture of a child at that age beside the
-// visit's date and status, then what most children do at that age and the
-// vaccines. The nurse marks vaccines given in her portal; parents only read.
-export function ChildVisitCard({ ageNow, total, visit }: { ageNow: string; total: number; visit: ChildVisit }) {
+// One visit of the Child Growth Chart: its date and status, what most
+// children do at that age and the vaccines. The nurse marks vaccines given
+// in her portal; parents only read.
+export function ChildVisitCard({ total, visit }: { total: number; visit: ChildVisit }) {
   const { c, date, language, pick } = useCareCopy();
   const doses = visit.doses.filter((dose) => dose.kind !== 'optional');
   // Doses that must wait longer than the visit date (an earlier dose was late).
@@ -38,28 +23,14 @@ export function ChildVisitCard({ ageNow, total, visit }: { ageNow: string; total
 
   return (
     <View style={careShared.card}>
-      <View style={styles.hero}>
-        <View style={styles.photoBox}>
-          <Image
-            accessibilityIgnoresInvertColors
-            accessibilityLabel={ageTitle}
-            contentFit="contain"
-            source={CHILD_IMAGES[visit.age.stage]}
-            style={styles.photo}
-            transition={200}
-          />
+      <View>
+        <View style={styles.titleRow}>
+          <Text style={styles.age}>{ageTitle}</Text>
+          <StatusPill status={visit.status} />
         </View>
-        <View style={styles.heroText}>
-          <Text style={styles.chartTitle}>{c('childGrowthTitle')}</Text>
-          <Text style={styles.ageNow}>{ageNow}</Text>
-          <View style={styles.visitRow}>
-            <Text style={styles.age}>{ageTitle}</Text>
-            <StatusPill status={visit.status} />
-          </View>
-          <Text style={styles.meta}>
-            {date(visit.dueDate)} · {c('visitOf', { n: visit.number, total })}
-          </Text>
-        </View>
+        <Text style={styles.meta}>
+          {date(visit.dueDate)} · {c('visitOf', { n: visit.number, total })}
+        </Text>
       </View>
 
       <View style={styles.facts}>
@@ -133,48 +104,19 @@ function DoseChip({ dose, status }: { dose: ChildDose; status: ChildVisit['statu
 }
 
 const styles = StyleSheet.create({
-  age: {
-    color: dashboardColors.text,
-    fontFamily: careFonts.bold,
-    fontSize: 18,
-    lineHeight: 23,
-  },
-  ageNow: {
-    color: dashboardColors.textMuted,
-    fontFamily: careFonts.semiBold,
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  chartTitle: {
-    color: dashboardColors.primary,
-    flex: 1,
-    fontFamily: careFonts.bold,
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  hero: {
+  titleRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 14,
+    gap: 12,
+    justifyContent: 'space-between',
   },
-  heroText: {
-    flex: 1,
-    gap: 3,
-  },
-  photoBox: {
-    alignItems: 'center',
-    backgroundColor: '#F3F7FB',
-    borderCurve: 'continuous',
-    borderRadius: 22,
-    height: 172,
-    justifyContent: 'center',
-    width: 132,
-  },
-  visitRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: 6,
-    marginTop: 8,
+  age: {
+    color: dashboardColors.text,
+    flexShrink: 1,
+    fontFamily: careFonts.bold,
+    fontSize: 24,
+    letterSpacing: -0.3,
+    lineHeight: 30,
   },
   block: {
     gap: 10,
@@ -287,10 +229,6 @@ const styles = StyleSheet.create({
     fontFamily: careFonts.medium,
     fontSize: 14,
     lineHeight: 20,
-  },
-  photo: {
-    height: 156,
-    width: 120,
   },
   shift: {
     alignItems: 'center',

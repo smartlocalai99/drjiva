@@ -55,6 +55,11 @@ export function addMonthsIso(date: string, months: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
 }
 
+/** Whole months of age (calendar months). */
+export function childMonths(birthDate: string, today: string): number {
+  return Math.max(0, monthsBetween(birthDate, today));
+}
+
 function monthsBetween(from: string, to: string): number {
   const [y1, m1, d1] = from.split('-').map(Number) as [number, number, number];
   const [y2, m2, d2] = to.split('-').map(Number) as [number, number, number];
