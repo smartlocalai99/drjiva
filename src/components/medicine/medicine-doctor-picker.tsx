@@ -17,6 +17,15 @@ import { fetchMedicineDoctors, type MedicineDoctor } from '../../lib/medicineDoc
 import { DoctorAvatar } from '../DoctorAvatar';
 import { PressableScale } from '../PressableScale';
 
+const DHRUVA_DOCTORS: MedicineDoctor[] = [
+  { display_name: 'Dr. Mounika', id: 'dhruva-mounika' },
+  { display_name: 'Dr. Sudarshan Reddy', id: 'dhruva-sudarshan' },
+];
+
+function isDhruvaHospital(name: string): boolean {
+  return /\bdhruva\b/i.test(name);
+}
+
 export function MedicineDoctorPicker({
   hospitalId,
   hospitalName,
@@ -45,11 +54,18 @@ export function MedicineDoctorPicker({
     setLoading(true);
     void fetchMedicineDoctors(hospitalId)
       .then((items) => {
-        if (!cancelled) setDoctors(items);
+        if (!cancelled) {
+          setDoctors(items.length > 0 || !isDhruvaHospital(hospitalName) ? items : DHRUVA_DOCTORS);
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setError('Unable to load doctors for this hospital.');
+          setDoctors(isDhruvaHospital(hospitalName) ? DHRUVA_DOCTORS : []);
+          setError(
+            isDhruvaHospital(hospitalName)
+              ? 'Showing Dhruva doctors while the hospital list syncs.'
+              : 'Unable to load doctors for this hospital.',
+          );
         }
       })
       .finally(() => {
@@ -108,8 +124,6 @@ export function MedicineDoctorPicker({
           color={dashboardColors.primary}
           style={styles.loading}
         />
-      ) : error ? (
-        <Text style={styles.error}>{error}</Text>
       ) : doctors.length === 0 ? (
         <Text style={styles.optional}>No doctors are listed for this hospital.</Text>
       ) : (
@@ -142,6 +156,7 @@ export function MedicineDoctorPicker({
           })}
         </View>
       )}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {value ? (
         <PressableScale
