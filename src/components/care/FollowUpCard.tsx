@@ -12,11 +12,14 @@ import { careFonts, careShared } from './careStyles';
 
 // Always the first card: when to go back, where, and who set it.
 export function FollowUpCard({
+  chips = false,
   extraItems = [],
   followup,
   today,
   visit,
 }: {
+  /** Show every item as small chips side by side (child vaccines). */
+  chips?: boolean;
   extraItems?: CareExtraItem[];
   followup: CareFollowup | null | undefined;
   today: string;
@@ -41,7 +44,7 @@ export function FollowUpCard({
   const days = daysUntil(followup.nextDate, today);
   const when = days <= 0 ? c('today') : days === 1 ? c('tomorrow') : c('inDays', { n: days });
   const phone = dialableIndianPhone(followup.hospital.phone);
-  const visitItems = visit?.items.filter((item) => !item.conditional).slice(0, 4) ?? [];
+  const visitItems = visit?.items.filter((item) => !item.conditional && !item.optional).slice(0, chips ? undefined : 4) ?? [];
   // Tests the nurse added from the case sheet for this visit.
   const extras = extraItems.filter((item) => item.dueDate === followup.nextDate && item.hospitalId === followup.hospital.id);
 
@@ -74,7 +77,16 @@ export function FollowUpCard({
           <Text style={styles.blockTitle}>
             {visitItems.length > 0 && visit ? `${c('atThisVisit')} · ${pick(visit.titleEn, visit.titleTe)}` : c('atThisVisit')}
           </Text>
-          {visit
+          {chips ? (
+            <View style={styles.chips}>
+              {[...(visit ? visitItems.map((item) => ({ id: item.id, label: pick(item.labelEn, item.labelTe) })) : []), ...extras].map((item) => (
+                <View key={item.id} style={styles.chip}>
+                  <Text style={styles.chipText}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {visit && !chips
             ? visitItems.map((item) => (
                 <View key={item.id} style={styles.bulletRow}>
                   <View style={styles.bullet} />
@@ -82,7 +94,7 @@ export function FollowUpCard({
                 </View>
               ))
             : null}
-          {extras.map((item) => (
+          {(chips ? [] : extras).map((item) => (
             <View key={item.id} style={styles.bulletRow}>
               <View style={styles.bullet} />
               <Text style={[careShared.body, styles.flex]}>{item.label}</Text>
@@ -133,6 +145,26 @@ const styles = StyleSheet.create({
     height: 8,
     marginTop: 9,
     width: 8,
+  },
+  chip: {
+    backgroundColor: dashboardColors.card,
+    borderColor: dashboardColors.track,
+    borderCurve: 'continuous',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  chipText: {
+    color: dashboardColors.text,
+    fontFamily: careFonts.semiBold,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   bulletRow: {
     flexDirection: 'row',

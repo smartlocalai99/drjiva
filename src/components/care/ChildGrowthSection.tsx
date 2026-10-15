@@ -5,14 +5,14 @@ import { dashboardColors } from '../../dashboardTheme';
 import type { CareVaccineRecord } from '../../lib/care';
 import { useCareCopy } from '../../lib/careCopy';
 import { childAge, type CarePlan } from '../../lib/careSchedule';
-import { childDisplayName, childVisits, currentChildVisit } from '../../lib/childGrowth';
+import { childMonths, childVisits, currentChildVisit } from '../../lib/childGrowth';
 import { ChildAgeStrip } from './ChildAgeStrip';
 import { ChildHero } from './ChildHero';
 import { ChildVisitCard } from './ChildVisitCard';
 import { careFonts } from './careStyles';
 
-// The child page: a photo for the child's age, the name, age and date of
-// birth, then `children` (the next visit card), then the Child Growth
+// The child page: a photo for the age chosen on the chart, the child's age
+// and date of birth, then `children` (the next visit card), then the Child Growth
 // Chart (visits by age, each with its vaccines). Read only: the nurse marks
 // vaccines given in her portal.
 export function ChildGrowthSection({
@@ -41,8 +41,7 @@ export function ChildGrowthSection({
         ageText={ageText(c, birthDate, today)}
         birthDate={birthDate}
         bleedTop={bleedTop}
-        name={childDisplayName(plan.personName, c('childNoName'))}
-        today={today}
+        photoMonths={childMonths(birthDate, selected ? selected.visit.fromDate : today)}
       />
       {children}
       {selected ? (

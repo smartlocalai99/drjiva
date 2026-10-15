@@ -217,7 +217,7 @@ export default function MyCareScreen() {
                   records={(care.vaccineRecords ?? []).filter((record) => record.planId === selectedPlan.id)}
                   today={today}
                 >
-                  <FollowUpCard extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />
+                  <FollowUpCard chips extraItems={extraItems} followup={followup} today={today} visit={followupVisit} />
                 </ChildGrowthSection>
               ) : selectedCycle ? (
                 <CycleSection cycle={selectedCycle} key={selectedCycle.id} today={today}>

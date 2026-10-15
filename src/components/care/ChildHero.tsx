@@ -5,7 +5,6 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors, dashboardSpacing } from '../../dashboardTheme';
 import { useCareCopy } from '../../lib/careCopy';
-import { childMonths } from '../../lib/childGrowth';
 import { careFonts, careShared } from './careStyles';
 
 // Photos chosen by the hospital: months 0–5, 6–11, and 1 year onwards.
@@ -17,24 +16,22 @@ const HERO = {
 
 const HERO_HEIGHT = 270;
 
-// Top of the child page: a big photo for the child's age that fades into
-// the page, then the child's name, age and date of birth.
+// Top of the child page: a big photo for the age chosen on the Child Growth
+// Chart (it changes with the strip), fading into the page, then the child's
+// age and date of birth.
 export function ChildHero({
   ageText,
   birthDate,
   bleedTop,
-  name,
-  today,
+  photoMonths,
 }: {
   ageText: string;
   birthDate: string;
   bleedTop: boolean;
-  name: string;
-  today: string;
+  photoMonths: number;
 }) {
   const { c, date } = useCareCopy();
-  const months = childMonths(birthDate, today);
-  const hero = months < 6 ? HERO.baby : months < 12 ? HERO.infant : HERO.toddler;
+  const hero = photoMonths < 6 ? HERO.baby : photoMonths < 12 ? HERO.infant : HERO.toddler;
 
   return (
     <>
@@ -48,16 +45,9 @@ export function ChildHero({
         />
       </View>
 
-      <View accessibilityLabel={`${name}, ${ageText}, ${c('childBornOn', { date: date(birthDate) })}`} accessible style={[careShared.card, styles.card]}>
-        <View style={styles.baby}>
-          <Text style={styles.babyEmoji}>👶</Text>
-        </View>
+      <View accessibilityLabel={`${ageText}, ${c('childBornOn', { date: date(birthDate) })}`} accessible style={[careShared.card, styles.card]}>
         <View style={styles.info}>
-          <Text style={styles.line}>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.divider}> | </Text>
-            {ageText}
-          </Text>
+          <Text style={styles.line}>{ageText}</Text>
           <View style={styles.born}>
             <MaterialCommunityIcons color="#7C3AED" name="cake-variant-outline" size={20} />
             <Text style={styles.bornText}>{c('childBornOn', { date: date(birthDate) })}</Text>
@@ -69,18 +59,6 @@ export function ChildHero({
 }
 
 const styles = StyleSheet.create({
-  baby: {
-    alignItems: 'center',
-    backgroundColor: '#FFF1E6',
-    borderRadius: 30,
-    height: 60,
-    justifyContent: 'center',
-    width: 60,
-  },
-  babyEmoji: {
-    fontSize: 34,
-    lineHeight: 40,
-  },
   born: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -98,10 +76,6 @@ const styles = StyleSheet.create({
     gap: 16,
     marginTop: -64,
     paddingVertical: 18,
-  },
-  divider: {
-    color: dashboardColors.textFaint,
-    fontFamily: careFonts.medium,
   },
   fade: {
     bottom: 0,
@@ -123,12 +97,9 @@ const styles = StyleSheet.create({
   },
   line: {
     color: dashboardColors.text,
-    fontFamily: careFonts.medium,
-    fontSize: 20,
-    lineHeight: 26,
-  },
-  name: {
     fontFamily: careFonts.bold,
+    fontSize: 22,
+    lineHeight: 28,
   },
   photo: {
     height: '100%',
