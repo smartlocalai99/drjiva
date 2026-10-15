@@ -28,6 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PressableScale } from '../src/components/PressableScale';
 import { CourseStartDatePicker } from '../src/components/medicine/course-start-date-picker';
 import { CustomMedicineSheet } from '../src/components/medicine/CustomMedicineSheet';
+import { MedicineDoctorPicker } from '../src/components/medicine/medicine-doctor-picker';
 import {
   DurationPicker,
   durationLabel,
@@ -160,6 +161,7 @@ export default function AddMedicineScreen() {
     Record<string, MedicineReminderDetails>
   >({});
   const [pattern, setPattern] = useState<DayPattern>('daily');
+  const [doctorName, setDoctorName] = useState('');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
   const deferredQuery = useDeferredValue(query);
@@ -362,6 +364,7 @@ export default function AddMedicineScreen() {
           startDate,
         });
         const created = await createMedicineCourse({
+          doctorName,
           customMedicineId: medicine.isCustom ? medicine.id : undefined,
           customHospitalId: customHospital?.id,
           dayPattern: duration.mode === 'ongoing' ? 'daily' : pattern,
@@ -488,6 +491,7 @@ export default function AddMedicineScreen() {
   };
 
   const selectHospital = (hospital: HospitalOption) => {
+    setDoctorName('');
     setIsCustomHospital(hospital.isCustom);
     setSelectedCustomHospitalId(hospital.isCustom ? hospital.id : '');
     setCustomHospitalName(hospital.isCustom ? hospital.name : '');
@@ -501,6 +505,7 @@ export default function AddMedicineScreen() {
   };
 
   const selectNewHospital = (name: string) => {
+    setDoctorName('');
     setHospitals((current) => [
       ...current,
       { id: `draft:${name}`, isCustom: true, name },
@@ -663,6 +668,12 @@ export default function AddMedicineScreen() {
                   {hospitalName}
                 </Text>
               </View>
+              <MedicineDoctorPicker
+                hospitalId={isCustomHospital ? undefined : workflow.hospitalId}
+                hospitalName={hospitalName}
+                onChange={setDoctorName}
+                value={doctorName}
+              />
               {selectedMedicines.length > 0 ? (
                 <SelectedMedicineStrip medicines={selectedMedicines} />
               ) : null}
@@ -962,6 +973,9 @@ export default function AddMedicineScreen() {
                 })}
               </View>
               <Text style={styles.summary}>{hospitalName}</Text>
+              {doctorName.trim() ? (
+                <Text style={styles.summary}>Doctor: {doctorName.trim()}</Text>
+              ) : null}
               <Text style={styles.summary}>
                 {durationLabel(duration)}
               </Text>

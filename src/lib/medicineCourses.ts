@@ -140,6 +140,7 @@ export async function createCustomHospital(
 }
 
 export async function createMedicineCourse(input: {
+  doctorName?: string | null;
   customMedicineId?: string;
   customHospitalId?: string;
   dayPattern: DayPattern;
@@ -221,6 +222,7 @@ export async function createMedicineCourse(input: {
       custom_hospital_id: input.customHospitalId ?? null,
       custom_medicine_id: input.customMedicineId ?? null,
       day_pattern: input.dayPattern,
+      doctor_name: input.doctorName?.trim() || null,
       duration_days: input.durationDays,
       hospital_id: input.hospitalId ?? null,
       medicine_id: input.medicineId ?? null,

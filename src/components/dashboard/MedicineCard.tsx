@@ -151,6 +151,7 @@ export function MedicineCard({
           </View>
           <DoctorAvatar
             doctorName={medicine.doctorName}
+            hospitalName={medicine.hospitalName}
             roundedSquare
             size={72}
           />

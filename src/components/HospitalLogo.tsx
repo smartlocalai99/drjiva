@@ -1,62 +1,83 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { dashboardColors } from '../dashboardTheme';
+import {
+  getIdentityInitials,
+  resolveHospitalBrand,
+  type HospitalBrand,
+} from '../lib/brandIdentity';
 
-const HOSPITAL_LOGO = require('../../assets/branding/hospital-logo.png');
+const ASIAN_LOGO = require('../../assets/branding/hospital-logo.png');
 export const DHRUVA_LOGO = require('../../assets/dhruvalogo.png');
 
-// One entry per hospital with a real logo on file. Key is the hospital name
-// normalized (lowercase, trimmed) — matched against the DB's `hospitals.name`
-// by substring so "Dhruva Hospitals" and "dhruva" both hit the same entry.
-// Add a line here + drop the file in assets/hospitals/ as each hospital's
-// logo becomes available; anything not listed falls back to HOSPITAL_LOGO.
-const HOSPITAL_LOGOS: Record<string, ReturnType<typeof require>> = {
+const HOSPITAL_LOGOS: Record<HospitalBrand, ReturnType<typeof require>> = {
+  asian: ASIAN_LOGO,
   dhruva: DHRUVA_LOGO,
 };
 
 export function isDhruvaHospital(hospitalName?: string): boolean {
-  return (hospitalName ?? '').trim().toLocaleLowerCase().includes('dhruva');
-}
-
-function resolveHospitalLogo(hospitalName?: string) {
-  const normalized = (hospitalName ?? '').trim().toLocaleLowerCase();
-  for (const [key, logo] of Object.entries(HOSPITAL_LOGOS)) {
-    if (normalized.includes(key)) return logo;
-  }
-  return HOSPITAL_LOGO;
+  return resolveHospitalBrand(hospitalName) === 'dhruva';
 }
 
 export function HospitalLogo({
   hospitalName,
+  logoUrl,
   roundedSquare = false,
   size = 28,
 }: {
   hospitalName?: string;
+  logoUrl?: string | null;
   roundedSquare?: boolean;
   size?: number;
 }) {
-  const useDhruvaLogo = isDhruvaHospital(hospitalName);
+  const brand = resolveHospitalBrand(hospitalName);
+  const remoteLogoUrl = logoUrl?.trim() || null;
+  const logoSource = remoteLogoUrl
+    ? { uri: remoteLogoUrl }
+    : brand
+      ? HOSPITAL_LOGOS[brand]
+      : null;
+  const [logoFailed, setLogoFailed] = useState(false);
+  const sourceKey = remoteLogoUrl ?? brand ?? '';
+  const showLogo = logoSource !== null && !logoFailed;
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [sourceKey]);
 
   return (
     <View
+      accessibilityLabel={`${hospitalName?.trim() || 'Hospital'} logo`}
+      accessible
       style={[
         styles.wrap,
-        useDhruvaLogo && styles.dhruvaWrap,
+        brand === 'dhruva' && styles.dhruvaWrap,
+        !showLogo && styles.fallbackWrap,
         {
           borderRadius: roundedSquare ? Math.max(10, size * 0.22) : size / 2,
           height: size,
-          padding: useDhruvaLogo ? size * 0.06 : size * 0.12,
+          padding: showLogo ? (brand === 'dhruva' ? size * 0.06 : size * 0.12) : 0,
           width: size,
         },
       ]}
     >
-      <Image
-        cachePolicy="memory"
-        contentFit="contain"
-        source={resolveHospitalLogo(hospitalName)}
-        style={styles.image}
-      />
+      {showLogo ? (
+        <Image
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          onError={() => setLogoFailed(true)}
+          source={logoSource}
+          style={styles.image}
+        />
+      ) : (
+        <Text
+          style={[styles.fallbackText, { fontSize: Math.max(10, size * 0.32) }]}
+        >
+          {getIdentityInitials(hospitalName, 'H')}
+        </Text>
+      )}
     </View>
   );
 }
@@ -73,6 +94,14 @@ const styles = StyleSheet.create({
   image: {
     height: '100%',
     width: '100%',
+  },
+  fallbackText: {
+    color: dashboardColors.primary,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  fallbackWrap: {
+    backgroundColor: '#EAF5F7',
   },
   dhruvaWrap: {
     borderColor: '#2467A6',

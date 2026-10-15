@@ -25,6 +25,7 @@ import {
 } from "../../lib/currency";
 import { useLanguage } from "../../lib/i18n";
 import { getShopProductRating } from "../../lib/shop-product-rating";
+import { SHOP_DELIVERY_ETA_LABEL } from "../../lib/shop-delivery";
 import { PressableScale } from "../PressableScale";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -217,7 +218,11 @@ export function MedicineDetailContent({
       </View>
 
       <View style={styles.benefitGrid}>
-        <Benefit icon="flash-outline" label="Fast delivery" value="15 mins" />
+        <Benefit
+          icon="flash-outline"
+          label="Fast delivery"
+          value={SHOP_DELIVERY_ETA_LABEL}
+        />
         <Benefit
           icon="cube-outline"
           label="On this order"

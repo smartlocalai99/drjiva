@@ -22,33 +22,33 @@ describe('currency formatting', () => {
 });
 
 describe('formatShopProductPrice', () => {
-  it('formats the catalogue selling price as rupees', () => {
-    expect(formatShopProductPrice(32)).toBe('₹32');
+  it('formats the catalogue MRP with the five percent discount applied', () => {
+    expect(formatShopProductPrice(100)).toBe('₹95');
   });
 
-  it('shows the dummy placeholder price when a real price is not set yet', () => {
-    expect(formatShopProductPrice(null)).toBe(`₹${DUMMY_MEDICINE_PRICE}`);
+  it('discounts the placeholder MRP when a real price is not set yet', () => {
+    expect(formatShopProductPrice(null)).toBe('₹46.55');
   });
 });
 
 describe('resolveShopProductPrice', () => {
-  it('keeps the catalogue price as the discounted selling price', () => {
-    expect(SHOP_DISCOUNT_PERCENT).toBe(15);
-    expect(resolveShopProductPrice(32)).toBe(32);
+  it('treats the catalogue price as MRP and applies five percent off', () => {
+    expect(SHOP_DISCOUNT_PERCENT).toBe(5);
+    expect(resolveShopProductPrice(32)).toBe(30.4);
   });
 
-  it('uses the placeholder selling price when missing', () => {
-    expect(resolveShopProductPrice(null)).toBe(DUMMY_MEDICINE_PRICE);
+  it('uses and discounts the placeholder MRP when missing', () => {
+    expect(resolveShopProductPrice(null)).toBe(46.55);
   });
 });
 
 describe('shop product MRP', () => {
-  it('derives MRP from the selling price and advertised discount', () => {
-    expect(resolveShopProductMrp(32)).toBe(37.65);
-    expect(formatShopProductMrp(32)).toBe('₹37.65');
+  it('uses the database catalogue price directly as MRP', () => {
+    expect(resolveShopProductMrp(32)).toBe(32);
+    expect(formatShopProductMrp(32)).toBe('₹32');
   });
 
-  it('derives a placeholder MRP when a price is missing', () => {
-    expect(resolveShopProductMrp(null)).toBe(57.65);
+  it('uses the placeholder value as MRP when a price is missing', () => {
+    expect(resolveShopProductMrp(null)).toBe(DUMMY_MEDICINE_PRICE);
   });
 });

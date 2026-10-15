@@ -1,6 +1,6 @@
 The bundled custom medicine reminder files are:
 
-`reminder.caf` (iOS) and `rec.wav` (Android)
+`rec.wav` (Android) and `reminder.caf` (iOS)
 
 Medicine reminders play the aggressively mastered ringtone from
 `finalstartingtone.mp3`, immediately followed by the complete original

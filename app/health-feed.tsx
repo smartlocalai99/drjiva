@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useVideoPlayer, VideoView, type VideoThumbnail } from 'expo-video';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
@@ -66,6 +66,7 @@ import {
   type HealthFeedPost,
   type HealthFeedPostRealtimeUpdate,
 } from '../src/lib/healthFeed';
+import { getHealthFeedMediaRenderMode } from '../src/lib/healthFeedMedia';
 import { getPatientByPhone } from '../src/lib/patients';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
 import {
@@ -330,9 +331,11 @@ export default function HealthFeedScreen() {
           data={viewerPosts}
           decelerationRate="fast"
           getItemLayout={(_, index) => ({ index, length: itemHeight, offset: itemHeight * index })}
+          initialNumToRender={1}
           initialScrollIndex={reelViewer.initialIndex}
           key={reelViewer.key}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={2}
           onViewableItemsChanged={onViewableItemsChanged}
           pagingEnabled
           refreshControl={<RefreshControl onRefresh={() => void loadPosts(true)} refreshing={refreshing} tintColor="#FFFFFF" />}
@@ -354,6 +357,7 @@ export default function HealthFeedScreen() {
           )}
           showsVerticalScrollIndicator={false}
           viewabilityConfig={viewabilityConfig}
+          windowSize={3}
         />
       ) : activeTab === 'forYou' && posts.length ? (
         <FlatList
@@ -361,7 +365,9 @@ export default function HealthFeedScreen() {
           data={posts}
           decelerationRate="fast"
           getItemLayout={(_, index) => ({ index, length: itemHeight, offset: itemHeight * index })}
+          initialNumToRender={1}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={2}
           onViewableItemsChanged={onViewableItemsChanged}
           pagingEnabled
           refreshControl={<RefreshControl onRefresh={() => void loadPosts(true)} refreshing={refreshing} tintColor="#FFFFFF" />}
@@ -383,6 +389,7 @@ export default function HealthFeedScreen() {
           )}
           showsVerticalScrollIndicator={false}
           viewabilityConfig={viewabilityConfig}
+          windowSize={3}
         />
       ) : activeTab === 'saved' ? (
         savedPosts.length ? (
@@ -473,6 +480,13 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
   const heartRotation = useSharedValue(0);
   const actionHeartScale = useSharedValue(1);
   const [userPaused, setUserPaused] = useState(false);
+  // Creating an Expo video player starts buffering immediately, so keep the
+  // player component unmounted until this full-screen card is actually visible.
+  const mediaRenderMode = getHealthFeedMediaRenderMode(
+    post.media_type,
+    'feed',
+    active,
+  );
   const lastTapRef = useRef(0);
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likeArrivalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -602,11 +616,13 @@ function FeedCard({ active, followed, height, liked, onComments, onDoubleLike, o
 
   return (
     <View style={[styles.feedCard, { height }]}>
-      {post.media_type === 'video' ? (
+      {mediaRenderMode === 'video' ? (
         <ErrorBoundary fallback={<View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />} onError={(videoError) => console.warn('Health feed video failed to render', videoError)}>
-          <FeedVideo active={active && !userPaused} uri={post.media_url} />
+          <FeedVideo active={!userPaused} uri={post.media_url} />
         </ErrorBoundary>
-      ) : <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />}
+      ) : mediaRenderMode === 'image' ? (
+        <Image accessibilityLabel={post.title} cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} transition={180} />
+      ) : <View style={[StyleSheet.absoluteFill, styles.mediaFallback]} />}
       <Pressable
         accessibilityHint={post.media_type === 'video' ? 'Single tap to pause or play. Double tap to like.' : 'Double tap to like this post.'}
         accessibilityLabel={post.title}
@@ -666,6 +682,12 @@ function ReelGrid({ contentTop, onOpen, posts }: { contentTop: number; onOpen: (
 }
 
 function ReelGridTile({ onPress, post }: { onPress: () => void; post: HealthFeedPost }) {
+  const mediaRenderMode = getHealthFeedMediaRenderMode(
+    post.media_type,
+    'grid',
+    true,
+  );
+
   return (
     <Pressable
       accessibilityHint="Opens this reel"
@@ -673,9 +695,13 @@ function ReelGridTile({ onPress, post }: { onPress: () => void; post: HealthFeed
       onPress={onPress}
       style={styles.gridTile}
     >
-      {post.media_type === 'image' ? (
+      {mediaRenderMode === 'image' ? (
         <Image cachePolicy="memory-disk" contentFit="cover" source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} />
-      ) : <VideoGridThumbnail uri={post.media_url} />}
+      ) : (
+        // A player-backed thumbnail can fetch every reel in the grid. A static
+        // tile keeps grid browsing network-free until the user opens a video.
+        <View style={[StyleSheet.absoluteFill, styles.gridVideoFallback]} />
+      )}
       <View pointerEvents="none" style={styles.gridTileShade} />
       {post.media_type === 'video' ? <Ionicons color="#FFFFFF" name="play" size={17} style={styles.gridPlayIcon} /> : null}
       <View style={styles.gridViewCount}>
@@ -684,33 +710,6 @@ function ReelGridTile({ onPress, post }: { onPress: () => void; post: HealthFeed
       </View>
     </Pressable>
   );
-}
-
-function VideoGridThumbnail({ uri }: { uri: string }) {
-  const [thumbnail, setThumbnail] = useState<VideoThumbnail | null>(null);
-  const player = useVideoPlayer({ uri, useCaching: true });
-
-  useEffect(() => {
-    if (process.env.EXPO_OS === 'web') return undefined;
-    let cancelled = false;
-    let requested = false;
-    const createThumbnail = () => {
-      if (requested || player.status !== 'readyToPlay') return;
-      requested = true;
-      void player.generateThumbnailsAsync(0.1, { maxHeight: 480, maxWidth: 320 })
-        .then(([result]) => { if (!cancelled && result) setThumbnail(result); })
-        .catch(() => undefined);
-    };
-    createThumbnail();
-    const subscription = player.addListener('statusChange', createThumbnail);
-    return () => { cancelled = true; subscription.remove(); };
-  }, [player]);
-
-  if (thumbnail) return <Image contentFit="cover" source={thumbnail} style={StyleSheet.absoluteFill} />;
-  if (process.env.EXPO_OS === 'web') {
-    return <VideoView contentFit="cover" nativeControls={false} player={player} style={StyleSheet.absoluteFill} />;
-  }
-  return <View style={[StyleSheet.absoluteFill, styles.gridVideoFallback]}><ActivityIndicator color="#FFFFFF" size="small" /></View>;
 }
 
 function FollowingDoctors({ onOpen, onRefresh, profiles, refreshing, topInset }: {

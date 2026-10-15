@@ -19,11 +19,21 @@ describe('app config medicine reminder sound', () => {
       'medicine-reminders-loud-v3',
     );
     expect(notificationsPlugin?.[1]?.sounds).toContain(
-      './assets/sounds/reminder.caf',
-    );
-    expect(notificationsPlugin?.[1]?.sounds).toContain(
       './assets/sounds/rec.wav',
     );
+    expect(notificationsPlugin?.[1]?.sounds).toContain(
+      './assets/sounds/reminder.caf',
+    );
+    expect(
+      notificationsPlugin?.[1]?.sounds.filter(
+        (sound) => sound === './assets/sounds/rec.wav',
+      ),
+    ).toHaveLength(1);
+    expect(
+      notificationsPlugin?.[1]?.sounds.filter(
+        (sound) => sound === './assets/sounds/reminder.caf',
+      ),
+    ).toHaveLength(1);
   });
 
   it('bundles the order success sound and exposes its channel settings', () => {

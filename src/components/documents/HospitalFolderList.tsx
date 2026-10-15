@@ -40,7 +40,7 @@ export function HospitalFolderList({
               size={64}
             />
             <View style={styles.logoBadge}>
-              <HospitalLogo size={32} />
+              <HospitalLogo hospitalName={group.hospitalName} size={32} />
             </View>
           </View>
           <Text numberOfLines={2} style={styles.name}>

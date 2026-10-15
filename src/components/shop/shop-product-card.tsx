@@ -15,6 +15,7 @@ import {
   SHOP_DISCOUNT_PERCENT,
 } from "../../lib/currency";
 import { getShopProductRating } from "../../lib/shop-product-rating";
+import { SHOP_DELIVERY_ETA_LABEL } from "../../lib/shop-delivery";
 import { HospitalLogo } from "../HospitalLogo";
 import { ProductQuantityControl } from "./product-quantity-control";
 
@@ -90,7 +91,9 @@ export function ShopProductCard({
                 />
               </View>
               <View style={styles.deliveryCopy}>
-                <Text style={styles.deliveryTitle}>Get it in 15 mins</Text>
+                <Text style={styles.deliveryTitle}>
+                  Get it in {SHOP_DELIVERY_ETA_LABEL}
+                </Text>
                 <Text style={styles.deliverySubtitle}>Fast delivery</Text>
               </View>
             </View>
