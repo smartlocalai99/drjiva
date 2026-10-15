@@ -2,7 +2,8 @@
 // All are free to use: public domain, CC0, CC BY or CC BY-SA. CC BY / BY-SA
 // need this credit. Fruit photos were cropped to one item and their
 // background removed; baby drawings were trimmed and lightly tinted; child
-// photos (Child Growth Chart) were cropped to one child, background removed.
+// photos (Child Growth Chart) were cropped to one child, background removed
+// (the 9-month black-and-white photo is warm-tinted).
 
 export type PhotoCredit = {
   key: string;
@@ -53,13 +54,13 @@ export const CARE_PHOTO_CREDITS: readonly PhotoCredit[] = [
   { key: 'sesame', name: 'Sesame seeds', title: 'Sa white sesame seeds', by: 'Sanjay ach', license: 'CC BY-SA 3.0', licenseUrl: 'http://creativecommons.org/licenses/by-sa/3.0/', source: 'https://commons.wikimedia.org/wiki/File:Sa_white_sesame_seeds.jpg' },
   { key: 'sweetpotato', name: 'Sweet potato', title: 'Ipomoea batatus-tuber-yercaud-salem-India', by: 'Yercaud-elango', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:Ipomoea_batatus-tuber-yercaud-salem-India.JPG' },
   { key: 'watermelon', name: 'Watermelon', title: 'Watermelon (Ekanuwa)', by: 'Lituleni', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:Watermelon_(Ekanuwa).jpg' },
-  { key: 'child-newborn', name: 'Child: birth', title: 'Newborn baby sleeps in a basket', by: 'Elizabeth', license: 'CC0', licenseUrl: 'http://creativecommons.org/publicdomain/zero/1.0/deed.en', source: 'https://commons.wikimedia.org/wiki/File:Newborn_baby_sleeps_in_a_basket.jpg' },
-  { key: 'child-smile', name: 'Child: 6–10 weeks', title: 'Smiling baby lying on towel', by: 'Moinul548', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:Smiling_baby_lying_on_towel.jpg' },
-  { key: 'child-headup', name: 'Child: 14 weeks', title: 'Baby, Four months old baby girl, Moscow, Russia', by: 'Vyacheslav Argenberg', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0', source: 'https://commons.wikimedia.org/wiki/File:Baby,_Four_months_old_baby_girl,_Moscow,_Russia.jpg' },
+  { key: 'child-newborn', name: 'Child: birth', title: 'Newborn Kerala baby', by: 'Kottakkalnet', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:Newborn_Kerala_baby.jpg' },
+  { key: 'child-smile', name: 'Child: 6–10 weeks', title: 'Baby, Tamil Nadu465', by: 'தகவலுழவன்', license: 'CC BY-SA 3.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0', source: 'https://commons.wikimedia.org/wiki/File:Baby,_Tamil_Nadu465.jpg' },
+  { key: 'child-headup', name: 'Child: 14 weeks', title: 'Top of the world (6838057196)', by: 'Subharnab Majumdar from Bangalore, India', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', source: 'https://commons.wikimedia.org/wiki/File:Top_of_the_world_(6838057196).jpg' },
   { key: 'child-sit', name: 'Child: 6–7 months', title: 'Baby Photoshoot in Bangalore', by: 'Avyuktaphotography', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:Baby_Photoshoot_in_Bangalore.jpg' },
-  { key: 'child-crawl', name: 'Child: 9 months', title: '9 Monate altes Baby - Krabbelalter', by: 'תהלה הרץ', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:9_Monate_altes_Baby_-_Krabbelalter.jpg' },
-  { key: 'child-stand', name: 'Child: 12 months', title: 'SAKIKO pulls to stand. (30619853102)', by: 'MIKI Yoshihito from Sapporo City,Hokkaido., JAPAN', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', source: 'https://commons.wikimedia.org/wiki/File:SAKIKO_pulls_to_stand._(30619853102).jpg' },
-  { key: 'child-walk', name: 'Child: 15–18 months', title: 'Spring Toddler (51211515561)', by: 'Reba Spike', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', source: 'https://commons.wikimedia.org/wiki/File:Spring_Toddler_(51211515561).jpg' },
-  { key: 'child-run', name: 'Child: 4 years', title: 'Lacandon little girl running in the grass at Bonampak', by: 'Bernard DUPONT', license: 'CC BY-SA 2.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0', source: 'https://commons.wikimedia.org/wiki/File:Lacandon_little_girl_running_in_the_grass_at_Bonampak.jpg' },
+  { key: 'child-crawl', name: 'Child: 9 months', title: 'Crawling ... (8218298892)', by: 'Subharnab Majumdar from Bangalore, India', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', source: 'https://commons.wikimedia.org/wiki/File:Crawling_..._(8218298892).jpg' },
+  { key: 'child-stand', name: 'Child: 12 months', title: 'First step of baby', by: 'Saloni bhargava', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:First_step_of_baby.jpg' },
+  { key: 'child-walk', name: 'Child: 15–18 months', title: 'Posing for dad! (10505333885)', by: 'Subharnab Majumdar from Bangalore, India', license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0', source: 'https://commons.wikimedia.org/wiki/File:Posing_for_dad!_(10505333885).jpg' },
+  { key: 'child-run', name: 'Child: 4 years', title: 'Indian Twins', by: 'Perumalnadar', license: 'CC0', licenseUrl: 'http://creativecommons.org/publicdomain/zero/1.0/deed.en', source: 'https://commons.wikimedia.org/wiki/File:Indian_Twins.jpg' },
   { key: 'child-school', name: 'Child: 10 years', title: 'School boy in the Dharavi Slum', by: 'HansenHimself', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0', source: 'https://commons.wikimedia.org/wiki/File:School_boy_in_the_Dharavi_Slum.jpg' },
 ];
