@@ -51,9 +51,10 @@ export const CARE_CHILD_REMINDER_IDS = Array.from({ length: CHILD_REMINDER_SLOTS
 
 export type ChildReminder = { at: Date; title: string; body: string; planId: string };
 
-const nineAm = (date: string) => {
+// Phone-local time on a 'YYYY-MM-DD' date.
+const at = (date: string, hour: number) => {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  return new Date(y, m - 1, d, 9, 0, 0, 0);
+  return new Date(y, m - 1, d, hour, 0, 0, 0);
 };
 
 export function childReminders(care: MyCare, language: AppLanguage, now: Date): ChildReminder[] {
@@ -70,9 +71,9 @@ export function childReminders(care: MyCare, language: AppLanguage, now: Date): 
     const name = childDisplayName(plan.personName, careText(language, 'childNoName'));
     const hospital = plan.hospitalName;
 
-    const add = (date: string, titleKey: CareCopyKey, body: string) => {
-      const at = nineAm(date);
-      if (at.getTime() > now.getTime()) out.push({ at, body, planId: plan.id, title: careText(language, titleKey, { name }) });
+    const add = (date: string, titleKey: CareCopyKey, body: string, hour = 8) => {
+      const when = at(date, hour);
+      if (when.getTime() > now.getTime()) out.push({ at: when, body, planId: plan.id, title: careText(language, titleKey, { name }) });
     };
 
     for (const visit of auto ? [auto] : []) {
@@ -86,7 +87,7 @@ export function childReminders(care: MyCare, language: AppLanguage, now: Date): 
       add(addDaysIso(visit.dueDate, -3), 'vaxReminder3Title', body);
       // The hospital visit reminder already covers the day before and the day.
       if (visit.dueDate !== followupDate) {
-        add(addDaysIso(visit.dueDate, -1), 'vaxReminder1Title', body);
+        add(addDaysIso(visit.dueDate, -1), 'vaxReminder1Title', body, 20);
         add(visit.dueDate, 'vaxReminder0Title', body);
       }
       add(addDaysIso(visit.dueDate, 7), 'vaxOverdueTitle', careText(language, 'vaxOverdueBody', { age, date: careDate(language, visit.dueDate), hospital }));
@@ -127,7 +128,7 @@ type Notifications = NonNullable<Awaited<ReturnType<typeof loadExpoNotifications
 // Phone-local times for a follow-up date 'YYYY-MM-DD'; null if already past.
 export function followupReminderTimes(nextDate: string, now: Date): { day: Date | null; eve: Date | null } {
   const [y, m, d] = nextDate.split('-').map(Number) as [number, number, number];
-  const eve = new Date(y, m - 1, d - 1, 18, 0, 0, 0);
+  const eve = new Date(y, m - 1, d - 1, 20, 0, 0, 0);
   const day = new Date(y, m - 1, d, 8, 0, 0, 0);
   return {
     day: day.getTime() > now.getTime() ? day : null,
@@ -198,9 +199,12 @@ export async function syncCareReminders(
   ]);
 
   const now = new Date();
-  const schedule = (identifier: string, date: Date, title: string, body: string, data: Record<string, string | undefined>) =>
+  // badge: the number on the app icon (1 the night before, 2 on the day);
+  // opening My Care clears it.
+  const schedule = (identifier: string, date: Date, title: string, body: string, data: Record<string, string | undefined>, badge = 1) =>
     notifications.scheduleNotificationAsync({
       content: {
+        badge,
         body,
         data,
         sound: 'default',
@@ -221,7 +225,7 @@ export async function syncCareReminders(
     const body = careText(language, 'cycleReminderBody', { hospital: group.hospital, n: group.day });
     const data = { date: group.date, type: 'care_cycle' };
     if (times.eve) await schedule(ids.eve, times.eve, careText(language, 'cycleReminderEveTitle', { steps: group.steps }), body, data);
-    if (times.day) await schedule(ids.day, times.day, careText(language, 'cycleReminderDayTitle', { steps: group.steps }), body, data);
+    if (times.day) await schedule(ids.day, times.day, careText(language, 'cycleReminderDayTitle', { steps: group.steps }), body, data, 2);
   }
 
   for (const [index, reminder] of vaccines.entries()) {
@@ -239,6 +243,24 @@ export async function syncCareReminders(
     await schedule(CARE_REMINDER_IDS.eve, eve, careText(language, 'reminderEveTitle'), careText(language, 'reminderEveBody', { hospital }), data);
   }
   if (day) {
-    await schedule(CARE_REMINDER_IDS.day, day, careText(language, 'reminderDayTitle'), careText(language, 'reminderDayBody', { hospital }), data);
+    await schedule(CARE_REMINDER_IDS.day, day, careText(language, 'reminderDayTitle'), careText(language, 'reminderDayBody', { hospital }), data, 2);
   }
+}
+
+const CARE_NOTIFICATION_TYPES = new Set(['care_followup', 'care_cycle', 'care_child_vaccine']);
+
+// The patient opened My Care: clear the number on the app icon, remove the
+// visit reminders already shown, and tell the server (push badge count).
+export async function clearCareReminderBadge(): Promise<void> {
+  const notifications = await loadExpoNotifications();
+  if (notifications) {
+    await notifications.setBadgeCountAsync(0).catch(() => false);
+    const shown = await notifications.getPresentedNotificationsAsync().catch(() => []);
+    await Promise.allSettled(
+      shown
+        .filter((item) => CARE_NOTIFICATION_TYPES.has(String(item.request.content.data?.type ?? '')))
+        .map((item) => notifications.dismissNotificationAsync(item.request.identifier)),
+    );
+  }
+  await supabase.rpc('care_mark_reminders_seen');
 }

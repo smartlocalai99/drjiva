@@ -18,7 +18,7 @@ import { fetchMyCare, readCachedMyCare, type CareExtraItem, type MyCare } from '
 import { useCareCopy } from '../src/lib/careCopy';
 import { cycleNextVisit, type CareCycle } from '../src/lib/careCycle';
 import { childDisplayName } from '../src/lib/childGrowth';
-import { syncCareReminders } from '../src/lib/careReminders';
+import { clearCareReminderBadge, syncCareReminders } from '../src/lib/careReminders';
 import { dialableIndianPhone, visitForDate, type CarePlan } from '../src/lib/careSchedule';
 import { getTabRoute } from '../src/lib/dashboardNav';
 import { normalizeRoutePhone } from '../src/lib/routePhone';
@@ -69,6 +69,8 @@ export default function MyCareScreen() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      // Seen: the visit reminder number on the app icon goes away.
+      void clearCareReminderBadge().catch(() => undefined);
       void (async () => {
         if (!hasCare.current && phone) {
           const cached = await readCachedMyCare(phone);

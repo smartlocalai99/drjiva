@@ -10,20 +10,20 @@ const { CARE_CHILD_REMINDER_IDS, CARE_CYCLE_REMINDER_IDS, CARE_REMINDER_IDS, CHI
   await import('./careReminders');
 
 describe('follow-up reminder times', () => {
-  it('fires at 6 PM the day before and 8 AM on the day (phone time)', () => {
+  it('fires at 8 PM the day before and 8 AM on the day (phone time)', () => {
     const { day, eve } = followupReminderTimes('2026-10-20', new Date(2026, 9, 13, 10, 0));
-    expect(eve).toEqual(new Date(2026, 9, 19, 18, 0, 0, 0));
+    expect(eve).toEqual(new Date(2026, 9, 19, 20, 0, 0, 0));
     expect(day).toEqual(new Date(2026, 9, 20, 8, 0, 0, 0));
   });
 
   it('skips a reminder whose time has passed', () => {
-    const { day, eve } = followupReminderTimes('2026-10-20', new Date(2026, 9, 19, 19, 0));
+    const { day, eve } = followupReminderTimes('2026-10-20', new Date(2026, 9, 19, 21, 0));
     expect(eve).toBeNull();
     expect(day).toEqual(new Date(2026, 9, 20, 8, 0, 0, 0));
   });
 
   it('works across a month boundary', () => {
-    expect(followupReminderTimes('2026-11-01', new Date(2026, 9, 13)).eve).toEqual(new Date(2026, 9, 31, 18, 0, 0, 0));
+    expect(followupReminderTimes('2026-11-01', new Date(2026, 9, 13)).eve).toEqual(new Date(2026, 9, 31, 20, 0, 0, 0));
   });
 
   it('uses its own IDs, never the medicine reminder ones', () => {
@@ -87,16 +87,16 @@ describe('child vaccine reminders', () => {
   const now = new Date(2026, 9, 15, 10, 0);
   const at = (list: { at: Date }[]) => list.map((r) => `${r.at.getMonth() + 1}/${r.at.getDate()} ${r.at.getHours()}:00`);
 
-  it('reminds 3 days before, 1 day before, on the day and once overdue, at 9 AM', () => {
+  it('reminds 3 days before (8 AM), the night before (8 PM), on the day (8 AM) and once overdue', () => {
     const list = childReminders(care(), 'en', now);
-    expect(at(list)).toEqual(['10/17 9:00', '10/19 9:00', '10/20 9:00', '10/27 9:00']);
+    expect(at(list)).toEqual(['10/17 8:00', '10/19 20:00', '10/20 8:00', '10/27 8:00']);
     expect(list[0]).toMatchObject({ body: '6w visit at Dhruva Hospitals: DHRUVA_CHILD_DTP_1', title: 'Arjun: vaccines in 3 days' });
     expect(list[3]!.title).toBe('Arjun: vaccines are overdue');
   });
 
   it('leaves the day before and the day to the hospital visit reminder on the same date', () => {
     const list = childReminders(care({ followup: { nextDate: '2026-10-20' } }), 'en', now);
-    expect(at(list)).toEqual(['10/17 9:00', '10/27 9:00']);
+    expect(at(list)).toEqual(['10/17 8:00', '10/27 8:00']);
   });
 
   it('reminds only about the next open visit, never optional vaccines', () => {
