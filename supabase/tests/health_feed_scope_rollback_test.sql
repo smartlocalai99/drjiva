@@ -45,8 +45,8 @@ reset role;
 select set_config('request.jwt.claims', json_build_object('sub', current_setting('test.other_phone'), 'role', 'authenticated')::text, true);
 set local role authenticated;
 insert into t_results (name, ok, detail)
-select 'other patient sees every doctor',
-  count(distinct hp.doctor_phone) >= 2 and public.health_feed_doctor_scope() is null,
+select 'other patient sees every doctor not hidden from the feed (Dr. Ritish Reddy hidden for now)',
+  count(*) > 0 and public.health_feed_doctor_scope() is null and not bool_or(d.hide_from_feed) and bool_and(d.display_name = 'Dr. Mounika'),
   string_agg(distinct d.display_name, ', ')
 from public.health_feed_posts() hp join public.doctors d on d.phone_number = hp.doctor_phone
 where hp.status = 'published';
