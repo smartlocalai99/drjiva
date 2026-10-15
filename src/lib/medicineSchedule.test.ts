@@ -48,6 +48,15 @@ const validInput = {
 };
 
 describe('medicine course validation', () => {
+  it('requires one selected reminder time for weekly medicines', () => {
+    expect(validateMedicineCourseInput({ ...validInput, dayPattern: 'weekly' })).toBeNull();
+    expect(validateMedicineCourseInput({
+      ...validInput, dayPattern: 'weekly', slots: ['morning', 'night'],
+    })).toBe('weeklySingleTime');
+    expect(validateMedicineCourseInput({
+      ...validInput, dayPattern: 'daily', slots: ['morning', 'night'],
+    })).toBeNull();
+  });
   it('requires catalogue and schedule selections', () => {
     expect(validateMedicineCourseInput({ ...validInput, hospitalId: '' })).toBe(
       'missingHospital',
@@ -114,6 +123,23 @@ describe('replaceEventSlotTime', () => {
 });
 
 describe('generateCourseDates', () => {
+  it('repeats weekly from the start date across months and years', () => {
+    expect(generateCourseDates('2026-10-15', 28, 'weekly')).toEqual([
+      '2026-10-15', '2026-10-22', '2026-10-29', '2026-11-05',
+    ]);
+    expect(generateCourseDates('2026-12-28', 15, 'weekly')).toEqual([
+      '2026-12-28', '2027-01-04', '2027-01-11',
+    ]);
+    expect(generateCourseDates('2028-02-24', 15, 'weekly')).toEqual([
+      '2028-02-24', '2028-03-02', '2028-03-09',
+    ]);
+  });
+
+  it('does not add a weekly dose beyond the course end', () => {
+    expect(generateCourseDates('2026-10-15', 7, 'weekly')).toEqual(['2026-10-15']);
+    expect(generateCourseDates('2026-10-15', 8, 'weekly')).toEqual(['2026-10-15', '2026-10-22']);
+    expect(generateCourseDates('2026-10-15', 365, 'weekly')).toHaveLength(53);
+  });
   it('generates daily and alternate dates within the duration span', () => {
     expect(generateCourseDates('2026-07-28', 5, 'daily')).toEqual([
       '2026-07-28',
@@ -131,6 +157,17 @@ describe('generateCourseDates', () => {
 });
 
 describe('expandDoseEvents', () => {
+  it('creates only one weekly event at the chosen local time', () => {
+    const events = expandDoseEvents({
+      dayPattern: 'weekly', durationDays: 28, startDate: '2026-10-15',
+      slots: ['night'], slotTimes: { night: '21:30' },
+    });
+    expect(events).toHaveLength(4);
+    expect(events.map(event => {
+      const date = new Date(event.scheduledFor);
+      return [date.getDay(), date.getHours(), date.getMinutes(), event.slot];
+    })).toEqual(Array.from({ length: 4 }, () => [4, 21, 30, 'night']));
+  });
   it('keeps a different saved time for each selected period', () => {
     const events = expandDoseEvents({
       dayPattern: 'alternate',

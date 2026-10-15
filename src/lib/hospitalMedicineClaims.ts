@@ -1,6 +1,6 @@
 import { getNotificationSettings } from './medicineCourses';
 import { syncPatientDoseNotifications } from './medicineNotificationSync';
-import { expandDoseEvents } from './medicineSchedule';
+import { expandDoseEvents, type DayPattern } from './medicineSchedule';
 import { ensureSecureReportSession } from './reportAuth';
 import { supabase } from './supabase';
 
@@ -24,7 +24,7 @@ type ClaimedCourseRow = {
   tablets_per_dose: number;
   start_date: string;
   duration_days: number;
-  day_pattern: 'daily' | 'alternate';
+  day_pattern: DayPattern;
   slots: Array<'morning' | 'afternoon' | 'night'>;
 };
 

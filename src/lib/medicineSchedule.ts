@@ -1,11 +1,12 @@
 export type DoseSlot = 'morning' | 'afternoon' | 'night';
-export type DayPattern = 'daily' | 'alternate';
+export type DayPattern = 'daily' | 'alternate' | 'weekly';
 export type FiniteCourseDays = number;
 export type CourseDuration =
   | { days: FiniteCourseDays; mode: 'finite' }
   | { mode: 'ongoing' };
 
 export type MedicineCourseInput = {
+  dayPattern?: DayPattern;
   durationDays: number;
   hospitalId: string;
   medicineId: string;
@@ -77,6 +78,9 @@ export function validateMedicineCourseInput(
   if (!input.hospitalId.trim()) return 'missingHospital';
   if (!input.medicineId.trim()) return 'missingMedicine';
   if (input.slots.length === 0) return 'missingSlot';
+  if (input.dayPattern === 'weekly' && input.slots.length !== 1) {
+    return 'weeklySingleTime';
+  }
   if (
     input.tabletsPerDose < MIN_TABLETS_PER_DOSE ||
     input.tabletsPerDose > MAX_TABLETS_PER_DOSE ||
@@ -100,7 +104,7 @@ export function generateCourseDates(
   pattern: DayPattern,
 ): string[] {
   const start = parseCalendarDate(startDate);
-  const step = pattern === 'alternate' ? 2 : 1;
+  const step = pattern === 'weekly' ? 7 : pattern === 'alternate' ? 2 : 1;
   const dates: string[] = [];
   for (let offset = 0; offset < durationDays; offset += step) {
     const date = new Date(start);

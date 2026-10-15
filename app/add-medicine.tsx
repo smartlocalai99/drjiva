@@ -318,6 +318,7 @@ export default function AddMedicineScreen() {
       const validation =
         !details ||
         validateMedicineCourseInput({
+          dayPattern: duration.mode === 'ongoing' ? 'daily' : pattern,
           durationDays: duration.mode === 'finite' ? duration.days : 1,
           hospitalId: workflow.hospitalId || customHospitalName,
           medicineId: medicine.id,
@@ -327,7 +328,9 @@ export default function AddMedicineScreen() {
       if (validation) {
         Alert.alert(
           medicine.name,
-          'Enter a valid quantity and choose at least one reminder period.',
+          validation === 'weeklySingleTime'
+            ? t('weeklySingleTime')
+            : 'Enter a valid quantity and choose at least one reminder period.',
         );
         return;
       }
@@ -466,6 +469,7 @@ export default function AddMedicineScreen() {
       if (
         !details ||
         validateMedicineCourseInput({
+          dayPattern: duration.mode === 'ongoing' ? 'daily' : pattern,
           durationDays: duration.mode === 'finite' ? duration.days : 1,
           hospitalId: workflow.hospitalId || customHospitalName,
           medicineId: medicine.id,
@@ -816,7 +820,7 @@ export default function AddMedicineScreen() {
                                 medicine.id,
                                 (current) => ({
                                   ...current,
-                                  slots: SLOT_KEYS.filter((item) =>
+                                  slots: pattern === 'weekly' ? [slot] : SLOT_KEYS.filter((item) =>
                                     item === slot
                                       ? !current.slots.includes(slot)
                                       : current.slots.includes(item),
@@ -865,7 +869,23 @@ export default function AddMedicineScreen() {
                       label={t('alternateDays')}
                       onPress={() => setPattern('alternate')}
                     />
+                    <Chip
+                      active={pattern === 'weekly'}
+                      label={t('weekly')}
+                      onPress={() => {
+                        setPattern('weekly');
+                        setMedicineDetails((current) => Object.fromEntries(
+                          Object.entries(current).map(([id, details]) => [
+                            id,
+                            { ...details, slots: [details.slots[0] ?? 'morning'] },
+                          ]),
+                        ));
+                      }}
+                    />
                   </View>
+                  {pattern === 'weekly' ? (
+                    <Text style={styles.courseRange}>{t('weeklyHint')}</Text>
+                  ) : null}
                 </>
               ) : null}
               <Primary
@@ -951,7 +971,7 @@ export default function AddMedicineScreen() {
                   : `${t('courseStarts')}: ${courseStartLabel} · ${t('courseEnds')}: ${courseEndLabel}`}
               </Text>
               <Text style={styles.summary}>
-                {pattern === 'daily' ? t('everyDay') : t('alternateDays')}
+                {pattern === 'weekly' ? t('weeklyHint') : pattern === 'daily' ? t('everyDay') : t('alternateDays')}
               </Text>
               <Primary
                 busy={busy}
