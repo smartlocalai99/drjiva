@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { dashboardColors } from '../../dashboardTheme';
 import type { CareExtraItem, CareFollowup } from '../../lib/care';
 import { useCareCopy } from '../../lib/careCopy';
-import { daysUntil, dialableIndianPhone, type CareVisit } from '../../lib/careSchedule';
+import { daysUntil, dialableIndianPhone, pendingVisitItems, type CareVisit } from '../../lib/careSchedule';
 import { HospitalLogo } from '../HospitalLogo';
 import { CallButton } from './CallButton';
 import { DoctorPhoto } from './DoctorPhoto';
@@ -44,7 +44,7 @@ export function FollowUpCard({
   const days = daysUntil(followup.nextDate, today);
   const when = days <= 0 ? c('today') : days === 1 ? c('tomorrow') : c('inDays', { n: days });
   const phone = dialableIndianPhone(followup.hospital.phone);
-  const visitItems = visit?.items.filter((item) => !item.conditional && !item.optional).slice(0, chips ? undefined : 4) ?? [];
+  const visitItems = visit ? pendingVisitItems(visit) : [];
   // Tests the nurse added from the case sheet for this visit.
   const extras = extraItems.filter((item) => item.dueDate === followup.nextDate && item.hospitalId === followup.hospital.id);
 
@@ -75,7 +75,7 @@ export function FollowUpCard({
       {(visitItems.length > 0 && visit) || extras.length > 0 ? (
         <View style={styles.block}>
           <Text style={styles.blockTitle}>
-            {visitItems.length > 0 && visit ? `${c('atThisVisit')} · ${pick(visit.titleEn, visit.titleTe)}` : c('atThisVisit')}
+            {c('atThisVisit')}
           </Text>
           {chips ? (
             <View style={styles.chips}>

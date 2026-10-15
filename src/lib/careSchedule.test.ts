@@ -7,6 +7,7 @@ import {
   dialableIndianPhone,
   itemState,
   pregnancyWeek,
+  pendingVisitItems,
   timeline,
   trimester,
   visitForDate,
@@ -137,6 +138,40 @@ describe('visit for a follow-up date', () => {
 
   it('falls back to the next visit starting after the date', () => {
     expect(visitForDate(plan, addDaysIso(lmp, 14 * 7 + 1))?.code).toBe('preg_w16');
+  });
+
+  it('shows only TD second dose at a booked visit after NT and double marker were completed', () => {
+    const nt = { ...visit('NT scan', { fromDate: '2026-08-24', toDate: '2026-09-13' }, [
+      { labelEn: 'NT scan', status: 'done', doneOn: '2026-10-14' },
+      { labelEn: 'Double marker', status: 'done', doneOn: '2026-10-14' },
+      { labelEn: 'TD second dose' },
+    ]), plannedDate: '2026-11-04' };
+    const tiffa = visit('TIFFA', { fromDate: '2026-10-26', toDate: '2026-11-22' }, [{ status: 'done' }]);
+    const result = visitForDate({ visits: [nt, tiffa] }, '2026-11-04');
+    expect(result?.id).toBe(nt.id);
+    expect(result?.items.map((item) => item.labelEn)).toEqual(['TD second dose']);
+    expect(nt.items[0]?.doneOn).toBe('2026-10-14');
+  });
+
+  it('does not replace a fully completed booked visit with unrelated schedule tests', () => {
+    const booked = { ...plan.visits[0]!, plannedDate: TODAY, items: plan.visits[0]!.items.map((item) => ({ ...item, status: 'done' as const })) };
+    expect(visitForDate({ visits: [booked, plan.visits[1]!] }, TODAY)).toBeNull();
+  });
+
+  it('combines unfinished items from visits booked on the same day', () => {
+    const visits = plan.visits.map((v) => ({ ...v, plannedDate: TODAY }));
+    expect(visitForDate({ visits }, TODAY)?.items).toHaveLength(2);
+  });
+
+  it('does not use a template window for a visit explicitly booked on another date', () => {
+    expect(visitForDate({ visits: [{ ...plan.visits[0]!, plannedDate: '2026-12-01' }] }, addDaysIso(lmp, 12 * 7))).toBeNull();
+  });
+
+  it('hides done, not-needed, optional and conditional items without truncating pending tests', () => {
+    const v = visit('Tests', { fromDate: TODAY, toDate: TODAY }, [
+      { status: 'done' }, { status: 'not_needed' }, { conditional: true }, { optional: true }, {}, {}, {}, {}, {},
+    ]);
+    expect(pendingVisitItems(v)).toHaveLength(5);
   });
 });
 

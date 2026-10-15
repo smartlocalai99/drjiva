@@ -22,6 +22,8 @@ export type CareItem = {
 
 export type CareVisit = {
   id: string;
+  /** Appointment explicitly booked by the nurse; independent of the template window. */
+  plannedDate?: string | null;
   code: string;
   titleEn: string;
   titleTe: string;
@@ -134,10 +136,19 @@ export function currentVisit(plan: Pick<CarePlan, 'visits'>, today: string): Car
   );
 }
 
-// What happens at a follow-up on this date: the visit whose window
-// contains it, else the next visit starting after it.
+export function pendingVisitItems(visit: Pick<CareVisit, 'items'>): CareItem[] {
+  return visit.items.filter((item) => !item.status && !item.conditional && !item.optional);
+}
+
+// A booked appointment wins over the pregnancy/child schedule. Completed
+// and not-needed items never reappear as work for the next appointment.
 export function visitForDate(plan: Pick<CarePlan, 'visits'>, date: string): CareVisit | null {
-  const sorted = sortVisits(plan.visits);
+  const booked = plan.visits.filter((visit) => visit.plannedDate === date);
+  if (booked.length) {
+    const items = booked.flatMap(pendingVisitItems);
+    return items.length ? { ...booked[0]!, items } : null;
+  }
+  const sorted = sortVisits(plan.visits).filter((visit) => !visit.plannedDate && pendingVisitItems(visit).length);
   return (
     sorted.find((visit) => visit.fromDate <= date && date <= visit.toDate) ??
     sorted.find((visit) => visit.fromDate > date) ??
