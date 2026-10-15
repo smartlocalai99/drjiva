@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getIdentityInitials,
+  resolvePatientMedicinePhotoIdentity,
   resolveDoctorIdentity,
   resolveHospitalBrand,
 } from './brandIdentity';
@@ -49,6 +50,35 @@ describe('resolveDoctorIdentity', () => {
     expect(resolveDoctorIdentity('Care team', 'SHANKAR GASTRO HOSPITAL')).toBeNull();
     expect(
       resolveDoctorIdentity('Dr. Anjali Rao', 'ASIAN MULTI SPECIALITY HOSPITALS'),
+    ).toBeNull();
+  });
+});
+
+describe('resolvePatientMedicinePhotoIdentity', () => {
+  it('uses Mounika for Bhavana’s Dhruva medicine with the Sudarshan fallback', () => {
+    expect(
+      resolvePatientMedicinePhotoIdentity(
+        'Bhavana',
+        null,
+        'Dhruva Hospitals',
+      ),
+    ).toBe('mounika');
+  });
+
+  it('does not change other patients or hospitals', () => {
+    expect(
+      resolvePatientMedicinePhotoIdentity(
+        'Bhavana',
+        'Dr. Mounika',
+        'Dhruva Hospitals',
+      ),
+    ).toBeNull();
+    expect(
+      resolvePatientMedicinePhotoIdentity(
+        'Anitha',
+        null,
+        'Dhruva Hospitals',
+      ),
     ).toBeNull();
   });
 });

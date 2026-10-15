@@ -32,11 +32,13 @@ const MEDICINE_PLACEHOLDER = require('../../../assets/notabs.png');
 type MedicineCardProps = {
   medicine: Medicine;
   index: number;
+  patientName?: string;
 };
 
 export function MedicineCard({
   medicine,
   index,
+  patientName,
 }: MedicineCardProps) {
   const scale = useSharedValue(1);
   const wasCompleted = useRef(medicine.completed);
@@ -152,6 +154,7 @@ export function MedicineCard({
           <DoctorAvatar
             doctorName={medicine.doctorName}
             hospitalName={medicine.hospitalName}
+            patientName={patientName}
             roundedSquare
             size={72}
           />

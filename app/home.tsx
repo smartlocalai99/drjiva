@@ -516,6 +516,7 @@ export default function HomeScreen() {
               index={index}
               key={medicine.id}
               medicine={medicine}
+              patientName={visiblePatientName}
             />
           ))
         )}

@@ -52,6 +52,7 @@ export default function RemindersScreen() {
   const phone = (phoneParam ?? '').replace(/\D/g, '').slice(-10);
 
   const [patientId, setPatientId] = useState<string>();
+  const [patientName, setPatientName] = useState<string>();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const [markedDateSet, setMarkedDateSet] = useState<Set<string>>(new Set());
@@ -69,6 +70,7 @@ export default function RemindersScreen() {
           throw new Error('Patient unavailable');
         }
         setPatientId(patient.patientId);
+        setPatientName(patient.name);
         setMedicines(
           await fetchMedicinesForDate(patient.patientId, date),
         );
@@ -250,6 +252,7 @@ export default function RemindersScreen() {
                 key={medicine.id}
                 medicine={medicine}
                 onDelete={() => confirmDelete(medicine)}
+                patientName={patientName}
               />
             ))}
           </View>
@@ -264,11 +267,13 @@ function ReminderCard({
   index,
   medicine,
   onDelete,
+  patientName,
 }: {
   deleting: boolean;
   index: number;
   medicine: Medicine;
   onDelete: () => void;
+  patientName?: string;
 }) {
   const slotTheme = DOSE_SLOT_THEME[medicine.slot];
   const courseDuration =
@@ -378,6 +383,7 @@ function ReminderCard({
         <DoctorAvatar
           doctorName={medicine.doctorName}
           hospitalName={medicine.hospitalName}
+          patientName={patientName}
           size={48}
         />
       </View>

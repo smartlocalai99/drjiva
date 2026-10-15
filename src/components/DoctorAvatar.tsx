@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import {
   getIdentityInitials,
+  resolvePatientMedicinePhotoIdentity,
   resolveDoctorIdentity,
   type DoctorIdentity,
 } from '../lib/brandIdentity';
@@ -18,17 +19,21 @@ const DOCTOR_PHOTOS: Record<DoctorIdentity, ReturnType<typeof require>> = {
 export function DoctorAvatar({
   doctorName,
   hospitalName,
+  patientName,
   photoUrl,
   roundedSquare = false,
   size = 20,
 }: {
   doctorName?: string | null;
   hospitalName?: string | null;
+  patientName?: string | null;
   photoUrl?: string | null;
   roundedSquare?: boolean;
   size?: number;
 }) {
-  const identity = resolveDoctorIdentity(doctorName, hospitalName);
+  const identity =
+    resolvePatientMedicinePhotoIdentity(patientName, doctorName, hospitalName) ??
+    resolveDoctorIdentity(doctorName, hospitalName);
   const fallbackDoctorName =
     doctorName?.trim().toLocaleLowerCase() === 'care team' ? null : doctorName;
   const remotePhotoUrl = photoUrl?.trim() || null;

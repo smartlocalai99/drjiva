@@ -51,6 +51,21 @@ export function resolveDoctorIdentity(
   return null;
 }
 
+export function resolvePatientMedicinePhotoIdentity(
+  patientName?: string | null,
+  doctorName?: string | null,
+  hospitalName?: string | null,
+): DoctorIdentity | null {
+  if (
+    normalizeIdentity(patientName) === 'bhavana' &&
+    resolveHospitalBrand(hospitalName) === 'dhruva' &&
+    resolveDoctorIdentity(doctorName, hospitalName) === 'sudarshan'
+  ) {
+    return 'mounika';
+  }
+  return null;
+}
+
 export function getIdentityInitials(
   value?: string | null,
   fallback = '?',
