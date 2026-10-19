@@ -27,7 +27,7 @@ vi.mock('./expoNotifications', () => ({
 import {
   findScheduledDoseNotificationIds,
   groupDoseNotificationRequests,
-  MAX_MEDICINE_ALERTS_IOS,
+  MIN_MEDICINE_ALERTS_IOS,
   scheduleDoseNotifications,
   scheduleDoseNotificationsWithAdapter,
   scheduleGroupedDoseNotifications,
@@ -286,6 +286,7 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     requireExpoNotifications.mockResolvedValue({
       SchedulableTriggerInputTypes: { DATE: 'date' },
       cancelScheduledNotificationAsync: async () => undefined,
+      getAllScheduledNotificationsAsync: async () => [],
       scheduleNotificationAsync: async (request: unknown) => {
         scheduledRequests.push(request);
         return 'combined-alert';
@@ -336,12 +337,15 @@ describe('phone alert limits and the app-open check', () => {
     slotKey: 'morning' as const,
     tablets: 1,
   });
-  const fakeNotifications = (requests: unknown[]) => ({
+  const fakeNotifications = (requests: unknown[], waitingOthers = 0) => ({
     AndroidAudioContentType: { SPEECH: 1 },
     AndroidAudioUsage: { ALARM: 4 },
     AndroidImportance: { MAX: 5 },
     SchedulableTriggerInputTypes: { DATE: 'date' },
     cancelScheduledNotificationAsync: async () => undefined,
+    // Visit / vaccine reminders already waiting on the phone.
+    getAllScheduledNotificationsAsync: async () =>
+      Array.from({ length: waitingOthers }, (_, i) => ({ content: { data: { type: 'care_followup' } }, identifier: `visit-${i}` })),
     scheduleNotificationAsync: async (request: unknown) => {
       requests.push(request);
       return `alert-${requests.length}`;
@@ -353,15 +357,35 @@ describe('phone alert limits and the app-open check', () => {
     mockPlatform.OS = 'ios';
   });
 
-  it('sets at most 40 alerts on an iPhone (iOS drops anything past 64)', async () => {
+  it('fills an iPhone up to 60 alerts when nothing else is waiting (iOS keeps 64)', async () => {
     const requests: unknown[] = [];
     requireExpoNotifications.mockResolvedValue(fakeNotifications(requests));
     const doses = Array.from({ length: 70 }, (_, i) => dose(`d${i}`, 60 * (i + 1)));
 
     const identifiers = await scheduleGroupedDoseNotifications(doses);
 
-    expect(requests).toHaveLength(MAX_MEDICINE_ALERTS_IOS);
-    expect(identifiers.map((item) => item.eventId)).toEqual(doses.slice(0, 40).map((item) => item.eventId));
+    expect(requests).toHaveLength(60);
+    expect(identifiers.map((item) => item.eventId)).toEqual(doses.slice(0, 60).map((item) => item.eventId));
+  });
+
+  it('leaves room on an iPhone for the visit and vaccine reminders already waiting', async () => {
+    const requests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue(fakeNotifications(requests, 16));
+    const doses = Array.from({ length: 70 }, (_, i) => dose(`d${i}`, 60 * (i + 1)));
+
+    await scheduleGroupedDoseNotifications(doses);
+
+    expect(requests).toHaveLength(44);
+  });
+
+  it('never sets fewer than 30 medicine alerts on an iPhone', async () => {
+    const requests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue(fakeNotifications(requests, 50));
+    const doses = Array.from({ length: 70 }, (_, i) => dose(`d${i}`, 60 * (i + 1)));
+
+    await scheduleGroupedDoseNotifications(doses);
+
+    expect(requests).toHaveLength(MIN_MEDICINE_ALERTS_IOS);
   });
 
   it('keeps the Telugu voice: grouped iPhone alerts play reminder.caf', async () => {

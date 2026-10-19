@@ -49,17 +49,28 @@ const PENDING_CANCELLATIONS_KEY = 'drjiva.pendingNotificationCancellations';
 const NOTIFICATION_NUDGE_SHOWN_KEY = 'drjiva.notificationSettingsNudgeShown';
 const DEFAULT_REMINDER_CHANNEL = 'medicine-reminders';
 
-// iPhones keep only 64 waiting notifications per app and silently drop the
-// rest, so set the next 40 medicine alerts (about two weeks) and leave room
-// for visit and vaccine reminders. The app-open check
-// (ensureDeviceDoseAlarms) sets the following ones as these ring.
-export const MAX_MEDICINE_ALERTS_IOS = 40;
+// iPhones keep only the 64 soonest waiting notifications per app and
+// silently drop the rest. Medicine alerts take the free room (about three
+// weeks for most patients), leaving space for the visit and vaccine
+// reminders already waiting plus a small margin, and never fewer than 30.
+// The app-open check (ensureDeviceDoseAlarms) sets the next ones as these
+// ring.
+const IOS_WAITING_LIMIT = 64;
+const IOS_MARGIN = 4;
+export const MIN_MEDICINE_ALERTS_IOS = 30;
 export const MAX_MEDICINE_ALERTS_ANDROID = 150;
 
-function maxMedicineAlerts(): number {
-  return Platform.OS === 'ios'
-    ? MAX_MEDICINE_ALERTS_IOS
-    : MAX_MEDICINE_ALERTS_ANDROID;
+// Call after this sync's own medicine alerts were cancelled: what is still
+// waiting belongs to other reminders.
+async function maxMedicineAlerts(
+  Notifications: Awaited<ReturnType<typeof requireExpoNotifications>>,
+): Promise<number> {
+  if (Platform.OS !== 'ios') return MAX_MEDICINE_ALERTS_ANDROID;
+  const waiting = await Notifications.getAllScheduledNotificationsAsync();
+  return Math.max(
+    MIN_MEDICINE_ALERTS_IOS,
+    IOS_WAITING_LIMIT - IOS_MARGIN - waiting.length,
+  );
 }
 
 function getMedicineReminderSoundConfig(): {
@@ -318,6 +329,7 @@ export async function scheduleGroupedDoseNotifications(
   const futureReminders = reminders.filter(
     (reminder) => new Date(reminder.scheduledFor).getTime() > Date.now(),
   );
+  const maxAlerts = await maxMedicineAlerts(Notifications);
 
   return scheduleGroupedDoseNotificationsWithAdapter(
     {
@@ -367,7 +379,7 @@ export async function scheduleGroupedDoseNotifications(
       },
     },
     futureReminders,
-    maxMedicineAlerts(),
+    maxAlerts,
   );
 }
 
