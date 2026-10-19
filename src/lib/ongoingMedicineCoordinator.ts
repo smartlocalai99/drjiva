@@ -1,7 +1,10 @@
 import { addCalendarDays, formatDateOnly } from './medicineCalendar';
 import { getNotificationSettings } from './medicineCourses';
 import { requestMedicineNotificationPermission } from './medicineNotifications';
-import { syncPatientDoseNotifications } from './medicineNotificationSync';
+import {
+  ensureDeviceDoseAlarms,
+  syncPatientDoseNotifications,
+} from './medicineNotificationSync';
 import { buildRollingDoseEvents } from './ongoingMedicineSchedule';
 import { ensureSecureReportSession } from './reportAuth';
 import type { DoseSlot } from './medicineSchedule';
@@ -24,7 +27,10 @@ type OngoingCourseRow = {
   tablets_per_dose: number;
 };
 
-export async function replenishOngoingMedicineCourses(horizonDays = 14): Promise<void> {
+export async function replenishOngoingMedicineCourses(
+  horizonDays = 14,
+  options: { checkDeviceAlarms?: boolean } = {},
+): Promise<void> {
   const ownerUserId = await ensureSecureReportSession();
   const { data, error } = await supabase
     .from('patient_medicine_courses')
@@ -108,5 +114,11 @@ export async function replenishOngoingMedicineCourses(horizonDays = 14): Promise
       '@react-native-async-storage/async-storage'
     );
     await AsyncStorage.setItem(migrationStorageKey, 'true');
+  }
+
+  // Medicines added or billed from another phone have no alarm here yet;
+  // check this phone's alarms (skipped when everything was just rebuilt).
+  if (notificationsAllowed && options.checkDeviceAlarms && !firstPatient) {
+    await ensureDeviceDoseAlarms();
   }
 }

@@ -241,22 +241,15 @@ export async function createMedicineCourse(input: {
 export async function saveNotificationIds(
   identifiers: readonly { eventId: string; notificationId: string }[],
 ): Promise<void> {
+  if (identifiers.length === 0) return;
   await ensureSecureReportSession();
-  // One update per phone alert (all the doses it covers), not per dose.
-  const byNotification = new Map<string, string[]>();
-  for (const item of identifiers) {
-    byNotification.set(item.notificationId, [
-      ...(byNotification.get(item.notificationId) ?? []),
-      item.eventId,
-    ]);
-  }
-  for (const [notificationId, eventIds] of byNotification) {
-    const { error } = await supabase
-      .from('patient_medicine_dose_events')
-      .update({ notification_id: notificationId })
-      .in('id', eventIds);
-    if (error) throw error;
-  }
+  // One database call for every alert on the phone (it was one per alert,
+  // which stopped halfway when the app went to the background).
+  const { error } = await supabase.rpc('save_dose_notification_ids', {
+    p_event_ids: identifiers.map((item) => item.eventId),
+    p_notification_ids: identifiers.map((item) => item.notificationId),
+  });
+  if (error) throw error;
 }
 
 export async function deleteMedicineCourse(courseId: string): Promise<void> {

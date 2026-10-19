@@ -221,6 +221,10 @@ begin
 
   -- 10. Follow-up reminders
   perform public.care_register_push_token('9999800002', 'ExponentPushToken[TestToken1234567]', 'android', 'te');
+  -- The phone last opened the app before the nurse saved this visit, so it
+  -- has no alarms of its own for it: the server pushes.
+  update public.care_push_tokens set updated_at = now() - interval '1 day'
+  where expo_push_token = 'ExponentPushToken[TestToken1234567]';
   v_count := public.care_send_followup_reminders('eve');
   insert into t_results values (default, '6 PM reminder queued for tomorrow''s visit', v_count = 1, v_count::text);
   v_count := public.care_send_followup_reminders('eve');

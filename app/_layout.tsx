@@ -68,8 +68,13 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    // At most every 30 minutes, also check that this phone has an alarm for
+    // each upcoming dose (one database read) and set any that are missing.
+    let lastAlarmCheck = 0;
     const replenish = () => {
-      void replenishOngoingMedicineCourses().catch((error) =>
+      const checkDeviceAlarms = Date.now() - lastAlarmCheck > 30 * 60_000;
+      if (checkDeviceAlarms) lastAlarmCheck = Date.now();
+      void replenishOngoingMedicineCourses(14, { checkDeviceAlarms }).catch((error) =>
         console.warn('Unable to extend ongoing medicine reminders', error),
       );
     };

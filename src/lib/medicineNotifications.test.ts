@@ -27,10 +27,13 @@ vi.mock('./expoNotifications', () => ({
 import {
   findScheduledDoseNotificationIds,
   groupDoseNotificationRequests,
+  MAX_MEDICINE_ALERTS_IOS,
   scheduleDoseNotifications,
   scheduleDoseNotificationsWithAdapter,
   scheduleGroupedDoseNotifications,
   scheduleGroupedDoseNotificationsWithAdapter,
+  scheduledDoseEventIds,
+  upcomingAlertEventIds,
 } from './medicineNotifications';
 
 describe('findScheduledDoseNotificationIds', () => {
@@ -322,3 +325,82 @@ describe('scheduleDoseNotificationsWithAdapter', () => {
     ]);
   });
 });
+
+describe('phone alert limits and the app-open check', () => {
+  const at = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+  const dose = (eventId: string, minutes: number) => ({
+    eventId,
+    medicineName: `Medicine ${eventId}`,
+    scheduledFor: at(minutes),
+    slot: 'Morning',
+    slotKey: 'morning' as const,
+    tablets: 1,
+  });
+  const fakeNotifications = (requests: unknown[]) => ({
+    AndroidAudioContentType: { SPEECH: 1 },
+    AndroidAudioUsage: { ALARM: 4 },
+    AndroidImportance: { MAX: 5 },
+    SchedulableTriggerInputTypes: { DATE: 'date' },
+    cancelScheduledNotificationAsync: async () => undefined,
+    scheduleNotificationAsync: async (request: unknown) => {
+      requests.push(request);
+      return `alert-${requests.length}`;
+    },
+    setNotificationChannelAsync: async () => undefined,
+  });
+
+  beforeEach(() => {
+    mockPlatform.OS = 'ios';
+  });
+
+  it('sets at most 40 alerts on an iPhone (iOS drops anything past 64)', async () => {
+    const requests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue(fakeNotifications(requests));
+    const doses = Array.from({ length: 70 }, (_, i) => dose(`d${i}`, 60 * (i + 1)));
+
+    const identifiers = await scheduleGroupedDoseNotifications(doses);
+
+    expect(requests).toHaveLength(MAX_MEDICINE_ALERTS_IOS);
+    expect(identifiers.map((item) => item.eventId)).toEqual(doses.slice(0, 40).map((item) => item.eventId));
+  });
+
+  it('keeps the Telugu voice: grouped iPhone alerts play reminder.caf', async () => {
+    const requests: Array<{ content: { sound: string } }> = [];
+    requireExpoNotifications.mockResolvedValue(fakeNotifications(requests));
+
+    await scheduleGroupedDoseNotifications([dose('a', 30), dose('b', 30)]);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ content: { sound: 'reminder.caf' } });
+  });
+
+  it('keeps the Telugu voice: grouped Android alerts use the rec sound channel', async () => {
+    mockPlatform.OS = 'android';
+    const requests: unknown[] = [];
+    requireExpoNotifications.mockResolvedValue(fakeNotifications(requests));
+
+    await scheduleGroupedDoseNotifications([dose('a', 30), dose('b', 30)]);
+
+    expect(requests[0]).toMatchObject({
+      content: { sound: 'rec' },
+      trigger: { channelId: 'medicine-reminders-loud-v3' },
+    });
+  });
+
+  it('lists the doses of the next alert times only, skipping past ones', () => {
+    const doses = [dose('past', -10), dose('first-a', 10), dose('first-b', 10), dose('second', 20), dose('third', 30)];
+
+    expect(upcomingAlertEventIds(doses, 2)).toEqual(['first-a', 'first-b', 'second']);
+  });
+
+  it('reads the doses behind every waiting alert, old single and new grouped', () => {
+    expect(
+      scheduledDoseEventIds([
+        { content: { data: { eventId: 'old-single' } }, identifier: '1' },
+        { content: { data: { eventId: 'g1', eventIds: ['g1', 'g2'] } }, identifier: '2' },
+        { content: { data: { type: 'care_followup' } }, identifier: 'visit' },
+      ]),
+    ).toEqual(new Set(['old-single', 'g1', 'g2']));
+  });
+});
+

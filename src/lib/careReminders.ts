@@ -11,16 +11,16 @@ import type { AppLanguage } from './i18n';
 import { toIndianE164 } from './phone';
 import { supabase } from './supabase';
 
-// Follow-up visit reminders: 6 PM the day before, 8 AM on the day.
+// Follow-up visit reminders: 8 PM the day before, 8 AM on the day.
 //
 // How it stays reliable:
-//  1. If this phone can get an Expo push token, it is saved in the
-//     database and a database job (pg_cron, 6 PM + 8 AM India time)
-//     pushes the reminder — this works even if the nurse saved the date
-//     after the patient last opened the app.
-//  2. If not (e.g. Android builds without Firebase), the two reminders
-//     are set on the phone whenever the app opens.
-// Never both, so there are no duplicates.
+//  1. The two reminders are always set on the phone whenever the app
+//     opens (works offline and without Apple / Google push keys).
+//  2. If this phone can get an Expo push token, it is saved in the
+//     database and a database job (pg_cron, 8 PM + 8 AM India time)
+//     pushes the reminder only to phones that have not opened the app
+//     since the nurse saved the date — the case the phone cannot know.
+// A phone gets one or the other, so there are no duplicates.
 //
 // Kept apart from medicine reminders: own Android channel, normal sound
 // (not the medicine voice), two fixed IDs, and no eventId in the data —
@@ -187,7 +187,9 @@ export async function syncCareReminders(
   }
   if (!granted) return;
 
-  const serverPush = await registerPushToken(notifications, phone, language);
+  // Lets the server remind phones that have not opened the app since the
+  // nurse set the date. Phones that have, set their own alarms below.
+  await registerPushToken(notifications, phone, language);
 
   // Clear only our own reminders, then set them again if needed.
   await Promise.allSettled([
@@ -234,7 +236,9 @@ export async function syncCareReminders(
     await schedule(id, reminder.at, reminder.title, reminder.body, { planId: reminder.planId, type: 'care_child_vaccine' });
   }
 
-  if (serverPush || !care.followup) return;
+  // Always on the phone itself: works offline and without Apple / Google
+  // push keys (iPhone push had none, so visit reminders never arrived).
+  if (!care.followup) return;
 
   const hospital = care.followup.hospital.name;
   const data = { followupId: care.followup.id, type: 'care_followup' };

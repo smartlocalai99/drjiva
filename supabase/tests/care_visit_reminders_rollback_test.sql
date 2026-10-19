@@ -17,8 +17,9 @@ begin
   insert into auth.users (id, instance_id, aud, role, is_anonymous, created_at, updated_at)
   values (v_uid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', true, now(), now());
   insert into public.patient_device_links (patient_id, owner_user_id) values (v_patient, v_uid);
-  insert into public.care_push_tokens (owner_user_id, patient_id, expo_push_token, platform, language)
-  values (v_uid, v_patient, 'ExponentPushToken[reminder-test]', 'ios', 'en');
+  -- The phone last opened the app yesterday, before the nurse set the date.
+  insert into public.care_push_tokens (owner_user_id, patient_id, expo_push_token, platform, language, updated_at)
+  values (v_uid, v_patient, 'ExponentPushToken[reminder-test]', 'ios', 'en', now() - interval '1 day');
 
   -- Visit tomorrow: the 8 PM reminder.
   insert into public.care_followups (patient_id, hospital_id, nurse_name, next_date)

@@ -6,9 +6,16 @@ import {
 import {
   cancelDoseNotifications,
   cancelScheduledDoseNotificationsForEvents,
+  listScheduledDoseEventIds,
   queueNotificationCancellations,
   scheduleGroupedDoseNotifications,
+  upcomingAlertEventIds,
 } from './medicineNotifications';
+
+// The next alert times (about a week of doses) this phone must already have
+// when the app opens. Fewer than the alerts a rebuild sets, so the check
+// passes for days after each rebuild.
+export const DEVICE_ALARM_CHECK_COUNT = 20;
 
 let notificationSyncQueue: Promise<void> = Promise.resolve();
 
@@ -47,17 +54,21 @@ async function performDoseNotificationSync(
   return { cleanupPending: false };
 }
 
+// One alarm job at a time, so an app resume, a medicine save and the
+// app-open check never rebuild from different snapshots at once.
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = notificationSyncQueue.then(task);
+  notificationSyncQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 function enqueueDoseNotificationSync(
   loadReminders: () => Promise<readonly FutureDoseReminder[]>,
 ): Promise<{ cleanupPending: boolean }> {
-  const sync = notificationSyncQueue.then(async () =>
-    performDoseNotificationSync(await loadReminders()),
-  );
-  notificationSyncQueue = sync.then(
-    () => undefined,
-    () => undefined,
-  );
-  return sync;
+  return enqueue(async () => performDoseNotificationSync(await loadReminders()));
 }
 
 export function syncDoseNotifications(
@@ -75,4 +86,21 @@ export function syncPatientDoseNotifications(
   // Fetch inside the queue so an overlapping app resume or medicine save
   // cannot replace newer alarms with a snapshot loaded before the last sync.
   return enqueueDoseNotificationSync(fetchDeviceDoseRemindersFromToday);
+}
+
+// A phone sets alarms only when something changes on that same phone, so
+// medicines added or billed from another phone (or the hospital) never rang
+// here, and iPhones drop alerts beyond their limit. On app open: one read of
+// this phone's upcoming doses, compared with the alarms waiting on the phone;
+// rebuild only if some are missing.
+export function ensureDeviceDoseAlarms(): Promise<'ok' | 'rebuilt'> {
+  return enqueue(async () => {
+    const reminders = await fetchDeviceDoseRemindersFromToday();
+    const expected = upcomingAlertEventIds(reminders, DEVICE_ALARM_CHECK_COUNT);
+    if (expected.length === 0) return 'ok';
+    const onPhone = await listScheduledDoseEventIds();
+    if (expected.every((eventId) => onPhone.has(eventId))) return 'ok';
+    await performDoseNotificationSync(reminders);
+    return 'rebuilt';
+  });
 }

@@ -6,8 +6,10 @@ vi.mock('./supabase', () => ({ supabase: { rpc: vi.fn() } }));
 vi.mock('./expoNotifications', () => ({ loadExpoNotifications: vi.fn() }));
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: { getItem: vi.fn(async () => null), setItem: vi.fn() } }));
 
-const { CARE_CHILD_REMINDER_IDS, CARE_CYCLE_REMINDER_IDS, CARE_REMINDER_IDS, CHILD_REMINDER_SLOTS, childReminders, cycleReminderDays, followupReminderTimes } =
+const { CARE_CHILD_REMINDER_IDS, CARE_CYCLE_REMINDER_IDS, CARE_REMINDER_IDS, CHILD_REMINDER_SLOTS, childReminders, cycleReminderDays, followupReminderTimes, syncCareReminders } =
   await import('./careReminders');
+const { loadExpoNotifications } = await import('./expoNotifications');
+const { supabase } = await import('./supabase');
 
 describe('follow-up reminder times', () => {
   it('fires at 8 PM the day before and 8 AM on the day (phone time)', () => {
@@ -115,3 +117,35 @@ describe('child vaccine reminders', () => {
     expect(CARE_CHILD_REMINDER_IDS.every((id) => id.startsWith('drjiva-care-child-'))).toBe(true);
   });
 });
+
+describe('visit reminders on the phone', () => {
+  it('sets the 8 PM and 8 AM alarms even when the phone registers for server push', async () => {
+    const scheduled: Array<{ identifier: string; trigger: { date: Date } }> = [];
+    vi.mocked(loadExpoNotifications).mockResolvedValue({
+      AndroidImportance: { HIGH: 4 },
+      SchedulableTriggerInputTypes: { DATE: 'date' },
+      cancelScheduledNotificationAsync: vi.fn(async () => undefined),
+      getExpoPushTokenAsync: vi.fn(async () => ({ data: 'ExponentPushToken[phone-1]' })),
+      getPermissionsAsync: vi.fn(async () => ({ granted: true })),
+      scheduleNotificationAsync: vi.fn(async (request: { identifier: string; trigger: { date: Date } }) => {
+        scheduled.push(request);
+        return request.identifier;
+      }),
+      setNotificationChannelAsync: vi.fn(async () => undefined),
+    } as never);
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null } as never);
+
+    const nextDate = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    await syncCareReminders(
+      '9999900001',
+      { followup: { hospital: { name: 'Dhruva Hospitals' }, id: 'f1', nextDate }, linked: true } as never,
+      'en',
+    );
+
+    expect(supabase.rpc).toHaveBeenCalledWith('care_register_push_token', expect.objectContaining({ p_token: 'ExponentPushToken[phone-1]' }));
+    expect(scheduled.map((request) => request.identifier).sort()).toEqual([CARE_REMINDER_IDS.day, CARE_REMINDER_IDS.eve].sort());
+    expect(scheduled.find((request) => request.identifier === CARE_REMINDER_IDS.eve)?.trigger.date.getHours()).toBe(20);
+    expect(scheduled.find((request) => request.identifier === CARE_REMINDER_IDS.day)?.trigger.date.getHours()).toBe(8);
+  });
+});
+

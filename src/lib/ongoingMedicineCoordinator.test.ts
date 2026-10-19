@@ -2,20 +2,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   from,
+  listScheduledDoseEventIds,
   migrationStorage,
   requestMedicineNotificationPermission,
+  rpc,
   scheduleGroupedDoseNotifications,
 } = vi.hoisted(() => ({
   from: vi.fn(),
+  listScheduledDoseEventIds: vi.fn(async () => new Set<string>()),
   migrationStorage: new Map<string, string>(),
   requestMedicineNotificationPermission: vi.fn(async () => true),
+  rpc: vi.fn(),
   scheduleGroupedDoseNotifications: vi.fn(),
 }));
 
 vi.mock('./reportAuth', () => ({
   ensureSecureReportSession: vi.fn(async () => 'owner-1'),
 }));
-vi.mock('./supabase', () => ({ supabase: { from } }));
+vi.mock('./supabase', () => ({ supabase: { from, rpc } }));
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: async (key: string) => migrationStorage.get(key) ?? null,
@@ -24,13 +28,18 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
     },
   },
 }));
-vi.mock('./medicineNotifications', () => ({
+vi.mock('./medicineNotifications', async (importOriginal) => ({
   cancelDoseNotifications: vi.fn(async () => undefined),
   cancelScheduledDoseNotificationsForEvents: vi.fn(async () => undefined),
+  listScheduledDoseEventIds,
   queueNotificationCancellations: vi.fn(async () => undefined),
   requestMedicineNotificationPermission,
   scheduleGroupedDoseNotifications,
+  upcomingAlertEventIds: (await importOriginal<typeof import('./medicineNotifications')>()).upcomingAlertEventIds,
 }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('expo-constants', () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock('./expoNotifications', () => ({ requireExpoNotifications: vi.fn() }));
 
 import { replenishOngoingMedicineCourses } from './ongoingMedicineCoordinator';
 
@@ -45,9 +54,16 @@ describe('grouped reminder cleanup migration', () => {
     migrationStorage.clear();
     savedNotificationIds.clear();
     requestMedicineNotificationPermission.mockResolvedValue(true);
+    listScheduledDoseEventIds.mockResolvedValue(new Set<string>());
     scheduleGroupedDoseNotifications.mockResolvedValue([
       { eventId: 'event-1', notificationId: 'grouped-reminder-1' },
     ]);
+    // Alert IDs are saved with one database call.
+    rpc.mockImplementation(async (name: string, args: { p_event_ids: string[]; p_notification_ids: string[] }) => {
+      if (name !== 'save_dose_notification_ids') throw new Error(`Unexpected rpc: ${name}`);
+      args.p_event_ids.forEach((eventId, index) => savedNotificationIds.set(eventId, args.p_notification_ids[index]!));
+      return { data: args.p_event_ids.length, error: null };
+    });
     from.mockImplementation((table: string) => {
       if (table === 'patient_medicine_courses') {
         const query = {
@@ -89,13 +105,6 @@ describe('grouped reminder cleanup migration', () => {
           }
           return query;
         },
-        update: ({ notification_id }: { notification_id: string }) => ({
-          in: async (column: string, eventIds: string[]) => {
-            if (column !== 'id') throw new Error(`Unexpected filter: ${column}`);
-            for (const eventId of eventIds) savedNotificationIds.set(eventId, notification_id);
-            return { error: null };
-          },
-        }),
       };
     });
   });
@@ -140,5 +149,35 @@ describe('grouped reminder cleanup migration', () => {
 
     expect(savedNotificationIds.get('event-1')).toBe('grouped-reminder-1');
     expect(migrationStorage.get(migrationKey)).toBe('true');
+  });
+
+  it('on app open, sets alarms for doses that have none on this phone', async () => {
+    migrationStorage.set(migrationKey, 'true');
+    listScheduledDoseEventIds.mockResolvedValue(new Set<string>());
+
+    await replenishOngoingMedicineCourses(14, { checkDeviceAlarms: true });
+
+    expect(scheduleGroupedDoseNotifications).toHaveBeenCalledOnce();
+    expect(savedNotificationIds.get('event-1')).toBe('grouped-reminder-1');
+  });
+
+  it('on app open, leaves alarms alone when the phone already has them', async () => {
+    migrationStorage.set(migrationKey, 'true');
+    listScheduledDoseEventIds.mockResolvedValue(new Set(['event-1']));
+
+    await replenishOngoingMedicineCourses(14, { checkDeviceAlarms: true });
+
+    expect(scheduleGroupedDoseNotifications).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('does not check the phone when notifications are off', async () => {
+    migrationStorage.set(migrationKey, 'true');
+    requestMedicineNotificationPermission.mockResolvedValue(false);
+
+    await replenishOngoingMedicineCourses(14, { checkDeviceAlarms: true });
+
+    expect(listScheduledDoseEventIds).not.toHaveBeenCalled();
+    expect(scheduleGroupedDoseNotifications).not.toHaveBeenCalled();
   });
 });

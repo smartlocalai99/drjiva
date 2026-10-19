@@ -49,6 +49,19 @@ const PENDING_CANCELLATIONS_KEY = 'drjiva.pendingNotificationCancellations';
 const NOTIFICATION_NUDGE_SHOWN_KEY = 'drjiva.notificationSettingsNudgeShown';
 const DEFAULT_REMINDER_CHANNEL = 'medicine-reminders';
 
+// iPhones keep only 64 waiting notifications per app and silently drop the
+// rest, so set the next 40 medicine alerts (about two weeks) and leave room
+// for visit and vaccine reminders. The app-open check
+// (ensureDeviceDoseAlarms) sets the following ones as these ring.
+export const MAX_MEDICINE_ALERTS_IOS = 40;
+export const MAX_MEDICINE_ALERTS_ANDROID = 150;
+
+function maxMedicineAlerts(): number {
+  return Platform.OS === 'ios'
+    ? MAX_MEDICINE_ALERTS_IOS
+    : MAX_MEDICINE_ALERTS_ANDROID;
+}
+
 function getMedicineReminderSoundConfig(): {
   channelId: string;
   sound: 'default' | string;
@@ -117,10 +130,12 @@ export async function scheduleDoseNotificationsWithAdapter(
 
 // One alert (one sound) per minute: every medicine due in the same minute
 // shares it, however many there are. It rings at the earliest of them.
-export function groupDoseNotificationRequests(
-  reminders: readonly DoseNotificationRequest[],
-): DoseNotificationGroup[] {
-  const groups = new Map<number, DoseNotificationGroup>();
+export function groupDoseNotificationRequests<
+  T extends { scheduledFor: string },
+>(
+  reminders: readonly T[],
+): Array<{ reminders: T[]; scheduledFor: string }> {
+  const groups = new Map<number, { reminders: T[]; scheduledFor: string }>();
   for (const reminder of reminders) {
     const timestamp = new Date(reminder.scheduledFor).getTime();
     if (!Number.isFinite(timestamp)) continue;
@@ -143,6 +158,18 @@ export function groupDoseNotificationRequests(
     .map(([, group]) => group);
 }
 
+// The dose events a phone alert rings for (old alerts: one, grouped: many).
+function doseEventIdsOf(data: ScheduledNotificationRequest['content']['data']): string[] {
+  return [
+    ...(typeof data?.eventId === 'string' ? [data.eventId] : []),
+    ...(Array.isArray(data?.eventIds)
+      ? data.eventIds.filter(
+          (eventId): eventId is string => typeof eventId === 'string',
+        )
+      : []),
+  ];
+}
+
 export function findScheduledDoseNotificationIds(
   requests: readonly ScheduledNotificationRequest[],
   eventIds: readonly string[],
@@ -151,16 +178,7 @@ export function findScheduledDoseNotificationIds(
   const identifiers = new Set<string>();
 
   for (const request of requests) {
-    const data = request.content.data;
-    const requestEventIds = [
-      ...(typeof data?.eventId === 'string' ? [data.eventId] : []),
-      ...(Array.isArray(data?.eventIds)
-        ? data.eventIds.filter(
-            (eventId): eventId is string => typeof eventId === 'string',
-          )
-        : []),
-    ];
-    if (requestEventIds.some((eventId) => targetEventIds.has(eventId))) {
+    if (doseEventIdsOf(request.content.data).some((eventId) => targetEventIds.has(eventId))) {
       identifiers.add(request.identifier);
     }
   }
@@ -168,14 +186,41 @@ export function findScheduledDoseNotificationIds(
   return [...identifiers];
 }
 
+// Every dose event that has an alert waiting on this phone.
+export function scheduledDoseEventIds(
+  requests: readonly ScheduledNotificationRequest[],
+): Set<string> {
+  return new Set(requests.flatMap((request) => doseEventIdsOf(request.content.data)));
+}
+
+// The dose events of the next `count` alert times (doses due in the same
+// minute share one alert). Past doses are left out.
+export function upcomingAlertEventIds(
+  reminders: readonly { eventId: string; scheduledFor: string }[],
+  count: number,
+  now = Date.now(),
+): string[] {
+  return groupDoseNotificationRequests(
+    reminders.filter((reminder) => new Date(reminder.scheduledFor).getTime() > now),
+  )
+    .slice(0, count)
+    .flatMap((group) => group.reminders.map((reminder) => reminder.eventId));
+}
+
+export async function listScheduledDoseEventIds(): Promise<Set<string>> {
+  const Notifications = await requireExpoNotifications();
+  return scheduledDoseEventIds(await Notifications.getAllScheduledNotificationsAsync());
+}
+
 export async function scheduleGroupedDoseNotificationsWithAdapter(
   adapter: GroupedNotificationAdapter,
   reminders: readonly DoseNotificationRequest[],
+  maxAlerts = Number.POSITIVE_INFINITY,
 ): Promise<Array<{ eventId: string; notificationId: string }>> {
   const scheduledIds: string[] = [];
   const identifiers: Array<{ eventId: string; notificationId: string }> = [];
   try {
-    for (const group of groupDoseNotificationRequests(reminders)) {
+    for (const group of groupDoseNotificationRequests(reminders).slice(0, maxAlerts)) {
       const notificationId = await adapter.schedule(group);
       scheduledIds.push(notificationId);
       identifiers.push(
@@ -322,6 +367,7 @@ export async function scheduleGroupedDoseNotifications(
       },
     },
     futureReminders,
+    maxMedicineAlerts(),
   );
 }
 
