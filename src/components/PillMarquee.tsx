@@ -13,7 +13,7 @@ import type { MarqueeTileSize } from './PlaceholderTile';
 
 export const CAROUSEL_IMAGES: CarouselImage[] = [
   require('../../assets/doctors/sudarshan.jpeg'),
-  require('../../assets/doctors/mounika.jpeg'),
+  require('../../assets/doctors/mounikaupdted.jpeg'),
   require('../../assets/carousel/prime.png'),
   require('../../assets/carousel/rekha.png'),
   require('../../assets/carousel/prime2.png'),

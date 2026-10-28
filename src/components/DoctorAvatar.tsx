@@ -11,7 +11,7 @@ import {
 
 const DOCTOR_PHOTOS: Record<DoctorIdentity, ReturnType<typeof require>> = {
   'chaitanya-reddy': require('../../assets/shankargastroenterologists.png'),
-  mounika: require('../../assets/doctors/mounika.jpeg'),
+  mounika: require('../../assets/doctors/mounikaupdted.jpeg'),
   'ritish-reddy': require('../../assets/doctors/Rithesh.jpg'),
   sudarshan: require('../../assets/doctors/sudarshan.jpeg'),
 };

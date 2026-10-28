@@ -10,7 +10,7 @@ import { careFonts } from './careStyles';
 // slightly rounded corners (next-visit card).
 const PHOTOS: Record<DoctorIdentity, number> = {
   'chaitanya-reddy': require('../../../assets/shankargastroenterologists.png'),
-  mounika: require('../../../assets/doctors/mounika.jpeg'),
+  mounika: require('../../../assets/doctors/mounikaupdted.jpeg'),
   'ritish-reddy': require('../../../assets/doctors/Rithesh.jpg'),
   sudarshan: require('../../../assets/doctors/sudarshan.jpeg'),
 };
